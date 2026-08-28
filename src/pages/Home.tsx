@@ -11,12 +11,14 @@ const CUSTOMER_TILES: Tile[] = [
   { t: 'Your Jobby Mates', d: 'Re-request providers you\'ve saved, without searching again.', to: '/mates' },
   { t: 'Your requests & jobs', d: 'Track your requests, compare quotes, accept, and follow the job to completion.', to: '/jobs' },
   { t: 'Mate Points', d: 'Your points balance and history — redeemable on future bookings.', to: '/wallet' },
+  { t: 'Jobby Mate referrals', d: 'Invite providers and friends onto Jobby-Connect and earn Mate Points for successful referrals.', to: '/jobby-mate' },
 ]
 
 const PROVIDER_TILES: Tile[] = [
   { t: 'Requests to me', d: 'See the quote requests customers have sent you and reply.', to: '/requests' },
   { t: 'Your quotes', d: 'Track the quotes you\'ve sent and which were accepted.', to: '/my-quotes' },
   { t: 'Your work', d: 'Jobs you\'ve won — start the work and see it through.', to: '/my-work' },
+  { t: 'Jobby Mate referrals', d: 'Invite your existing customers on board — optionally gift them Mate Points as a welcome.', to: '/jobby-mate' },
 ]
 
 function TileGrid({ tiles }: { tiles: Tile[] }) {

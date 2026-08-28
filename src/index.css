@@ -1452,3 +1452,78 @@ select:focus {
 .redeem-box { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .redeem-label { font-size: 12px; color: var(--muted); }
 .redeem-input { width: 90px; padding: 4px 8px; }
+
+
+/* =================================================================== */
+/* Jobby Mate Referral Program (Phase G) — APPEND to end of src/index.css */
+/* =================================================================== */
+
+.jm-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 14px;
+  background: #fff;
+}
+.jm-card h3 { margin: 0 0 4px; color: var(--navy); }
+
+.jm-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.jm-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.jm-form .input { flex: 1 1 180px; }
+
+.jm-textarea { width: 100%; min-height: 84px; resize: vertical; margin-top: 8px; }
+.jm-check { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--ink); }
+.jm-filter { max-width: 260px; }
+
+.jm-offers { border-color: var(--amber); background: #fffdf6; }
+.jm-offer-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.jm-offer-actions { display: flex; gap: 8px; }
+
+.jm-conn {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+}
+.jm-conn:last-child { border-bottom: none; }
+.jm-conn-main { display: flex; flex-direction: column; gap: 2px; }
+.jm-conn-side { display: flex; align-items: center; gap: 10px; }
+
+.jm-badge {
+  font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: #eef2f7; color: var(--navy2);
+}
+.jm-paid { background: #e6f6ee; color: var(--green); }
+.jm-offered { background: #fff3d6; color: var(--amberd); }
+.jm-pending_payment { background: #fff3d6; color: var(--amberd); }
+.jm-payment_overdue { background: #fbe4e2; color: #c0392b; }
+.jm-declined { background: #eef2f7; color: #64748b; }
+.jm-none { background: #eef2f7; color: var(--navy2); }
+
+.jm-settings { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; padding: 14px; }
+.jm-settings label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--ink); }
+
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th, .tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.tbl th { color: var(--navy); font-weight: 600; }
+
+/* .input as a class (existing CSS styles the bare <input> element only, so
+   the class is needed for <textarea> and to be explicit) */
+.input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  box-sizing: border-box;
+}
+.input:focus { outline: none; border-color: var(--teal); }
+textarea.input { font-family: inherit; }
+
+/* primary dark (navy) button — matches the palette of the existing buttons */
+.btn-dark { background: var(--navy); color: #fff; }
+.btn-dark:hover { background: var(--navy2); }
+.btn-dark:disabled { opacity: .5; cursor: not-allowed; }

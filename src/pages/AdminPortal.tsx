@@ -22,6 +22,7 @@ export default function AdminPortal() {
           <NavLink to="/admin/master" className={({ isActive }) => `admin-navlink${isActive ? ' on' : ''}`}>Master data</NavLink>
           <NavLink to="/admin/approvals" className={({ isActive }) => `admin-navlink${isActive ? ' on' : ''}`}>Approvals</NavLink>
           <NavLink to="/admin/finance" className={({ isActive }) => `admin-navlink${isActive ? ' on' : ''}`}>Finance</NavLink>
+          <NavLink to="/admin/referrals" className={({ isActive }) => `admin-navlink${isActive ? ' on' : ''}`}>Referrals</NavLink>
           {admin?.superAdmin && (
             <NavLink to="/admin/admins" className={({ isActive }) => `admin-navlink${isActive ? ' on' : ''}`}>Admins</NavLink>
           )}

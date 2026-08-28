@@ -490,3 +490,102 @@ export interface LedgerLine {
   customerId: string | null
   providerId: string | null
 }
+
+
+// ===================================================================
+// ---- Jobby Mate Referral Program (Phase G) ----
+// APPEND this block to the END of src/types.ts (do not remove anything).
+// ===================================================================
+
+export type ReferrerType = 'CUSTOMER' | 'PROVIDER'
+
+export type ReferralPointsStatus =
+  | 'NONE'
+  | 'OFFERED'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'DECLINED'
+  | 'PAYMENT_OVERDUE'
+
+export interface MateConnection {
+  referralRecordId: string
+  direction: 'REFERRED_BY_ME' | 'REFERRED_ME'
+  otherPartyId: string
+  otherPartyType: ReferrerType
+  otherPartyName: string | null
+  industry: string | null
+  suburb: string | null
+  pointsAmount: number
+  pointsStatus: ReferralPointsStatus
+  createdAt: string
+}
+
+export interface SendInviteRequest {
+  mobiles: string[]
+  inviteeType: ReferrerType
+  nameHint?: string | null
+  industryHint?: string | null
+  pointsOffered?: number | null
+}
+
+export interface InviteSkipped {
+  mobile: string
+  reason: string
+}
+export interface InviteResult {
+  sent: string[]
+  skipped: InviteSkipped[]
+}
+
+export interface ReferralActionResult {
+  referralRecordId: string
+  pointsStatus: ReferralPointsStatus
+  message: string
+}
+
+export function referralStatusLabel(s: ReferralPointsStatus): string {
+  switch (s) {
+    case 'NONE': return 'Connected'
+    case 'OFFERED': return 'Offer pending'
+    case 'PENDING_PAYMENT': return 'Payment pending'
+    case 'PAID': return 'Points granted'
+    case 'DECLINED': return 'Declined'
+    case 'PAYMENT_OVERDUE': return 'Points overdue'
+    default: return s
+  }
+}
+
+// ---- Admin: referral config & settings (Phase G-1) ----
+export interface ReferralConfig {
+  id: string
+  suburb: string | null
+  industry: string | null
+  pointsPerReferral: number
+  effectiveFrom: string
+  effectiveTo: string | null
+  default: boolean
+}
+
+export interface ReferralSettings {
+  id: number
+  centsPerPoint: number
+  flowBMinPoints: number | null
+  flowBMaxPoints: number | null
+  flowBBatchLimit: number
+  linkExpiryDays: number
+  flowAResponseDays: number
+  paymentGraceDays: number
+  updatedAt: string
+}
+
+export interface ReferralQueueRow {
+  referralRecordId: string
+  kind: 'PAYMENT_OVERDUE' | 'COMPLAINT'
+  referrerId: string | null
+  referrerType: string | null
+  refereeId: string | null
+  refereeType: string | null
+  pointsAmount: number
+  detail: string | null
+  createdAt: string | null
+}

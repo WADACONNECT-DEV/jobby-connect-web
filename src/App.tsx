@@ -14,6 +14,7 @@ import ProviderRequests from './pages/ProviderRequests'
 import ProviderProfile from './pages/ProviderProfile'
 import ProviderView from './pages/ProviderView'
 import Mates from './pages/Mates'
+import JobbyMate from './pages/JobbyMate'
 import AdminLogin from './pages/AdminLogin'
 import AdminPortal from './pages/AdminPortal'
 import Admin from './pages/Admin'
@@ -22,6 +23,7 @@ import AdminUsers from './pages/AdminUsers'
 import AdminChangePassword from './pages/AdminChangePassword'
 import AdminApprovals from './pages/AdminApprovals'
 import AdminFinance from './pages/AdminFinance'
+import AdminReferrals from './pages/AdminReferrals'
 import CustomerProfile from './pages/CustomerProfile'
 import WalletPage from './pages/Wallet'
 
@@ -70,6 +72,7 @@ export default function App() {
         <Route path="password" element={<AdminChangePassword />} />
         <Route path="approvals" element={<AdminApprovals />} />
         <Route path="finance" element={<AdminFinance />} />
+        <Route path="referrals" element={<AdminReferrals />} />
       </Route>
 
       {/* ---- Customer / Provider app ---- */}
@@ -87,6 +90,7 @@ export default function App() {
         <Route path="/provider" element={<RequireAuth><ProviderProfile /></RequireAuth>} />
         <Route path="/providers/:userId" element={<RequireAuth><ProviderView /></RequireAuth>} />
         <Route path="/mates" element={<RequireAuth><Mates /></RequireAuth>} />
+        <Route path="/jobby-mate" element={<RequireAuth><JobbyMate /></RequireAuth>} />
         <Route path="/customer-profile" element={<RequireAuth><CustomerProfile /></RequireAuth>} />
         <Route path="/wallet" element={<RequireAuth><WalletPage /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
