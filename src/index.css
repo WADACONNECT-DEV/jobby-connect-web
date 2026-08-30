@@ -1527,3 +1527,817 @@ textarea.input { font-family: inherit; }
 .btn-dark { background: var(--navy); color: #fff; }
 .btn-dark:hover { background: var(--navy2); }
 .btn-dark:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---- Shared list controls (filter / sort / search) ----
+   One bar, used by every dashboard box on both the customer and provider
+   tabs so the controls are identical everywhere (UAT §3.1, §3.2, §5.1, §5.2). */
+.lv-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.lv-search {
+  width: auto;
+  flex: 1 1 200px;
+  min-width: 160px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+.lv-search:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(43, 135, 158, 0.12);
+}
+
+.lv-select {
+  width: auto;
+  flex: 0 1 auto;
+  max-width: 190px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.lv-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lv-dir {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--navy2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lv-dir:hover {
+  border-color: var(--teal);
+}
+.lv-dir:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 1px;
+}
+
+.lv-count {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--grey);
+  white-space: nowrap;
+}
+
+.lv-clear {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--mist);
+  color: var(--navy2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+.lv-clear:hover {
+  border-color: var(--teal);
+}
+
+@media (max-width: 640px) {
+  .lv-select { max-width: none; flex: 1 1 140px; }
+  .lv-count { margin-left: 0; width: 100%; }
+}
+
+/* ---- Provider pipeline tabs (Requests to me: Received / Replied / Wins / Lost / Expired) ---- */
+.pipe-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.pipe-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--navy2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pipe-tab:hover { border-color: var(--teal); }
+.pipe-tab.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.pipe-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.pipe-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--mist);
+  color: var(--navy2);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.pipe-tab.active .pipe-count {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.pipe-quote {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--mist);
+  font-size: 13px;
+  color: var(--grey);
+}
+.pipe-quote-amt { font-weight: 700; color: var(--navy2); }
+
+@media (max-width: 640px) {
+  .pipe-tab { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ---- Percentage-complete indicator (Spec 2.6) ---- */
+.prog-wrap {
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--mist);
+}
+.prog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 7px;
+}
+.prog-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.prog-pct {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.prog-bar {
+  height: 9px;
+  border-radius: 999px;
+  background: #e3ebf3;
+  overflow: hidden;
+}
+.prog-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--teal);
+  transition: width 240ms ease;
+}
+.prog-fill.full { background: var(--green); }
+.prog-caption {
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--grey);
+}
+
+.prog-list {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.prog-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.prog-row:last-child { border-bottom: none; }
+.prog-row-pct {
+  min-width: 42px;
+  font-weight: 700;
+  color: var(--navy2);
+}
+.prog-row-note { flex: 1; color: var(--ink); }
+.prog-row-date { color: var(--grey); font-size: 12.5px; white-space: nowrap; }
+
+.prog-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+@media (max-width: 640px) {
+  .prog-row { flex-wrap: wrap; }
+  .prog-row-date { width: 100%; }
+}
+
+/* ---- Collapsed summary row (Your quotes, UAT 5.2) ---- */
+.sum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sum-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sum-title {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 15px;
+}
+.sum-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.sum-amt {
+  font-weight: 700;
+  color: var(--navy2);
+  white-space: nowrap;
+}
+.sum-flag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---- Services summary on the My Provider tab (UAT 5.5) ---- */
+.svc-summary {
+  margin: 4px 0 16px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--mist);
+}
+.svc-summary-head {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.svc-line {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--line);
+}
+.svc-line:last-of-type { border-bottom: none; }
+.svc-ind {
+  min-width: 130px;
+  font-weight: 700;
+  color: var(--navy2);
+}
+.svc-subs { flex: 1; color: var(--ink); }
+.svc-summary-foot {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--grey);
+}
+
+@media (max-width: 640px) {
+  .svc-line { flex-direction: column; gap: 2px; }
+  .svc-ind { min-width: 0; }
+  .sum-right { margin-left: 0; width: 100%; justify-content: space-between; }
+}
+
+/* ---- Job photos (Spec 2.2 / 2.6 / 7.5) ---- */
+.img-block { margin-top: 12px; }
+.img-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 7px;
+}
+.img-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.img-loading { font-size: 13px; color: var(--grey); }
+
+.img-tile { position: relative; }
+.img-thumb {
+  display: block;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--mist);
+  cursor: pointer;
+}
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-placeholder { cursor: default; }
+
+.img-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--navy2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.img-remove:hover { border-color: var(--red, #c0392b); color: var(--red, #c0392b); }
+
+.img-add {
+  width: 84px;
+  height: 84px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--grey);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.img-add:hover { border-color: var(--teal); color: var(--teal); }
+.img-add:disabled { opacity: 0.6; cursor: default; }
+
+.img-note {
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--grey);
+}
+.img-note.warn { color: var(--amber-ink, #8a6100); font-weight: 600; }
+
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(12, 26, 38, 0.82);
+  cursor: zoom-out;
+}
+.img-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+}
+.img-lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---- Notification bell + panel (Spec 2.3) ---- */
+.nb-wrap { position: relative; margin-right: 10px; }
+.nb-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.nb-btn:hover { border-color: rgba(255, 255, 255, 0.5); }
+.nb-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+}
+
+.nb-panel {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 60;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(12, 26, 38, 0.18);
+  overflow: hidden;
+}
+.nb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.nb-link {
+  border: none;
+  background: none;
+  color: var(--teal);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nb-empty { padding: 16px 12px; font-size: 13px; color: var(--grey); }
+
+.nb-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.nb-item:hover { background: var(--mist); }
+.nb-item.unread { border-left-color: var(--amber); background: rgba(255, 193, 7, 0.06); }
+.nb-item-title { display: block; font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.nb-item-body {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.nb-item-date { display: block; margin-top: 4px; font-size: 11.5px; color: var(--grey); }
+
+.nb-all {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background: var(--mist);
+  color: var(--navy2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---- Notifications page ---- */
+.notif-list { display: flex; flex-direction: column; gap: 8px; }
+.notif-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  border-radius: 9px;
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+}
+.notif-row:hover { border-color: var(--teal); }
+.notif-row.unread { border-left-color: var(--amber); background: #fff; }
+.notif-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.notif-title { font-weight: 700; color: var(--navy); font-size: 14.5px; }
+.notif-body { font-size: 13px; color: var(--ink); }
+.notif-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; white-space: nowrap; }
+.notif-date { font-size: 12px; color: var(--grey); }
+
+/* ---- Admin Communications ---- */
+.ob-when { white-space: nowrap; font-size: 12.5px; }
+.ob-addr { font-size: 11.5px; color: var(--grey); }
+.ob-body { max-width: 380px; font-size: 12.5px; }
+.ob-err { font-size: 11.5px; color: #b3261e; }
+.ob-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.ob-sent { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
+.ob-failed { background: rgba(179, 38, 30, 0.12); color: #b3261e; }
+.ob-skipped { background: var(--mist); color: var(--grey); }
+
+@media (max-width: 640px) {
+  .notif-row { flex-direction: column; }
+  .notif-side { align-items: flex-start; flex-direction: row; gap: 10px; }
+}
+
+/* ---- Checkout method / test-outcome bar (Series 2 4.1) ---- */
+.pay-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--mist);
+}
+.pay-label {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ---- Rate effective window (Series 2 4.3) ---- */
+.rate-window { white-space: nowrap; font-size: 12.5px; }
+.rate-note {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--grey);
+}
+.qb-rate {
+  font-size: 12.5px;
+  color: var(--grey);
+}
+
+/* ---- Role tabs: customer vs provider (UAT Round 1 4.1-4.3) ----
+   The two roles get visually distinct backgrounds so it's obvious at a glance
+   which one you're in, while staying inside the Jobby-Connect palette. Open
+   item 7.5 asks the brand owner for exact values - when they arrive, change
+   these two variables and nothing else. */
+:root {
+  --pane-customer: #f5f8fc;   /* the light background as currently built */
+  --pane-provider: #eef5f7;   /* a cooler tint drawn from --teal */
+}
+
+.role-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0;
+}
+.role-tab {
+  padding: 11px 20px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--paper);
+  color: var(--grey);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.role-tab:hover { color: var(--navy2); }
+.role-tab.on { color: var(--navy); }
+.role-tab.customer.on { background: var(--pane-customer); }
+.role-tab.provider.on { background: var(--pane-provider); border-top: 2px solid var(--teal); }
+.role-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+.role-pane {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 0 10px 10px 10px;
+}
+.role-pane.customer { background: var(--pane-customer); }
+.role-pane.provider { background: var(--pane-provider); }
+
+/* No tabs for a single-role account - don't box the content in for no reason. */
+.role-pane:first-child {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--teal);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.whoami-link { cursor: pointer; }
+.whoami-link:hover { text-decoration: underline; }
+
+/* ---- Account settings ---- */
+.acct-card {
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.acct-row {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.acct-row:last-of-type { border-bottom: none; }
+.acct-label {
+  min-width: 90px;
+  font-weight: 700;
+  color: var(--grey);
+}
+.acct-value { color: var(--ink); }
+.acct-actions { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+.acct-head {
+  margin: 22px 0 10px;
+  font-size: 15px;
+  color: var(--navy);
+}
+
+@media (max-width: 640px) {
+  .role-tab { flex: 1; padding: 11px 10px; text-align: center; }
+  .role-pane { padding: 14px 12px; }
+  .acct-row { flex-direction: column; gap: 2px; }
+}
+
+/* ---- Provider public mini-site (UAT Round 1 5.4) ----
+   Three themes, all drawn from the Jobby-Connect palette so a provider's page
+   still reads as part of the product. Adding a fourth is one block here plus a
+   constant in SiteTheme. */
+.site {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper);
+  --site-ink: var(--navy);
+  --site-accent: var(--amber);
+  --site-band: var(--navy);
+  --site-band-ink: #fff;
+  --site-wash: var(--mist);
+}
+.site-classic { --site-band: var(--navy); --site-accent: var(--amber); --site-wash: #f5f8fc; }
+.site-coastal { --site-band: #1f6b7d; --site-accent: var(--teal); --site-wash: #eef5f7; }
+.site-slate   { --site-band: #3f4a56; --site-accent: #7b8794; --site-wash: #f4f5f7; }
+
+.site-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 24px;
+  background: var(--site-band);
+  color: var(--site-band-ink);
+  border-bottom: 3px solid var(--site-accent);
+}
+.site-hero h2 { color: #fff; margin: 0; }
+.site-tagline { margin-top: 4px; font-size: 14px; opacity: 0.85; }
+.site-hero .prov-rating-num, .site-hero .prov-new { color: #fff; }
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0 12px;
+  background: var(--site-wash);
+  border-bottom: 1px solid var(--line);
+}
+.site-navlink {
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--grey);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.site-navlink:hover { color: var(--site-ink); }
+.site-navlink.on { color: var(--site-ink); border-bottom-color: var(--site-accent); }
+.site-navlink:focus-visible { outline: 2px solid var(--site-accent); outline-offset: -3px; }
+
+.site-body { padding: 22px 24px; }
+.site-lead { font-size: 15.5px; color: var(--ink); margin-bottom: 14px; }
+.site-para { margin-bottom: 11px; color: var(--ink); }
+.site-muted { color: var(--grey); font-size: 14px; }
+.site-h3 {
+  margin: 20px 0 10px;
+  font-size: 15px;
+  color: var(--site-ink);
+}
+.site-h3:first-child { margin-top: 0; }
+
+.site-service {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.site-service:last-child { border-bottom: none; }
+.site-service-name {
+  font-weight: 700;
+  color: var(--site-ink);
+  margin-bottom: 7px;
+}
+
+.site-review {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.site-review:last-child { border-bottom: none; }
+
+.site-contact {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 14px;
+  background: var(--site-wash);
+}
+
+.site-foot-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 24px;
+  background: var(--site-wash);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .site-hero, .site-body, .site-foot-bar { padding-left: 14px; padding-right: 14px; }
+  .site-navlink { flex: 1; text-align: center; padding: 12px 8px; }
+}

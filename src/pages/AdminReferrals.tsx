@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import {
-  formatMoney,
   type ReferralConfig,
   type ReferralSettings,
   type ReferralQueueRow,

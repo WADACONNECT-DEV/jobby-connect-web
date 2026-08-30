@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { ImageUploader } from '../components/ImageUploader'
 import { CATEGORY_LABELS, type Job, type ServiceCategory } from '../types'
 
 interface Selected {
@@ -22,6 +23,9 @@ export default function NewRequest() {
   const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Photos attach to a job, so they can only be added once it exists. On a
+  // successful send we stay on the page and offer the photo step (spec 2.2).
+  const [createdJob, setCreatedJob] = useState<Job | null>(null)
 
   const categories = Object.keys(CATEGORY_LABELS) as ServiceCategory[]
 
@@ -43,7 +47,7 @@ export default function NewRequest() {
     }
     setBusy(true)
     try {
-      await api<Job>('/jobs', 'POST', {
+      const created = await api<Job>('/jobs', 'POST', {
         title,
         category,
         description,
@@ -53,12 +57,29 @@ export default function NewRequest() {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         providerIds: providers.map((p) => p.userId),
       })
-      navigate('/jobs')
+      setCreatedJob(created)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send your request.')
     } finally {
       setBusy(false)
     }
+  }
+
+  if (createdJob) {
+    return (
+      <div className="center">
+        <div className="card card-wide">
+          <h2>Request sent</h2>
+          <div className="card-sub">
+            Sent to {providers.length} provider{providers.length > 1 ? 's' : ''}. Add photos so they can quote accurately — optional, and you can skip straight through.
+          </div>
+          <ImageUploader jobId={createdJob.id} kind="REQUEST" canUpload label="Photos of the job" />
+          <button className="btn btn-amber btn-block" style={{ marginTop: 18 }} onClick={() => navigate('/jobs')}>
+            Done
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

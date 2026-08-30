@@ -50,3 +50,47 @@ export async function api<T>(path: string, method: string, body?: unknown): Prom
   }
   return data as T
 }
+
+/**
+ * Multipart upload. Content-Type is deliberately NOT set — the browser has to
+ * add it itself so the multipart boundary is included.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = {}
+  const token = isAdminApiPath(path) ? adminTokenStore.get() : tokenStore.get()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`/api/v1${path}`, { method: 'POST', headers, body: form })
+
+  let data: unknown = null
+  try {
+    data = await res.json()
+  } catch {
+    // no body
+  }
+
+  if (!res.ok) {
+    const message =
+      data && typeof data === 'object' && 'message' in data
+        ? String((data as { message: unknown }).message)
+        : `Upload failed (${res.status})`
+    throw new Error(message)
+  }
+  return data as T
+}
+
+/**
+ * Fetches a protected binary resource and returns an object URL for it.
+ * Job images sit behind the same bearer token as everything else, so they
+ * can't be dropped straight into an <img src> — the browser wouldn't send the
+ * header. Callers must revoke the URL when they're done with it.
+ */
+export async function apiObjectUrl(path: string): Promise<string> {
+  const headers: Record<string, string> = {}
+  const token = tokenStore.get()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`/api/v1${path}`, { headers })
+  if (!res.ok) throw new Error(`Could not load image (${res.status})`)
+  return URL.createObjectURL(await res.blob())
+}

@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { THEME_LABELS, type SiteTheme } from '../types'
 import { useAuth } from '../auth'
 import {
   type MasterIndustry,
@@ -12,6 +14,7 @@ import {
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT']
 
 export default function ProviderProfile() {
+  const navigate = useNavigate()
   const { refresh } = useAuth()
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined)
 
@@ -33,6 +36,13 @@ export default function ProviderProfile() {
   // selections
   const [selIndustries, setSelIndustries] = useState<Set<string>>(new Set())
   const [selSubcats, setSelSubcats] = useState<Set<string>>(new Set())
+
+  // Public mini-site settings (UAT 5.4)
+  const [siteTheme, setSiteTheme] = useState<SiteTheme>('CLASSIC')
+  const [aboutText, setAboutText] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactHours, setContactHours] = useState('')
   const [selSuburbs, setSelSuburbs] = useState<Map<string, string>>(new Map()) // id -> label
 
   const [error, setError] = useState('')
@@ -61,6 +71,11 @@ export default function ProviderProfile() {
         setSelIndustries(new Set(p.industries.map((i) => i.id)))
         setSelSubcats(new Set(p.subcategories.map((s) => s.id)))
         setSelSuburbs(new Map(p.suburbs.map((s) => [s.id, s.name])))
+        setSiteTheme(p.siteTheme ?? 'CLASSIC')
+        setAboutText(p.aboutText ?? '')
+        setContactEmail(p.contactEmail ?? '')
+        setContactPhone(p.contactPhone ?? '')
+        setContactHours(p.contactHours ?? '')
       })
       .catch(() => setProfile(null))
   }, [])
@@ -86,8 +101,21 @@ export default function ProviderProfile() {
   function toggleIndustry(id: string) {
     setSelIndustries((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+        // Drop that industry's subcategories too — otherwise they stay selected
+        // and get saved against an industry the provider no longer works in.
+        const orphaned = (subcatsByIndustry[id] ?? []).map((s) => s.id)
+        if (orphaned.length > 0) {
+          setSelSubcats((subs) => {
+            const kept = new Set(subs)
+            orphaned.forEach((subId) => kept.delete(subId))
+            return kept
+          })
+        }
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -124,6 +152,11 @@ export default function ProviderProfile() {
       industryIds: Array.from(selIndustries),
       subcategoryIds: Array.from(selSubcats),
       suburbIds: Array.from(selSuburbs.keys()),
+      siteTheme,
+      aboutText: aboutText || null,
+      contactEmail: contactEmail || null,
+      contactPhone: contactPhone || null,
+      contactHours: contactHours || null,
     }
     try {
       const isNew = profile === null
@@ -152,6 +185,31 @@ export default function ProviderProfile() {
         </div>
         {error && <div className="msg err">{error}</div>}
         {ok && <div className="msg ok">{ok}</div>}
+
+        {!isNew && selIndustries.size > 0 && (
+          <div className="svc-summary">
+            <div className="svc-summary-head">Services you cover</div>
+            {Array.from(selIndustries).map((indId) => {
+              const ind = industries.find((x) => x.id === indId)
+              const subs = (subcatsByIndustry[indId] ?? []).filter((sc) => selSubcats.has(sc.id))
+              return (
+                <div className="svc-line" key={indId}>
+                  <span className="svc-ind">{ind?.name ?? 'Industry'}</span>
+                  <span className="svc-subs">
+                    {subs.length > 0
+                      ? subs.map((sc) => sc.name).join(', ')
+                      : 'No subcategories selected'}
+                  </span>
+                </div>
+              )
+            })}
+            <div className="svc-summary-foot">
+              {selSubcats.size} subcategor{selSubcats.size === 1 ? 'y' : 'ies'} across{' '}
+              {selIndustries.size} industr{selIndustries.size === 1 ? 'y' : 'ies'}
+              {selSuburbs.size > 0 && ` · ${selSuburbs.size} suburb${selSuburbs.size === 1 ? '' : 's'}`}
+            </div>
+          </div>
+        )}
 
         <label>Business name</label>
         <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Rivertown Plumbing" />
@@ -228,8 +286,47 @@ export default function ProviderProfile() {
           )}
         </div>
 
-        <label>About your business (optional)</label>
-        <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell customers about your experience, what you specialise in…" />
+        <label>Short description (optional)</label>
+        <textarea rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="One line customers see in search results…" />
+
+        {/* ---- Public page (UAT Round 1 5.4) ---- */}
+        <h3 className="acct-head">Your public page</h3>
+        <p className="md-note" style={{ marginTop: 0 }}>
+          Customers see this as a small site with Home, About Us, Services and Contact Us pages.
+          Your Services page is built from the industries and subcategories you picked above.
+        </p>
+
+        <label>Theme</label>
+        <select value={siteTheme} onChange={(e) => setSiteTheme(e.target.value as SiteTheme)}>
+          {(Object.keys(THEME_LABELS) as SiteTheme[]).map((t) => (
+            <option key={t} value={t}>{THEME_LABELS[t]}</option>
+          ))}
+        </select>
+
+        <label style={{ marginTop: 12 }}>About Us (optional)</label>
+        <textarea rows={4} value={aboutText} onChange={(e) => setAboutText(e.target.value)}
+                  placeholder="Your story, experience, what you specialise in. Blank lines start a new paragraph." />
+
+        <div className="row2" style={{ marginTop: 12 }}>
+          <div>
+            <label>Contact phone (optional)</label>
+            <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="e.g. 03 9000 0000" />
+          </div>
+          <div>
+            <label>Contact email (optional)</label>
+            <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="e.g. hello@yourbusiness.com.au" />
+          </div>
+        </div>
+
+        <label style={{ marginTop: 12 }}>Opening hours (optional)</label>
+        <input value={contactHours} onChange={(e) => setContactHours(e.target.value)} placeholder="e.g. Mon–Fri 7am–5pm, Sat by appointment" />
+
+        {profile && (
+          <button type="button" className="btn btn-ghost-dark btn-sm" style={{ marginTop: 14 }}
+                  onClick={() => navigate(`/providers/${profile.userId}`)}>
+            Preview my public page
+          </button>
+        )}
 
         <button className="btn btn-amber btn-block" type="submit" disabled={busy} style={{ marginTop: 18 }}>
           {busy ? 'Saving…' : isNew ? 'Create provider profile' : 'Save changes'}

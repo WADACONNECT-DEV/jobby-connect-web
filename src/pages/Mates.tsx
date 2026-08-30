@@ -2,12 +2,50 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Stars } from '../components/Stars'
-import { type Mate } from '../types'
+import { ListControls } from '../components/ListControls'
+import { byDate, byNumber, byText, useListView, type FilterOption } from '../listView'
+import { formatDate, type Mate } from '../types'
+
+/** Distinct values across a list-valued field (industries, suburbs). */
+function optionsFromList(pick: (m: Mate) => string[]) {
+  return (rows: Mate[]): FilterOption[] => {
+    const seen = new Set<string>()
+    rows.forEach((row) => pick(row).forEach((value) => { if (value) seen.add(value) }))
+    return Array.from(seen).sort().map((value) => ({ value, label: value }))
+  }
+}
 
 export default function Mates() {
   const navigate = useNavigate()
   const [mates, setMates] = useState<Mate[] | null>(null)
   const [error, setError] = useState('')
+
+  const list = useListView<Mate>('customer.mates', mates, {
+    search: (m) => `${m.businessName ?? ''} ${m.providerName} ${m.serviceArea ?? ''} ${m.industries.join(' ')} ${m.suburbs.join(' ')}`,
+    filters: [
+      {
+        key: 'industry',
+        label: 'industries',
+        options: optionsFromList((m) => m.industries),
+        match: (m, value) => m.industries.includes(value),
+      },
+      {
+        key: 'suburb',
+        label: 'suburbs',
+        options: optionsFromList((m) => m.suburbs),
+        match: (m, value) => m.suburbs.includes(value),
+      },
+    ],
+    sorts: [
+      { key: 'rating', label: 'Rating', compare: byNumber<Mate>((m) => m.averageRating), defaultDir: 'desc' },
+      { key: 'jobs', label: 'Jobs completed', compare: byNumber<Mate>((m) => m.jobsCompleted), defaultDir: 'desc' },
+      { key: 'used', label: 'Recently used', compare: byDate<Mate>((m) => m.lastJobAt), defaultDir: 'desc' },
+      { key: 'saved', label: 'Recently saved', compare: byDate<Mate>((m) => m.savedAt), defaultDir: 'desc' },
+      { key: 'name', label: 'Name', compare: byText<Mate>((m) => m.businessName ?? m.providerName), defaultDir: 'asc' },
+    ],
+    defaultSortKey: 'saved',
+    defaultSortDir: 'desc',
+  })
 
   function load() {
     return api<Mate[]>('/mates', 'GET')
@@ -32,7 +70,10 @@ export default function Mates() {
 
   return (
     <>
-      <div className="page-head"><h2>Your Jobby Mates</h2></div>
+      <div className="page-head">
+        <h2>Your Jobby Mates</h2>
+        <button className="btn btn-amber" onClick={() => navigate('/jobby-mate')}>Invite a Jobby Mate</button>
+      </div>
       <p className="page-intro">Providers you've saved. Request a quote from a trusted mate without searching again.</p>
 
       {error && <div className="msg err">{error}</div>}
@@ -46,8 +87,19 @@ export default function Mates() {
       )}
 
       {mates && mates.length > 0 && (
+        <ListControls list={list} searchPlaceholder="Search your mates" countLabel="mates" />
+      )}
+
+      {mates && mates.length > 0 && list.shown === 0 && (
+        <div className="empty">
+          <p>No mates match these filters.</p>
+          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
+        </div>
+      )}
+
+      {list.shown > 0 && (
         <div className="job-list">
-          {mates.map((m) => (
+          {list.visible.map((m) => (
             <div className="job-card" key={m.providerUserId}>
               <div className="job-top">
                 <span className="job-title">{m.businessName ?? m.providerName}</span>
@@ -57,11 +109,16 @@ export default function Mates() {
                   ) : (<span className="prov-new">No reviews yet</span>)}
                 </span>
               </div>
-              {m.serviceArea && <div className="job-meta"><span>{m.serviceArea}</span></div>}
+              <div className="job-meta">
+                {m.industries.map((industry) => <span className="chip" key={industry}>{industry}</span>)}
+                {m.serviceArea && <span>{m.serviceArea}</span>}
+                {m.jobsCompleted > 0 && <span>· {m.jobsCompleted} job{m.jobsCompleted > 1 ? 's' : ''} completed</span>}
+                {m.lastJobAt && <span className="job-date">· last used {formatDate(m.lastJobAt)}</span>}
+              </div>
               <div className="job-foot">
                 <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(`/providers/${m.providerUserId}`)}>View profile</button>
                 <div className="job-actions">
-                  <button className="btn btn-ghost-dark btn-sm" onClick={() => remove(m.providerUserId)}>Remove</button>
+                  <button className="btn btn-ghost-dark btn-sm" onClick={() => remove(m.providerUserId)}>Remove Jobby Mate</button>
                   <button className="btn btn-amber btn-sm" onClick={() => requestQuote(m)}>Request a quote</button>
                 </div>
               </div>

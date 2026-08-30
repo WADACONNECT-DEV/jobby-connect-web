@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import {
-  formatMoney,
   referralStatusLabel,
   type MateConnection,
   type InviteResult,

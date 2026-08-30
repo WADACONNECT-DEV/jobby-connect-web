@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import {
   bpsToPercent,
+  formatDate,
   percentToBps,
   type MasterIndustry,
   type MasterPlan,
@@ -214,6 +215,11 @@ function Plans({ onError }: { onError: (m: string) => void }) {
   const [rows, setRows] = useState<MasterPlan[]>([])
   const [name, setName] = useState('')
   const [sort, setSort] = useState('0')
+  // Per-tier image limits, edited inline (Series 2 work order 4.2).
+  const [editing, setEditing] = useState<string | null>(null)
+  const [minImg, setMinImg] = useState('0')
+  const [maxImg, setMaxImg] = useState('5')
+  const [maxMb, setMaxMb] = useState('10')
 
   const load = () => api<MasterPlan[]>('/admin/master/plans', 'GET').then(setRows).catch(report)
   useEffect(() => { load() }, [])
@@ -230,15 +236,71 @@ function Plans({ onError }: { onError: (m: string) => void }) {
     try { await api(`/admin/master/plans/${r.id}`, 'PUT', { active: !r.active }); load() } catch (e) { report(e) }
   }
 
+  function startEdit(r: MasterPlan) {
+    setEditing(r.id)
+    setMinImg(String(r.minImages)); setMaxImg(String(r.maxImages)); setMaxMb(String(r.maxImageMb))
+  }
+
+  async function saveLimits(r: MasterPlan) {
+    try {
+      await api(`/admin/master/plans/${r.id}`, 'PUT', {
+        minImages: Number(minImg) || 0,
+        maxImages: Number(maxImg) || 0,
+        maxImageMb: Number(maxMb) || 1,
+      })
+      setEditing(null); load()
+    } catch (e) { report(e) }
+  }
+
+  /** Only one plan governs customer uploads; setting it clears the others. */
+  async function makeCustomerDefault(r: MasterPlan) {
+    try { await api(`/admin/master/plans/${r.id}`, 'PUT', { customerDefault: true }); load() } catch (e) { report(e) }
+  }
+
   return (
     <div className="md-panel">
       <table className="md-table">
-        <thead><tr><th>Plan</th><th>Sort</th><th>Active</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Plan</th><th>Sort</th><th>Min images</th><th>Max images</th><th>Max MB</th>
+            <th>Customer uploads</th><th>Active</th><th></th>
+          </tr>
+        </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className={r.active ? '' : 'md-inactive'}>
-              <td>{r.name}</td><td>{r.sortOrder}</td><td>{r.active ? 'Yes' : 'No'}</td>
-              <td><button className="btn btn-ghost-dark btn-xs" onClick={() => toggle(r)}>{r.active ? 'Deactivate' : 'Activate'}</button></td>
+              <td>{r.name}</td>
+              <td>{r.sortOrder}</td>
+              {editing === r.id ? (
+                <>
+                  <td><input className="md-sort" type="number" min="0" value={minImg} onChange={(e) => setMinImg(e.target.value)} /></td>
+                  <td><input className="md-sort" type="number" min="0" value={maxImg} onChange={(e) => setMaxImg(e.target.value)} /></td>
+                  <td><input className="md-sort" type="number" min="1" value={maxMb} onChange={(e) => setMaxMb(e.target.value)} /></td>
+                </>
+              ) : (
+                <>
+                  <td>{r.minImages}</td><td>{r.maxImages}</td><td>{r.maxImageMb}</td>
+                </>
+              )}
+              <td>
+                {r.customerDefault
+                  ? <span className="tag-ok">Uses this plan</span>
+                  : <button className="btn btn-ghost-dark btn-xs" onClick={() => makeCustomerDefault(r)}>Use this</button>}
+              </td>
+              <td>{r.active ? 'Yes' : 'No'}</td>
+              <td>
+                {editing === r.id ? (
+                  <>
+                    <button className="btn btn-amber btn-xs" onClick={() => saveLimits(r)}>Save</button>{' '}
+                    <button className="btn btn-ghost-dark btn-xs" onClick={() => setEditing(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-ghost-dark btn-xs" onClick={() => startEdit(r)}>Limits</button>{' '}
+                    <button className="btn btn-ghost-dark btn-xs" onClick={() => toggle(r)}>{r.active ? 'Deactivate' : 'Activate'}</button>
+                  </>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -248,6 +310,10 @@ function Plans({ onError }: { onError: (m: string) => void }) {
         <input className="md-sort" type="number" placeholder="Sort" value={sort} onChange={(e) => setSort(e.target.value)} />
         <button className="btn btn-amber btn-sm" type="submit">Add</button>
       </form>
+      <p className="md-note">
+        Image limits apply per subscription tier. Customers hold no subscription, so job-request
+        photos use whichever plan is marked "Uses this plan".
+      </p>
     </div>
   )
 }
@@ -266,6 +332,10 @@ function Rates({ onError }: { onError: (m: string) => void }) {
   const [commission, setCommission] = useState('10')
   const [points, setPoints] = useState('5')
   const [promo, setPromo] = useState('')
+  // Effective window: the matrix is dated, so a rate change can be scheduled
+  // without disturbing the rate that historical quotes were priced on.
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
 
   const loadRates = () => api<MasterRate[]>('/admin/master/rates', 'GET').then(setRows).catch(report)
   useEffect(() => {
@@ -287,8 +357,10 @@ function Rates({ onError }: { onError: (m: string) => void }) {
         matePointsBps: percentToBps(Number(points) || 0),
         promoLabel: promo || null,
         active: true,
+        effectiveFrom: from ? new Date(from).toISOString() : null,
+        effectiveTo: to ? new Date(to).toISOString() : null,
       })
-      setPromo(''); loadRates()
+      setPromo(''); setFrom(''); setTo(''); loadRates()
     } catch (e) { report(e) }
   }
   async function toggle(r: MasterRate) {
@@ -298,7 +370,7 @@ function Rates({ onError }: { onError: (m: string) => void }) {
   return (
     <div className="md-panel">
       <table className="md-table">
-        <thead><tr><th>Industry</th><th>Suburb</th><th>Plan</th><th>Commission</th><th>Points</th><th>Promo</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Industry</th><th>Suburb</th><th>Plan</th><th>Commission</th><th>Points</th><th>Effective</th><th>Promo</th><th>Active</th><th></th></tr></thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className={r.active ? '' : 'md-inactive'}>
@@ -307,12 +379,16 @@ function Rates({ onError }: { onError: (m: string) => void }) {
               <td>{r.planName ?? 'Any'}</td>
               <td>{bpsToPercent(r.commissionBps)}%</td>
               <td>{bpsToPercent(r.matePointsBps)}%</td>
+              <td className="rate-window">
+                {rateWindow(r)}
+                {r.active && !inForce(r) && <div className="rate-note">not in force</div>}
+              </td>
               <td>{r.promoLabel ?? '—'}</td>
               <td>{r.active ? 'Yes' : 'No'}</td>
               <td><button className="btn btn-ghost-dark btn-xs" onClick={() => toggle(r)}>{r.active ? 'Deactivate' : 'Activate'}</button></td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={8} className="md-empty">No rates yet.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={9} className="md-empty">No rates yet.</td></tr>}
         </tbody>
       </table>
 
@@ -344,10 +420,36 @@ function Rates({ onError }: { onError: (m: string) => void }) {
           <div><label>Promo label</label>
             <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="e.g. New suburb" />
           </div>
+          <div><label>Effective from (optional)</label>
+            <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div><label>Effective to (optional)</label>
+            <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
         </div>
         <button className="btn btn-amber btn-sm" type="submit" style={{ marginTop: 10 }}>Add rate</button>
       </form>
-      <p className="md-note">The most specific active rate wins: a row with a suburb and plan beats an industry-only row.</p>
+      <p className="md-note">
+        The most specific active rate wins: a row with a suburb and plan beats an industry-only row.
+        Leave the dates blank for a rate that applies from now on. Changing a rate never alters
+        quotes already sent — each quote stores the rate row it was priced on.
+      </p>
     </div>
   )
+}
+
+/** Human-readable effective window for a rate row. */
+function rateWindow(r: MasterRate): string {
+  if (!r.effectiveFrom && !r.effectiveTo) return 'Always'
+  const from = r.effectiveFrom ? formatDate(r.effectiveFrom) : 'Always'
+  const to = r.effectiveTo ? formatDate(r.effectiveTo) : 'ongoing'
+  return `${from} → ${to}`
+}
+
+/** Whether a rate row applies right now, so a scheduled or expired row is obvious. */
+function inForce(r: MasterRate): boolean {
+  const now = Date.now()
+  if (r.effectiveFrom && Date.parse(r.effectiveFrom) > now) return false
+  if (r.effectiveTo && Date.parse(r.effectiveTo) <= now) return false
+  return true
 }

@@ -2,14 +2,17 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Stars, StarInput } from '../components/Stars'
-import { CATEGORY_LABELS, formatDate, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentResult, type Review, type Wallet } from '../types'
+import { ListControls } from '../components/ListControls'
+import { ProgressBar } from '../components/ProgressBar'
+import { ImageUploader } from '../components/ImageUploader'
+import { byDate, byText, optionsFrom, useListView } from '../listView'
+import { CATEGORY_LABELS, METHOD_LABELS, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type ServiceCategory, type Wallet } from '../types'
 
 export default function MyJobs() {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState<Job[] | null>(null)
   const [error, setError] = useState('')
 
-  const [expanded, setExpanded] = useState<string | null>(null)
   const [quotesByJob, setQuotesByJob] = useState<Record<string, CustomerQuote[]>>({})
   const [loadingQuotes, setLoadingQuotes] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -18,11 +21,47 @@ export default function MyJobs() {
   const [redeemFor, setRedeemFor] = useState<string | null>(null)
   const [redeemAmt, setRedeemAmt] = useState('')
 
+  // Checkout: which rail to charge, and (Round 1 only) a forced outcome so each
+  // method's failure path can be demonstrated.
+  const [caps, setCaps] = useState<PaymentCapabilities | null>(null)
+  const [method, setMethod] = useState<PaymentMethod>('CARD')
+  const [simulate, setSimulate] = useState<PaymentSimulation>('SUCCESS')
+
+  const [progressByJob, setProgressByJob] = useState<Record<string, ProgressEntry[]>>({})
+  const [historyFor, setHistoryFor] = useState<string | null>(null)
+
   const [reviewByJob, setReviewByJob] = useState<Record<string, Review | null>>({})
   const [reviewOpenFor, setReviewOpenFor] = useState<string | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [reviewError, setReviewError] = useState('')
+
+  // Filter / sort / expand state for this box. Held outside the component so
+  // it survives leaving the page and coming Back (UAT §5.3).
+  const list = useListView<Job>('customer.jobs', jobs, {
+    search: (job) => `${job.title} ${job.description} ${job.suburb} ${job.providerName ?? ''}`,
+    filters: [
+      {
+        key: 'status',
+        label: 'statuses',
+        options: optionsFrom<Job>((job) => job.status, (value) => statusLabel(value as Job['status'])),
+        match: (job, value) => job.status === value,
+      },
+      {
+        key: 'category',
+        label: 'industries',
+        options: optionsFrom<Job>((job) => job.category, (value) => CATEGORY_LABELS[value as ServiceCategory]),
+        match: (job, value) => job.category === value,
+      },
+    ],
+    sorts: [
+      { key: 'created', label: 'Date requested', compare: byDate<Job>((job) => job.createdAt), defaultDir: 'desc' },
+      { key: 'title', label: 'Title', compare: byText<Job>((job) => job.title), defaultDir: 'asc' },
+      { key: 'status', label: 'Status', compare: byText<Job>((job) => job.status), defaultDir: 'asc' },
+    ],
+    defaultSortKey: 'created',
+    defaultSortDir: 'desc',
+  })
 
   function loadJobs() {
     return api<Job[]>('/jobs/mine', 'GET')
@@ -33,16 +72,39 @@ export default function MyJobs() {
             .then((rev) => setReviewByJob((prev) => ({ ...prev, [j.id]: rev })))
             .catch(() => setReviewByJob((prev) => ({ ...prev, [j.id]: null })))
         })
+        // Progress the provider has posted, so the customer sees the same figure.
+        js.filter((j) => j.status === 'IN_PROGRESS' || j.status === 'COMPLETED').forEach((j) => {
+          api<ProgressEntry[]>(`/jobs/${j.id}/progress`, 'GET')
+            .then((entries) => setProgressByJob((prev) => ({ ...prev, [j.id]: entries })))
+            .catch(() => setProgressByJob((prev) => ({ ...prev, [j.id]: [] })))
+        })
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load your requests.'))
   }
 
-  useEffect(() => { loadJobs() }, [])
+  // The Mate Points balance is needed up front: without it the "Use points"
+  // option never appears until after a payment has already been made.
+  function loadBalance() {
+    return api<Wallet>('/points/wallet', 'GET')
+      .then((w) => setPointsBalance(w.balance))
+      .catch(() => setPointsBalance(0))
+  }
+
+  useEffect(() => {
+    loadJobs()
+    loadBalance()
+    api<PaymentCapabilities>('/payments/capabilities', 'GET')
+      .then((c) => {
+        setCaps(c)
+        if (c.methods.length > 0) setMethod(c.methods[0])
+      })
+      .catch(() => setCaps(null))
+  }, [])
 
   async function toggleQuotes(jobId: string) {
     setActionError('')
-    if (expanded === jobId) { setExpanded(null); return }
-    setExpanded(jobId)
+    if (list.isExpanded(jobId)) { list.setExpanded(jobId, false); return }
+    list.setExpanded(jobId, true)
     if (!quotesByJob[jobId]) {
       setLoadingQuotes(true)
       try {
@@ -58,8 +120,9 @@ export default function MyJobs() {
     setBusyId(stageId ?? quoteId)
     try {
       await api<PaymentResult>('/payments', 'POST', {
-        quoteId, stageId, method: 'STUB',
+        quoteId, stageId, method,
         redeemPoints: redeem && redeem > 0 ? redeem : null,
+        simulate: caps?.simulationEnabled ? simulate : null,
       })
       const [qs, w] = await Promise.all([
         api<CustomerQuote[]>(`/jobs/${jobId}/quotes`, 'GET'),
@@ -69,7 +132,9 @@ export default function MyJobs() {
       setPointsBalance(w.balance)
       setRedeemFor(null); setRedeemAmt('')
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Payment failed')
+      // The gateway's reason matters here - "insufficient funds" and "timeout"
+      // need different actions from the customer.
+      setActionError(e instanceof Error ? e.message : 'Payment failed')
     } finally {
       setBusyId(null)
     }
@@ -108,6 +173,7 @@ export default function MyJobs() {
       const rev = await api<Review>(`/jobs/${jobId}/review`, 'POST', { rating, comment: comment || null })
       setReviewByJob((prev) => ({ ...prev, [jobId]: rev }))
       setReviewOpenFor(null)
+      await loadBalance()
     } catch (err) {
       setReviewError(err instanceof Error ? err.message : 'Could not submit review.')
     } finally { setBusyId(null) }
@@ -131,12 +197,25 @@ export default function MyJobs() {
       )}
 
       {jobs && jobs.length > 0 && (
+        <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
+      )}
+
+      {jobs && jobs.length > 0 && list.shown === 0 && (
+        <div className="empty">
+          <p>No requests match these filters.</p>
+          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
+        </div>
+      )}
+
+      {jobs && list.shown > 0 && (
         <div className="job-list">
-          {jobs.map((job) => {
+          {list.visible.map((job) => {
             const quotes = quotesByJob[job.id]
-            const isOpen = expanded === job.id
+            const isOpen = list.isExpanded(job.id)
             const busy = busyId === job.id
             const review = reviewByJob[job.id]
+            const history = progressByJob[job.id] ?? []
+            const latest = history[0]
             return (
               <div className="job-card" key={job.id}>
                 <div className="job-top">
@@ -150,6 +229,50 @@ export default function MyJobs() {
                   <span className="job-date">· {formatDate(job.createdAt)}</span>
                 </div>
                 <p className="job-desc">{job.description}</p>
+
+                {/* Photos the customer sent with the request; editable while it's still open. */}
+                <ImageUploader
+                  jobId={job.id}
+                  kind="REQUEST"
+                  canUpload={job.status === 'OPEN'}
+                  label="Photos you sent"
+                />
+
+                {latest && (
+                  <ProgressBar
+                    percent={latest.percent}
+                    caption={`Updated ${formatDateTime(latest.createdAt)}${latest.note ? ` · ${latest.note}` : ''}`}
+                  />
+                )}
+
+                {history.length > 1 && (
+                  <button
+                    className="btn btn-ghost-dark btn-xs"
+                    style={{ marginTop: 8 }}
+                    onClick={() => setHistoryFor(historyFor === job.id ? null : job.id)}
+                  >
+                    {historyFor === job.id ? 'Hide progress history' : `Progress history (${history.length})`}
+                  </button>
+                )}
+
+                {historyFor === job.id && (
+                  <div className="prog-list">
+                    {history.map((entry) => (
+                      <div className="prog-row" key={entry.id}>
+                        <span className="prog-row-pct">{entry.percent}%</span>
+                        <span className="prog-row-note">{entry.note ?? '—'}</span>
+                        <span className="prog-row-date">{formatDateTime(entry.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                  <ImageUploader jobId={job.id} kind="PROGRESS" label="Progress photos" />
+                )}
+                {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                  <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
+                )}
 
                 {job.status === 'OPEN' && (
                   <p className="job-assigned">Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</p>
@@ -191,6 +314,26 @@ export default function MyJobs() {
                       <button type="submit" className="btn btn-amber btn-sm" disabled={busy}>{busy ? 'Submitting…' : 'Submit review'}</button>
                     </div>
                   </form>
+                )}
+
+                {caps && quotes && quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
+                  || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')) && (
+                  <div className="pay-bar">
+                    <label className="pay-label">Pay with</label>
+                    <select className="lv-select" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+                      {caps.methods.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
+                    </select>
+                    {caps.simulationEnabled && (
+                      <>
+                        <label className="pay-label">Test outcome</label>
+                        <select className="lv-select" value={simulate} onChange={(e) => setSimulate(e.target.value as PaymentSimulation)}>
+                          {caps.simulations.map((sim) => (
+                            <option key={sim} value={sim}>{SIMULATION_LABELS[sim]}</option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
                 )}
 
                 {isOpen && job.status === 'OPEN' && (

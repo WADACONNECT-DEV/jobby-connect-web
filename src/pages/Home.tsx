@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { usePersistedValue } from '../listView'
 import { formatMoney, type Wallet } from '../types'
 import { useAuth } from '../auth'
 
@@ -18,6 +19,7 @@ const PROVIDER_TILES: Tile[] = [
   { t: 'Requests to me', d: 'See the quote requests customers have sent you and reply.', to: '/requests' },
   { t: 'Your quotes', d: 'Track the quotes you\'ve sent and which were accepted.', to: '/my-quotes' },
   { t: 'Your work', d: 'Jobs you\'ve won — start the work and see it through.', to: '/my-work' },
+  { t: 'Provider profile', d: 'Update your business details, service areas, industries and GST status.', to: '/provider' },
   { t: 'Jobby Mate referrals', d: 'Invite your existing customers on board — optionally gift them Mate Points as a welcome.', to: '/jobby-mate' },
 ]
 
@@ -36,6 +38,19 @@ function TileGrid({ tiles }: { tiles: Tile[] }) {
   )
 }
 
+type Role = 'customer' | 'provider'
+
+/**
+ * The dashboard. One account can hold both roles, so this is a role switcher —
+ * but only for people who actually have both (UAT Round 1 §4.1/§4.2).
+ *
+ * A plain customer sees no provider section and no "Become a provider" button;
+ * that entry point moved to Account settings. Someone whose provider
+ * application is still pending sees only their Customer tab, with the pending
+ * status shown there (§4.2, and open item 7.2 — "somewhere sensible"; the
+ * customer dashboard is where they'll look). Both tabs appear only once an
+ * admin has approved them.
+ */
 export default function Home() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -51,57 +66,82 @@ export default function Home() {
   const customerReady = user?.customerProfileComplete ?? false
   const hasProvider = user?.hasProviderProfile ?? false
   const approval = user?.providerApprovalStatus ?? null
+  const isApprovedProvider = hasProvider && approval === 'APPROVED'
+
+  // Which tab is open survives navigating away and coming back (UAT §5.3).
+  const [role, setRole] = usePersistedValue<Role>('home.role', 'customer')
+  const activeRole: Role = isApprovedProvider ? role : 'customer'
 
   return (
     <>
       <section className="welcome">
         <h2>Welcome, {firstName}!</h2>
-        <p>Request quotes as a customer, or set up as a provider to win work.</p>
+        <p>
+          {isApprovedProvider
+            ? 'Switch between requesting work and providing it.'
+            : 'Request quotes from providers you choose.'}
+        </p>
       </section>
 
-      {/* ---- Customer area ---- */}
-      <div className="area-head">
-        <h3>As a customer</h3>
-        {points !== null && <span className="points-chip">Mate Points: {formatMoney(points)}</span>}
-      </div>
-      {customerReady ? (
-        <TileGrid tiles={CUSTOMER_TILES} />
-      ) : (
-        <div className="gate-card">
-          <p>Complete a quick customer profile (name + mobile) to start requesting quotes.</p>
-          <button className="btn btn-amber btn-sm" onClick={() => navigate('/customer-profile')}>Complete customer profile</button>
+      {isApprovedProvider && (
+        <div className="role-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={activeRole === 'customer'}
+            className={`role-tab customer${activeRole === 'customer' ? ' on' : ''}`}
+            onClick={() => setRole('customer')}
+          >
+            As a customer
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeRole === 'provider'}
+            className={`role-tab provider${activeRole === 'provider' ? ' on' : ''}`}
+            onClick={() => setRole('provider')}
+          >
+            As a provider
+          </button>
         </div>
       )}
 
-      {/* ---- Provider area ---- */}
-      <div className="area-head" style={{ marginTop: 26 }}><h3>As a provider</h3></div>
-
-      {hasProvider && approval === 'PENDING' && (
-        <div className="banner banner-pending">
-          <strong>Your provider profile is pending approval.</strong> You can set up your profile now, but you won't
-          appear in customer search until an admin approves you.
-        </div>
-      )}
-      {hasProvider && approval === 'REJECTED' && (
-        <div className="banner banner-rejected">
-          <strong>Your provider profile wasn't approved.</strong> Please review your details or contact support.
-        </div>
-      )}
-
-      {hasProvider ? (
-        <>
-          <TileGrid tiles={PROVIDER_TILES} />
-          <div className="grid2" style={{ marginTop: 12 }}>
-            <div className="panel panel-active" role="button" onClick={() => navigate('/provider')}>
-              <h3>Provider profile</h3>
-              <p>Update your business details, service areas, industries and GST status.</p>
-            </div>
+      {activeRole === 'customer' && (
+        <div className="role-pane customer">
+          <div className="area-head">
+            <h3>{isApprovedProvider ? 'As a customer' : 'Your dashboard'}</h3>
+            {points !== null && <span className="points-chip">Mate Points: {formatMoney(points)}</span>}
           </div>
-        </>
-      ) : (
-        <div className="gate-card">
-          <p>Offer your services on Jobby-Connect. Set up a provider profile — an admin reviews it before you go live in search.</p>
-          <button className="btn btn-amber btn-sm" onClick={() => navigate('/provider')}>Become a provider</button>
+
+          {/* A pending or rejected application is surfaced here, because this is
+              the only tab the applicant can see until they're approved. */}
+          {hasProvider && approval === 'PENDING' && (
+            <div className="banner banner-pending">
+              <strong>Your provider application is pending approval.</strong> Once an admin approves
+              it, your Provider tab will appear here.{' '}
+              <button className="link-btn" onClick={() => navigate('/account')}>View in Account</button>
+            </div>
+          )}
+          {hasProvider && approval === 'REJECTED' && (
+            <div className="banner banner-rejected">
+              <strong>Your provider application wasn't approved.</strong>{' '}
+              <button className="link-btn" onClick={() => navigate('/account')}>Review in Account</button>
+            </div>
+          )}
+
+          {customerReady ? (
+            <TileGrid tiles={CUSTOMER_TILES} />
+          ) : (
+            <div className="gate-card">
+              <p>Complete a quick customer profile (name + mobile) to start requesting quotes.</p>
+              <button className="btn btn-amber btn-sm" onClick={() => navigate('/customer-profile')}>Complete customer profile</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeRole === 'provider' && (
+        <div className="role-pane provider">
+          <div className="area-head"><h3>As a provider</h3></div>
+          <TileGrid tiles={PROVIDER_TILES} />
         </div>
       )}
     </>

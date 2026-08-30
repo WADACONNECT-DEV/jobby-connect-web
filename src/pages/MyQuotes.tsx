@@ -1,12 +1,23 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { ListControls } from '../components/ListControls'
+import { byDate, byNumber, byText, optionsFrom, useListView } from '../listView'
 import {
   formatDate, formatMoney, settlementLabel,
   type ProviderQuote, type SettlementResult, type SettlementStatus,
 } from '../types'
 
 interface ReviewTarget { quoteId: string; stageId: string | null; label: string }
+
+/** Does this quote (or any of its stages) need the provider to do something? */
+function needsAction(q: ProviderQuote): boolean {
+  if (q.status !== 'ACCEPTED') return false
+  const pending = (st: SettlementStatus | null | undefined) =>
+    st === 'PENDING_COMPLETION' || st === 'PENDING_REVIEW'
+  if (q.paymentType === 'STAGED') return (q.stages ?? []).some((st) => pending(st.settlementStatus))
+  return pending(q.settlementStatus)
+}
 
 export default function MyQuotes() {
   const navigate = useNavigate()
@@ -19,6 +30,44 @@ export default function MyQuotes() {
   const [cooperation, setCooperation] = useState(3)
   const [hazards, setHazards] = useState('')
   const [notes, setNotes] = useState('')
+
+  const list = useListView<ProviderQuote>('provider.quotes', quotes, {
+    search: (q) => `${q.jobTitle} ${q.message ?? ''}`,
+    filters: [
+      {
+        key: 'status',
+        label: 'quote statuses',
+        options: optionsFrom<ProviderQuote>((q) => q.status ?? ''),
+        match: (q, value) => q.status === value,
+      },
+      {
+        key: 'payment',
+        label: 'payment types',
+        options: optionsFrom<ProviderQuote>(
+          (q) => q.paymentType ?? '',
+          (value) => (value === 'STAGED' ? 'Staged payment' : 'Full payment'),
+        ),
+        match: (q, value) => q.paymentType === value,
+      },
+      {
+        key: 'action',
+        label: 'work states',
+        options: () => [
+          { value: 'ACTION', label: 'Action needed' },
+          { value: 'NONE', label: 'Nothing to do' },
+        ],
+        match: (q, value) => (value === 'ACTION' ? needsAction(q) : !needsAction(q)),
+      },
+    ],
+    sorts: [
+      { key: 'sent', label: 'Date sent', compare: byDate<ProviderQuote>((q) => q.createdAt ?? null), defaultDir: 'desc' },
+      { key: 'total', label: 'Customer pays', compare: byNumber<ProviderQuote>((q) => q.customerTotal), defaultDir: 'desc' },
+      { key: 'payable', label: 'You get paid', compare: byNumber<ProviderQuote>((q) => q.providerPayable), defaultDir: 'desc' },
+      { key: 'title', label: 'Job title', compare: byText<ProviderQuote>((q) => q.jobTitle), defaultDir: 'asc' },
+    ],
+    defaultSortKey: 'sent',
+    defaultSortDir: 'desc',
+  })
 
   const load = () =>
     api<ProviderQuote[]>('/quotes/mine', 'GET')
@@ -80,7 +129,7 @@ export default function MyQuotes() {
         <h2>Your quotes</h2>
         <button className="btn btn-amber" onClick={() => navigate('/requests')}>See requests</button>
       </div>
-      <p className="page-intro">Quotes you've sent, what you'll be paid, and where they stand.</p>
+      <p className="page-intro">Quotes you've sent, what you'll be paid, and where they stand. Open a quote to see the full breakdown.</p>
 
       {error && <div className="msg err">{error}</div>}
       {quotes === null && !error && <div className="loading">Loading…</div>}
@@ -124,53 +173,88 @@ export default function MyQuotes() {
       )}
 
       {quotes && quotes.length > 0 && (
+        <ListControls list={list} searchPlaceholder="Search your quotes" countLabel="quotes" />
+      )}
+
+      {quotes && quotes.length > 0 && list.shown === 0 && (
+        <div className="empty">
+          <p>No quotes match these filters.</p>
+          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
+        </div>
+      )}
+
+      {list.shown > 0 && (
         <div className="job-list">
-          {quotes.map((q) => (
-            <div className="job-card" key={q.id ?? q.jobId}>
-              <div className="job-top">
-                <span className="job-title">{q.jobTitle}</span>
-                {q.status && <span className={`status status-${q.status.toLowerCase()}`}>{q.status}</span>}
-              </div>
-              {q.lineItems.length > 0 && (
-                <div className="qmini">
-                  {q.lineItems.map((li, i) => (
-                    <div className="qmini-row" key={i}><span>{li.description}</span><span>{formatMoney(li.amount)}</span></div>
-                  ))}
+          {list.visible.map((q) => {
+            const rowId = q.id ?? q.jobId
+            const open = list.isExpanded(rowId)
+            const action = needsAction(q)
+            return (
+              <div className="job-card" key={rowId}>
+                {/* Summary row — title, status, amount. Collapsed by default (UAT §5.2). */}
+                <div className="sum-row">
+                  <span className="sum-main">
+                    <span className="sum-title">{q.jobTitle}</span>
+                    {q.status && <span className={`status status-${q.status.toLowerCase()}`}>{q.status}</span>}
+                    {action && <span className="sum-flag">Action needed</span>}
+                  </span>
+                  <span className="sum-right">
+                    <span className="sum-amt">{formatMoney(q.customerTotal)}</span>
+                    <button className="btn btn-ghost-dark btn-xs" onClick={() => list.toggleExpanded(rowId)}>
+                      {open ? 'Hide' : 'View'}
+                    </button>
+                  </span>
                 </div>
-              )}
-              {q.message && <p className="job-desc">{q.message}</p>}
-              <div className="quote-breakdown">
-                <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(q.customerTotal)}</span></div>
-                <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(q.providerPayable)}</span></div>
-                <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(q.pointsEarned)} in points</span></div>
-                {q.stages && q.stages.length > 0 && (
-                  <div className="stage-preview">
-                    <div className="stage-preview-head">Payment stages</div>
-                    {q.stages.map((st) => (
-                      <div className="stage-row" key={st.id ?? st.name}>
-                        <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
-                        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          {formatMoney(st.customerTotal)} · you get {formatMoney(st.providerPayable)}
-                          {q.status === 'ACCEPTED' && st.id &&
-                            unitAction(q.id!, st.id, st.settlementStatus, `${q.jobTitle} — ${st.name}`, st.id)}
-                        </span>
+
+                {open && (
+                  <>
+                    {q.lineItems.length > 0 && (
+                      <div className="qmini">
+                        {q.lineItems.map((li, i) => (
+                          <div className="qmini-row" key={i}><span>{li.description}</span><span>{formatMoney(li.amount)}</span></div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                    {q.message && <p className="job-desc">{q.message}</p>}
+                    <div className="quote-breakdown">
+                      <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(q.customerTotal)}</span></div>
+                      <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(q.providerPayable)}</span></div>
+                      <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(q.pointsEarned)} in points</span></div>
+                      <div className="qb-row qb-rate">
+                        <span>Rates applied</span>
+                        <span>{q.commissionRate}% commission &middot; {q.pointsRate}% Mate Points</span>
+                      </div>
+                      {q.stages && q.stages.length > 0 && (
+                        <div className="stage-preview">
+                          <div className="stage-preview-head">Payment stages</div>
+                          {q.stages.map((st) => (
+                            <div className="stage-row" key={st.id ?? st.name}>
+                              <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
+                              <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                {formatMoney(st.customerTotal)} · you get {formatMoney(st.providerPayable)}
+                                {q.status === 'ACCEPTED' && st.id &&
+                                  unitAction(q.id!, st.id, st.settlementStatus, `${q.jobTitle} — ${st.name}`, st.id)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Full-payment settlement action */}
+                    {q.status === 'ACCEPTED' && q.paymentType !== 'STAGED' && q.id && (
+                      <div className="quote-item-foot">
+                        {unitAction(q.id, null, q.settlementStatus, q.jobTitle, q.id)}
+                      </div>
+                    )}
+                    <div className="job-foot">
+                      <span className="job-date">{q.createdAt ? `Sent ${formatDate(q.createdAt)}` : ''}</span>
+                      <span className="job-by">{q.paymentType === 'STAGED' ? 'Staged payment' : 'Full payment'}</span>
+                    </div>
+                  </>
                 )}
               </div>
-              {/* Full-payment settlement action */}
-              {q.status === 'ACCEPTED' && q.paymentType !== 'STAGED' && q.id && (
-                <div className="quote-item-foot">
-                  {unitAction(q.id, null, q.settlementStatus, q.jobTitle, q.id)}
-                </div>
-              )}
-              <div className="job-foot">
-                <span className="job-date">{q.createdAt ? `Sent ${formatDate(q.createdAt)}` : ''}</span>
-                <span className="job-by">{q.paymentType === 'STAGED' ? 'Staged payment' : 'Full payment'}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </>

@@ -1,5 +1,6 @@
 import { Navigate, Outlet, Route, Routes, useNavigate, Link } from 'react-router-dom'
 import { useAuth, RequireAuth } from './auth'
+import { NotificationBell } from './components/NotificationBell'
 import { RequireAdmin } from './adminAuth'
 import Landing from './pages/Landing'
 import Register from './pages/Register'
@@ -24,8 +25,11 @@ import AdminChangePassword from './pages/AdminChangePassword'
 import AdminApprovals from './pages/AdminApprovals'
 import AdminFinance from './pages/AdminFinance'
 import AdminReferrals from './pages/AdminReferrals'
+import AdminCommunications from './pages/AdminCommunications'
 import CustomerProfile from './pages/CustomerProfile'
+import Account from './pages/Account'
 import WalletPage from './pages/Wallet'
+import Notifications from './pages/Notifications'
 
 function Header() {
   const { user, logout } = useAuth()
@@ -39,7 +43,8 @@ function Header() {
       <div className="spacer" />
       {user && (
         <>
-          <span className="whoami">{user.fullName}</span>
+          <NotificationBell />
+          <Link to="/account" className="whoami whoami-link" title="Account settings">{user.fullName}</Link>
           <button className="btn btn-nav" onClick={() => { logout(); navigate('/') }}>Log out</button>
         </>
       )}
@@ -73,6 +78,7 @@ export default function App() {
         <Route path="approvals" element={<AdminApprovals />} />
         <Route path="finance" element={<AdminFinance />} />
         <Route path="referrals" element={<AdminReferrals />} />
+        <Route path="communications" element={<AdminCommunications />} />
       </Route>
 
       {/* ---- Customer / Provider app ---- */}
@@ -92,7 +98,9 @@ export default function App() {
         <Route path="/mates" element={<RequireAuth><Mates /></RequireAuth>} />
         <Route path="/jobby-mate" element={<RequireAuth><JobbyMate /></RequireAuth>} />
         <Route path="/customer-profile" element={<RequireAuth><CustomerProfile /></RequireAuth>} />
+        <Route path="/account" element={<RequireAuth><Account /></RequireAuth>} />
         <Route path="/wallet" element={<RequireAuth><WalletPage /></RequireAuth>} />
+        <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

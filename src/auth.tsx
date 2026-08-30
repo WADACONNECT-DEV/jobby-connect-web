@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api, tokenStore } from './api'
+import { clearViews } from './listView'
 import type { AuthResponse, User } from './types'
 
 interface AuthState {
@@ -55,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     logout: () => {
       tokenStore.clear()
+      // Saved filter/sort/expand state per box is kept across navigation, so it
+      // has to be dropped on sign-out — otherwise the next person to sign in on
+      // this browser inherits the previous user's view of every dashboard box.
+      clearViews()
       setUser(null)
     },
     // Re-fetch the current user (e.g. after gaining the PROVIDER role).

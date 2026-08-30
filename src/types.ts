@@ -106,6 +106,11 @@ export interface ProviderProfile {
   subcategories: Ref[]
   suburbs: Ref[]
   categories: ServiceCategory[]
+  siteTheme: SiteTheme
+  aboutText: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  contactHours: string | null
   createdAt: string
 }
 
@@ -119,6 +124,20 @@ export interface ProviderSummary {
   reviewCount: number
 }
 
+export type SiteTheme = 'CLASSIC' | 'COASTAL' | 'SLATE'
+
+export const THEME_LABELS: Record<SiteTheme, string> = {
+  CLASSIC: 'Classic — navy & amber',
+  COASTAL: 'Coastal — teal',
+  SLATE: 'Slate — muted grey',
+}
+
+/** One industry and the subcategories a provider covers within it. */
+export interface ProviderService {
+  industry: string
+  subcategories: string[]
+}
+
 export interface ProviderPublic {
   id: string
   userId: string
@@ -129,6 +148,13 @@ export interface ProviderPublic {
   averageRating: number
   reviewCount: number
   reviews: Review[]
+  siteTheme: SiteTheme
+  aboutText: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  contactHours: string | null
+  services: ProviderService[]
+  suburbs: string[]
 }
 
 export interface Mate {
@@ -138,6 +164,10 @@ export interface Mate {
   serviceArea: string | null
   averageRating: number
   reviewCount: number
+  industries: string[]
+  suburbs: string[]
+  jobsCompleted: number
+  lastJobAt: string | null
   savedAt: string
 }
 
@@ -209,6 +239,12 @@ export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-AU', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
+}
+
 
 // ---- Master data (Phase B) ----
 export interface MasterIndustry {
@@ -240,6 +276,10 @@ export interface MasterPlan {
   name: string
   active: boolean
   sortOrder: number
+  minImages: number
+  maxImages: number
+  maxImageMb: number
+  customerDefault: boolean
 }
 
 export interface MasterRate {
@@ -329,6 +369,8 @@ export interface ProviderQuote {
   customerTotal: number
   pointsEarned: number
   providerPayable: number
+  commissionRate: number
+  pointsRate: number
   stages: ProviderQuoteStage[]
   message: string | null
   status: QuoteStatus | null
@@ -588,4 +630,154 @@ export interface ReferralQueueRow {
   pointsAmount: number
   detail: string | null
   createdAt: string | null
+}
+
+/* ---- Provider request pipeline (dashboard tabs, Spec §3.4 / Series 2 §3.4) ---- */
+
+export type ProviderRequestOutcome = 'RECEIVED' | 'REPLIED' | 'WON' | 'LOST' | 'EXPIRED'
+
+export const OUTCOME_LABELS: Record<ProviderRequestOutcome, string> = {
+  RECEIVED: 'Received',
+  REPLIED: 'Replied',
+  WON: 'Wins',
+  LOST: 'Lost',
+  EXPIRED: 'Expired',
+}
+
+export interface ProviderRequestRow {
+  jobId: string
+  jobTitle: string
+  category: ServiceCategory
+  description: string
+  suburb: string
+  timeFrame: string | null
+  customerName: string
+  jobStatus: JobStatus
+  expiresAt: string | null
+  requestedAt: string
+  targetCount: number
+  outcome: ProviderRequestOutcome
+  quoteId: string | null
+  quoteTotal: number | null
+  providerPayable: number | null
+  quoteStatus: QuoteStatus | null
+  settlementStatus: SettlementStatus | null
+  quotedAt: string | null
+}
+
+/* ---- Job progress (percentage-complete indicator, Spec 2.6) ---- */
+
+export interface ProgressEntry {
+  id: string
+  jobId: string
+  percent: number
+  note: string | null
+  createdAt: string
+}
+
+/* ---- Job images (Spec 2.2 / 2.6 / 7.5) ---- */
+
+export type AttachmentKind = 'REQUEST' | 'PROGRESS' | 'COMPLETION'
+
+export interface Attachment {
+  id: string
+  jobId: string
+  progressId: string | null
+  kind: AttachmentKind
+  originalFilename: string | null
+  contentType: string
+  sizeBytes: number
+  width: number | null
+  height: number | null
+  createdAt: string
+}
+
+/** The image rules in force for the current user on a job. */
+export interface ImageLimits {
+  planId: string | null
+  planName: string
+  minImages: number
+  maxImages: number
+  maxImageMb: number
+}
+
+/* ---- Notifications + message outbox (Spec 2.3 / 3.3) ---- */
+
+export type EventType =
+  | 'QUOTE_RECEIVED' | 'QUOTE_ACCEPTED' | 'QUOTE_DECLINED'
+  | 'JOB_STARTED' | 'PROGRESS_UPDATED' | 'JOB_COMPLETED' | 'JOB_CANCELLED'
+  | 'PAYMENT_RECEIVED' | 'REVIEW_SUBMITTED' | 'PAYOUT_RELEASED'
+  | 'REFERRAL_INVITED' | 'REFERRAL_REWARDED'
+
+export const EVENT_LABELS: Record<EventType, string> = {
+  QUOTE_RECEIVED: 'Quote received',
+  QUOTE_ACCEPTED: 'Quote accepted',
+  QUOTE_DECLINED: 'Quote declined',
+  JOB_STARTED: 'Job started',
+  PROGRESS_UPDATED: 'Progress updated',
+  JOB_COMPLETED: 'Job completed',
+  JOB_CANCELLED: 'Job cancelled',
+  PAYMENT_RECEIVED: 'Payment received',
+  REVIEW_SUBMITTED: 'Review submitted',
+  PAYOUT_RELEASED: 'Payout released',
+  REFERRAL_INVITED: 'Referral invited',
+  REFERRAL_REWARDED: 'Referral rewarded',
+}
+
+export interface NotificationItem {
+  id: string
+  eventType: EventType
+  title: string
+  body: string | null
+  link: string | null
+  jobId: string | null
+  read: boolean
+  createdAt: string
+}
+
+export type MessageChannel = 'IN_APP' | 'EMAIL' | 'SMS'
+export type MessageStatus = 'SENT' | 'FAILED' | 'SKIPPED'
+
+/** One delivery record on the admin Communications screen. */
+export interface OutboxEntry {
+  id: string
+  channel: MessageChannel
+  eventType: EventType
+  recipientId: string | null
+  recipientName: string | null
+  recipientAddress: string | null
+  subject: string | null
+  body: string | null
+  status: MessageStatus
+  providerRef: string | null
+  error: string | null
+  jobId: string | null
+  createdAt: string
+}
+
+/* ---- Payment methods & Round 1 failure simulation (Series 2 4.1) ---- */
+
+export type PaymentSimulation =
+  | 'SUCCESS' | 'DECLINED' | 'INSUFFICIENT_FUNDS' | 'TIMEOUT' | 'GATEWAY_ERROR'
+
+export const METHOD_LABELS: Record<PaymentMethod, string> = {
+  CARD: 'Credit card',
+  DEBIT_CARD: 'Debit card',
+  PAYPAL: 'PayPal',
+  AFTERPAY: 'Afterpay',
+  STUB: 'Sandbox',
+}
+
+export const SIMULATION_LABELS: Record<PaymentSimulation, string> = {
+  SUCCESS: 'Succeed',
+  DECLINED: 'Declined',
+  INSUFFICIENT_FUNDS: 'Insufficient funds',
+  TIMEOUT: 'Processor timeout',
+  GATEWAY_ERROR: 'Gateway error',
+}
+
+export interface PaymentCapabilities {
+  methods: PaymentMethod[]
+  simulationEnabled: boolean
+  simulations: PaymentSimulation[]
 }
