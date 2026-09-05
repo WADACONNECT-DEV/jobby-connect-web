@@ -2544,3 +2544,16 @@ textarea.input { font-family: inherit; }
 
 .typeahead-name { font-weight: 700; color: var(--navy); font-size: 14px; }
 .typeahead-sub { color: var(--grey); font-size: 12.5px; white-space: nowrap; }
+
+/* ==========================================================================
+   UAT ROUND 2 — R2-4 : platform settings tab
+   ========================================================================== */
+
+/* Brief confirmation after saving a setting, so a single-field form still gives
+   feedback without a banner. */
+.md-saved {
+  align-self: center;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 700;
+}

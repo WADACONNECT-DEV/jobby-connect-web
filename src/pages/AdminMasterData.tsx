@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { clearPlatformSettings } from '../platform'
 import {
   bpsToPercent,
   formatDate,
   percentToBps,
+  type PlatformSettings,
   type MasterIndustry,
   type MasterPlan,
   type MasterRate,
@@ -12,13 +14,14 @@ import {
   type MasterSuburb,
 } from '../types'
 
-type Tab = 'industries' | 'subcategories' | 'suburbs' | 'plans' | 'rates'
+type Tab = 'industries' | 'subcategories' | 'suburbs' | 'plans' | 'rates' | 'settings'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'industries', label: 'Industries' },
   { key: 'subcategories', label: 'Subcategories' },
   { key: 'suburbs', label: 'Suburbs' },
   { key: 'plans', label: 'Plans' },
   { key: 'rates', label: 'Rates' },
+  { key: 'settings', label: 'Settings' },
 ]
 
 export default function AdminMasterData() {
@@ -49,6 +52,7 @@ export default function AdminMasterData() {
       {tab === 'suburbs' && <Suburbs onError={setError} />}
       {tab === 'plans' && <Plans onError={setError} />}
       {tab === 'rates' && <Rates onError={setError} />}
+      {tab === 'settings' && <Settings onError={setError} />}
     </>
   )
 }
@@ -452,4 +456,75 @@ function inForce(r: MasterRate): boolean {
   if (r.effectiveFrom && Date.parse(r.effectiveFrom) > now) return false
   if (r.effectiveTo && Date.parse(r.effectiveTo) <= now) return false
   return true
+}
+
+/* ---------------- Platform settings ---------------- */
+/**
+ * Platform-wide configuration (V25). The provider-per-request cap lives here so
+ * the owner can change it without a code change — UAT Round 2 open item 7.2.
+ */
+function Settings({ onError }: { onError: (m: string) => void }) {
+  const report = useReporter(onError)
+  const [current, setCurrent] = useState<PlatformSettings | null>(null)
+  const [maxProviders, setMaxProviders] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  const load = () => api<PlatformSettings>('/admin/master/settings', 'GET')
+    .then((s) => { setCurrent(s); setMaxProviders(String(s.maxProvidersPerRequest)) })
+    .catch(report)
+  useEffect(() => { load() }, [])
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const value = Number(maxProviders)
+    if (!Number.isInteger(value) || value < 1 || value > 10) {
+      onError('Maximum providers per request must be a whole number between 1 and 10.')
+      return
+    }
+    try {
+      const updated = await api<PlatformSettings>('/admin/master/settings', 'PUT', { maxProvidersPerRequest: value })
+      setCurrent(updated)
+      setMaxProviders(String(updated.maxProvidersPerRequest))
+      // Members' browsers cache the settings for the session; drop this one so
+      // an admin testing the change sees it straight away.
+      clearPlatformSettings()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (e) { report(e) }
+  }
+
+  return (
+    <div className="md-panel">
+      <table className="md-table">
+        <thead><tr><th>Setting</th><th>Value</th><th>Last changed</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Maximum providers per quote request</td>
+            <td>{current ? current.maxProvidersPerRequest : '—'}</td>
+            <td>{current && current.updatedAt ? formatDate(current.updatedAt) : '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <form className="md-add" onSubmit={save}>
+        <input
+          className="md-sort"
+          type="number"
+          min={1}
+          max={10}
+          value={maxProviders}
+          onChange={(e) => setMaxProviders(e.target.value)}
+          aria-label="Maximum providers per quote request"
+        />
+        <button className="btn btn-amber btn-sm" type="submit">Save</button>
+        {saved && <span className="md-saved">Saved</span>}
+      </form>
+
+      <p className="md-note">
+        How many providers one customer can send a single quote request to. The request form and the
+        provider selection screens all read this value, and the API enforces it, so there is one
+        number rather than three. Changing it does not affect requests already sent.
+      </p>
+    </div>
+  )
 }
