@@ -2557,3 +2557,141 @@ textarea.input { font-family: inherit; }
   font-size: 13px;
   font-weight: 700;
 }
+
+/* ==========================================================================
+   UAT ROUND 3 — R3-1 : dual-role tab colours (carried over from Round 1)
+   The two panes were previously #f5f8fc and #eef5f7 — close enough in
+   lightness to read as the same colour. They now differ in HUE, not just
+   brightness, which is what makes them tell apart at a glance.
+   ========================================================================== */
+:root {
+  --pane-customer: #f7fbff;   /* customer: light, cool blue-white */
+  --pane-provider: #eaf3ef;   /* provider: a clearly different green-teal tint */
+}
+
+.role-pane.customer { border-top: 3px solid var(--navy2); }
+.role-pane.provider { border-top: 3px solid var(--teal); }
+
+.role-tab.customer.on { box-shadow: inset 0 3px 0 var(--navy2); }
+.role-tab.provider.on { box-shadow: inset 0 3px 0 var(--teal); }
+
+/* ==========================================================================
+   UAT ROUND 3 — R3-2/3/4 : decline a request
+   ========================================================================== */
+
+/* Destructive action. Deliberately not amber: declining must not look like the
+   primary "send a quote" path sitting next to it. */
+.btn-danger {
+  background: #b91c1c;
+  border: 1px solid #b91c1c;
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) { background: #991b1b; border-color: #991b1b; }
+.btn-danger:disabled { background: #e3c6c6; border-color: #e3c6c6; color: #fdf2f2; cursor: not-allowed; }
+
+/* The confirmation panel, styled as a sibling of .quote-form so the two read as
+   the same kind of surface (UAT Round 3 §6). */
+.decline-form {
+  margin-top: 14px;
+  padding: 14px;
+  background: #fff7f7;
+  border: 1px solid #f0d4d4;
+  border-radius: 10px;
+}
+.decline-form h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #7f1d1d;
+}
+.decline-lead {
+  margin: 0 0 12px;
+  color: var(--grey);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.decline-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.decline-form textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+.decline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* The recorded decline — shown to the provider on their Declined tab, and to
+   the customer on their request. */
+.decline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fdf6f6;
+  border-left: 3px solid #b91c1c;
+  border-radius: 0 8px 8px 0;
+}
+.decline-note-head {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #7f1d1d;
+  margin-bottom: 4px;
+}
+.decline-note p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   UAT ROUND 3 — R3-5/6/7 : draft save, preview gate, safe cancel
+   ========================================================================== */
+
+/* The line under the quote form's buttons: why Send is locked, when the draft
+   was last saved, and whether anything is unsaved. */
+.quote-hint {
+  margin: 8px 0 0;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--grey);
+  line-height: 1.5;
+}
+
+/* A disabled Send Quote must look deliberate, not broken. */
+.quote-form .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ==========================================================================
+   UAT ROUND 3 — R3-8 : GST treatment per quote line
+   ========================================================================== */
+
+/* Sits between the amount and the remove button on a line row. Narrow, so the
+   description keeps the space it needs. */
+.qline-gst {
+  flex: 0 0 auto;
+  width: 104px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 13px;
+  color: var(--navy);
+}
+.qline-gst:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+@media (max-width: 720px) {
+  .qline-gst { width: 100%; }
+}

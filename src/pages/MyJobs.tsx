@@ -283,6 +283,17 @@ export default function MyJobs() {
                     )}
                   </p>
                 )}
+
+                {/* A provider who declined, with their reason, so the customer
+                    isn't left waiting on a quote that will never come. */}
+                {(job.targetProviders ?? [])
+                  .filter((t) => t.status === 'DECLINED')
+                  .map((t) => (
+                    <div className="decline-note" key={t.userId}>
+                      <span className="decline-note-head">{t.name} declined this request</span>
+                      {t.declineMessage && <p>{t.declineMessage}</p>}
+                    </div>
+                  ))}
                 {job.providerName && job.status !== 'OPEN' && (
                   <p className="job-assigned">Assigned to <strong>{job.providerName}</strong></p>
                 )}

@@ -60,6 +60,10 @@ export interface Job {
 export interface JobTargetProvider {
   userId: string
   name: string
+  /** REQUESTED, QUOTED, DECLINED or EXPIRED. */
+  status: string
+  /** Present when the provider declined — shown to the customer (Round 3 9.1). */
+  declineMessage: string | null
 }
 
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN'
@@ -323,6 +327,8 @@ export type PaymentType = 'FULL' | 'STAGED'
 export interface QuoteLineInput {
   description: string
   amount: string // dollars as text in the form
+  /** Whether GST applies to this line (UAT Round 3 s3). Defaults to true. */
+  gstApplicable: boolean
 }
 
 export interface QuoteStageInput {
@@ -644,7 +650,7 @@ export interface ReferralQueueRow {
 
 /* ---- Provider request pipeline (dashboard tabs, Spec §3.4 / Series 2 §3.4) ---- */
 
-export type ProviderRequestOutcome = 'RECEIVED' | 'REPLIED' | 'WON' | 'LOST' | 'EXPIRED'
+export type ProviderRequestOutcome = 'RECEIVED' | 'REPLIED' | 'WON' | 'LOST' | 'EXPIRED' | 'DECLINED'
 
 export const OUTCOME_LABELS: Record<ProviderRequestOutcome, string> = {
   RECEIVED: 'Received',
@@ -652,6 +658,7 @@ export const OUTCOME_LABELS: Record<ProviderRequestOutcome, string> = {
   WON: 'Wins',
   LOST: 'Lost',
   EXPIRED: 'Expired',
+  DECLINED: 'Declined',
 }
 
 export interface ProviderRequestRow {
@@ -673,6 +680,28 @@ export interface ProviderRequestRow {
   quoteStatus: QuoteStatus | null
   settlementStatus: SettlementStatus | null
   quotedAt: string | null
+  /** Set only on a request this provider declined (UAT Round 3 s6/s8). */
+  declineMessage: string | null
+  declinedAt: string | null
+}
+
+/** A saved, unpriced quote form (UAT Round 3 s7). One per request. */
+export interface QuoteDraftPayload {
+  lineItems: { description: string; amount: number | null; gstApplicable: boolean }[]
+  bonusPoints: number | null
+  paymentType: PaymentType
+  stages: { name: string; percent: number | null }[]
+  message: string | null
+}
+
+export interface QuoteDraftResponse {
+  draft: QuoteDraftPayload | null
+  updatedAt: string
+}
+
+/** Declining a request, with the message the customer will see. */
+export interface DeclineRequestInput {
+  message: string
 }
 
 /* ---- Job progress (percentage-complete indicator, Spec 2.6) ---- */
