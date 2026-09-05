@@ -4,7 +4,7 @@ import { api } from '../api'
 import { Stars } from '../components/Stars'
 import { ListControls } from '../components/ListControls'
 import { byDate, byNumber, byText, useListView, usePersistedValue, type FilterOption } from '../listView'
-import { MAX_PROVIDERS_PER_REQUEST } from '../platform'
+import { useMaxProvidersPerRequest } from '../platform'
 import { formatDate, type Mate } from '../types'
 
 /** Distinct values across a list-valued field (industries, suburbs). */
@@ -33,6 +33,9 @@ export default function Mates() {
   // NOT persisted — a stale selection surviving a page revisit would be a
   // surprise, and the customer is choosing it in the moment.
   const [selected, setSelected] = useState<string[]>([])
+
+  // Admin-managed cap, same number the API enforces (open item 7.2).
+  const maxProviders = useMaxProvidersPerRequest()
 
   const list = useListView<Mate>('customer.mates', mates, {
     search: (m) => `${m.businessName ?? ''} ${m.providerName} ${m.serviceArea ?? ''} ${m.industries.join(' ')} ${m.suburbs.join(' ')}`,
@@ -82,7 +85,7 @@ export default function Mates() {
   function toggle(providerUserId: string) {
     setSelected((prev) => {
       if (prev.includes(providerUserId)) return prev.filter((id) => id !== providerUserId)
-      if (prev.length >= MAX_PROVIDERS_PER_REQUEST) return prev
+      if (prev.length >= maxProviders) return prev
       return [...prev, providerUserId]
     })
   }
@@ -104,7 +107,7 @@ export default function Mates() {
     navigate('/new-request', { state: { providers: chosen } })
   }
 
-  const atCap = selected.length >= MAX_PROVIDERS_PER_REQUEST
+  const atCap = selected.length >= maxProviders
   const selectedNames = mates
     ? selected.map((id) => mates.find((m) => m.providerUserId === id)).filter(Boolean).map((m) => nameOf(m as Mate))
     : []
@@ -169,7 +172,7 @@ export default function Mates() {
             return (
               <div className={`job-card mate-card${isSelected ? ' mate-selected' : ''}`} key={m.providerUserId}>
                 <div className="job-top">
-                  <label className="mate-pick" title={!isSelected && atCap ? `You can request up to ${MAX_PROVIDERS_PER_REQUEST} providers at once` : 'Include in one request'}>
+                  <label className="mate-pick" title={!isSelected && atCap ? `You can request up to ${maxProviders} providers at once` : 'Include in one request'}>
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -208,7 +211,7 @@ export default function Mates() {
       {selected.length > 0 && (
         <div className="mate-selectbar">
           <span>
-            {selected.length} of {MAX_PROVIDERS_PER_REQUEST} selected: <strong>{selectedNames.join(', ')}</strong>
+            {selected.length} of {maxProviders} selected: <strong>{selectedNames.join(', ')}</strong>
           </span>
           <div className="job-actions">
             <button className="btn btn-ghost-dark btn-sm" onClick={() => setSelected([])}>Clear selection</button>

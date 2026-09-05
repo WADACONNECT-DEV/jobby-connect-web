@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Stars } from '../components/Stars'
+import { useMaxProvidersPerRequest } from '../platform'
 import {
   CATEGORY_LABELS,
   parseSearch,
@@ -24,6 +25,9 @@ export default function Search() {
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Selected[]>([])
   const [savedMates, setSavedMates] = useState<Set<string>>(new Set())
+
+  // The cap is admin-managed (UAT Round 2 open item 7.2) - never a literal here.
+  const maxProviders = useMaxProvidersPerRequest()
 
   const categories = Object.keys(CATEGORY_LABELS) as ServiceCategory[]
 
@@ -152,7 +156,7 @@ export default function Search() {
                   <button
                     className={`btn btn-sm ${isSelected(p.userId) ? 'btn-green' : 'btn-amber'}`}
                     onClick={() => toggleSelect(p)}
-                    disabled={!isSelected(p.userId) && selected.length >= 3}
+                    disabled={!isSelected(p.userId) && selected.length >= maxProviders}
                   >
                     {isSelected(p.userId) ? '✓ Added' : '+ Add to request'}
                   </button>
@@ -166,7 +170,7 @@ export default function Search() {
       {/* Sticky selection bar */}
       {selected.length > 0 && (
         <div className="select-bar">
-          <span>{selected.length} of 3 selected: {selected.map((s) => s.businessName).join(', ')}</span>
+          <span>{selected.length} of {maxProviders} selected: {selected.map((s) => s.businessName).join(', ')}</span>
           <button className="btn btn-amber" onClick={proceed}>Request quotes →</button>
         </div>
       )}

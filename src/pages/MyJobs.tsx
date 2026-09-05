@@ -275,7 +275,13 @@ export default function MyJobs() {
                 )}
 
                 {job.status === 'OPEN' && (
-                  <p className="job-assigned">Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</p>
+                  <p className="job-assigned">
+                    {job.targetProviders && job.targetProviders.length > 0 ? (
+                      <>Sent to: <strong>{job.targetProviders.map((t) => t.name).join(', ')}</strong> · awaiting quotes</>
+                    ) : (
+                      <>Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</>
+                    )}
+                  </p>
                 )}
                 {job.providerName && job.status !== 'OPEN' && (
                   <p className="job-assigned">Assigned to <strong>{job.providerName}</strong></p>
