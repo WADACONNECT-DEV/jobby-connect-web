@@ -7,6 +7,8 @@ export interface User {
   email: string
   fullName: string
   mobile: string | null
+  /** Defaults the job address on a quote request (UAT Round 2 s5.2). */
+  registeredAddress: string | null
   roles: Role[]
   customerProfileComplete: boolean
   hasProviderProfile: boolean
@@ -49,7 +51,15 @@ export interface Job {
   providerId: string | null
   providerName: string | null
   targetCount: number
+  /** Who the request was actually sent to, named (UAT Round 2 s6.1). */
+  targetProviders: JobTargetProvider[]
   createdAt: string
+}
+
+/** A provider a quote request was sent to. */
+export interface JobTargetProvider {
+  userId: string
+  name: string
 }
 
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN'
@@ -780,4 +790,10 @@ export interface PaymentCapabilities {
   methods: PaymentMethod[]
   simulationEnabled: boolean
   simulations: PaymentSimulation[]
+}
+
+/** Platform-wide configuration served by GET /master/settings (V25). */
+export interface PlatformSettings {
+  maxProvidersPerRequest: number
+  updatedAt: string
 }

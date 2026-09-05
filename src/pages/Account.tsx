@@ -33,6 +33,10 @@ export default function Account() {
           <span className="acct-label">Mobile</span>
           <span className="acct-value">{user?.mobile ?? 'Not set'}</span>
         </div>
+        <div className="acct-row">
+          <span className="acct-label">Address</span>
+          <span className="acct-value">{user?.registeredAddress ?? 'Not set'}</span>
+        </div>
         <div className="acct-actions">
           <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate('/customer-profile')}>
             {customerReady ? 'Update your details' : 'Complete your profile'}

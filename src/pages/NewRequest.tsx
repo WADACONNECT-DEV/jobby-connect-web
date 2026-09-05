@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import { ImageUploader } from '../components/ImageUploader'
 import { SuburbPicker } from '../components/SuburbPicker'
 import { CATEGORY_LABELS, type Job, type ServiceCategory } from '../types'
@@ -13,12 +14,15 @@ interface Selected {
 export default function NewRequest() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
   const providers: Selected[] = (location.state as { providers?: Selected[] })?.providers ?? []
 
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState<ServiceCategory | ''>('')
   const [suburb, setSuburb] = useState('')
-  const [jobAddress, setJobAddress] = useState('')
+  // Defaults to the customer's registered address; they can type a different one
+  // for this job (UAT Round 2 §5.2).
+  const [jobAddress, setJobAddress] = useState(user?.registeredAddress ?? '')
   const [description, setDescription] = useState('')
   const [timeFrame, setTimeFrame] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
@@ -121,6 +125,13 @@ export default function NewRequest() {
 
         <label htmlFor="job-address">Job address (optional)</label>
         <input id="job-address" value={jobAddress} onChange={(e) => setJobAddress(e.target.value)} placeholder="Street address for the work" />
+        {user?.registeredAddress && jobAddress !== user.registeredAddress && (
+          <p className="field-hint">
+            <button type="button" className="link-btn" onClick={() => setJobAddress(user.registeredAddress ?? '')}>
+              Use my registered address
+            </button>
+          </p>
+        )}
 
         <label htmlFor="job-description">Describe the job</label>
         <textarea id="job-description" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What needs doing, size, access, anything providers should know…" />
