@@ -2502,3 +2502,45 @@ textarea.input { font-family: inherit; }
   .mates-controls .lv-bar { flex-basis: 100%; }
   .mate-selectbar { flex-direction: column; align-items: flex-start; }
 }
+
+/* ==========================================================================
+   UAT ROUND 2 — R2-3 : suburb type-ahead
+   ========================================================================== */
+
+/* Wraps the input so the suggestion list can hang beneath it. The input itself
+   keeps every existing form style — this only positions things. */
+.typeahead {
+  position: relative;
+}
+.typeahead input { width: 100%; }
+
+.typeahead-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 8px 20px rgba(16, 42, 67, 0.14);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.typeahead-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.typeahead-item.on { background: var(--mist); }
+
+.typeahead-name { font-weight: 700; color: var(--navy); font-size: 14px; }
+.typeahead-sub { color: var(--grey); font-size: 12.5px; white-space: nowrap; }
