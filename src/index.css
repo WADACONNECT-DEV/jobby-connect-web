@@ -2695,3 +2695,19 @@ textarea.input { font-family: inherit; }
 @media (max-width: 720px) {
   .qline-gst { width: 100%; }
 }
+
+/* ==========================================================================
+   FIX : payment area on the customer's job
+   ========================================================================== */
+
+/* Shown when the job is under way but the provider hasn't marked the work
+   complete yet — so the absence of a Pay button reads as a state, not a fault. */
+.pay-waiting {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  background: var(--mist);
+  border-left: 3px solid var(--teal);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  color: var(--grey);
+}

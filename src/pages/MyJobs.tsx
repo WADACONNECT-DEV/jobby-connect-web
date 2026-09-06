@@ -72,6 +72,16 @@ export default function MyJobs() {
             .then((rev) => setReviewByJob((prev) => ({ ...prev, [j.id]: rev })))
             .catch(() => setReviewByJob((prev) => ({ ...prev, [j.id]: null })))
         })
+        // BUGFIX: quotes were only ever fetched by expanding the quotes panel,
+        // and that panel was only offered while a job was still OPEN. Once the
+        // customer accepted a quote there was no way to load it again — so the
+        // Pay bar, which needs the quote's settlement status, could never appear
+        // and payment was unreachable. Load them for every job past OPEN.
+        js.filter((j) => j.status !== 'OPEN').forEach((j) => {
+          api<CustomerQuote[]>(`/jobs/${j.id}/quotes`, 'GET')
+            .then((qs) => setQuotesByJob((prev) => ({ ...prev, [j.id]: qs })))
+            .catch(() => { /* leave it unset; the panel shows its own error */ })
+        })
         // Progress the provider has posted, so the customer sees the same figure.
         js.filter((j) => j.status === 'IN_PROGRESS' || j.status === 'COMPLETED').forEach((j) => {
           api<ProgressEntry[]>(`/jobs/${j.id}/progress`, 'GET')
@@ -299,9 +309,11 @@ export default function MyJobs() {
                 )}
 
                 <div className="job-foot">
-                  {job.status === 'OPEN' && (
-                    <button className="btn btn-ghost-dark btn-sm" onClick={() => toggleQuotes(job.id)}>{isOpen ? 'Hide quotes' : 'View quotes'}</button>
-                  )}
+                  <button className="btn btn-ghost-dark btn-sm" onClick={() => toggleQuotes(job.id)}>
+                    {isOpen
+                      ? (job.status === 'OPEN' ? 'Hide quotes' : 'Hide quote')
+                      : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
+                  </button>
                   <div className="job-actions">
                     {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
                       <button className="btn btn-ghost-dark btn-sm" disabled={busy} onClick={() => jobAction(job.id, 'cancel')}>Cancel</button>
@@ -333,6 +345,16 @@ export default function MyJobs() {
                   </form>
                 )}
 
+                {job.status !== 'OPEN' && quotes && quotes.length > 0
+                  && !quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
+                    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))
+                  && quotes.some((q) => q.settlementStatus === 'PENDING_COMPLETION'
+                    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_COMPLETION')) && (
+                  <p className="pay-waiting">
+                    Waiting for the provider to mark the work complete — you'll be able to pay here once they do.
+                  </p>
+                )}
+
                 {caps && quotes && quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
                   || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')) && (
                   <div className="pay-bar">
@@ -353,7 +375,7 @@ export default function MyJobs() {
                   </div>
                 )}
 
-                {isOpen && job.status === 'OPEN' && (
+                {isOpen && (
                   <div className="quotes-panel">
                     {actionError && <div className="msg err">{actionError}</div>}
                     {loadingQuotes && !quotes && <div className="loading">Loading quotes…</div>}
