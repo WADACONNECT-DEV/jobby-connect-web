@@ -24,6 +24,9 @@ export default function ProviderProfile() {
   const [bio, setBio] = useState('')
   const [serviceArea, setServiceArea] = useState('')
   const [gstRegistered, setGstRegistered] = useState(false)
+  // Promotional Mate Points advertised on quotes (UAT Round 4 3.5). Customers
+  // can sort search results by this, so it lives on the profile.
+  const [promoPoints, setPromoPoints] = useState('')
   const [planId, setPlanId] = useState('')
 
   // master lists
@@ -67,6 +70,7 @@ export default function ProviderProfile() {
         setBio(p.bio ?? '')
         setServiceArea(p.serviceArea)
         setGstRegistered(p.gstRegistered)
+        setPromoPoints(p.promoPoints ? String(p.promoPoints) : '')
         setPlanId(p.subscriptionPlanId ?? '')
         setSelIndustries(new Set(p.industries.map((i) => i.id)))
         setSelSubcats(new Set(p.subcategories.map((s) => s.id)))
@@ -148,6 +152,7 @@ export default function ProviderProfile() {
       bio: bio || null,
       serviceArea,
       gstRegistered,
+      promoPoints: promoPoints ? Number(promoPoints) : null,
       subscriptionPlanId: planId || null,
       industryIds: Array.from(selIndustries),
       subcategoryIds: Array.from(selSubcats),
@@ -232,6 +237,21 @@ export default function ProviderProfile() {
           <input type="checkbox" checked={gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />
           <span>My business is registered for GST</span>
         </label>
+
+        <label htmlFor="promo-points">Promotional Mate Points offered (optional)</label>
+        <input
+          id="promo-points"
+          type="number"
+          min="0"
+          step="0.01"
+          value={promoPoints}
+          onChange={(e) => setPromoPoints(e.target.value)}
+          placeholder="e.g. 20"
+        />
+        <p className="field-hint">
+          Mate Points you advertise on your quotes. Customers can sort search results by this, so a
+          higher offer lifts you up that list. Leave blank if you don't offer any.
+        </p>
 
         <label>Industries you work in</label>
         <div className="cat-check">

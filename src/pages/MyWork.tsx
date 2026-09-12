@@ -1,13 +1,27 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import { Stars } from '../components/Stars'
 import { ProgressBar } from '../components/ProgressBar'
 import { ImageUploader } from '../components/ImageUploader'
-import { CATEGORY_LABELS, formatDate, formatDateTime, statusLabel, type Job, type ProgressEntry, type Review } from '../types'
+import {
+  CATEGORY_LABELS,
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  settlementLabel,
+  statusLabel,
+  type Job,
+  type ProgressEntry,
+  type ProviderQuote,
+  type Review,
+  type SettlementResult,
+} from '../types'
 
 export default function MyWork() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [jobs, setJobs] = useState<Job[] | null>(null)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -20,6 +34,11 @@ export default function MyWork() {
   const [note, setNote] = useState('')
   const [progressError, setProgressError] = useState('')
   const [historyFor, setHistoryFor] = useState<string | null>(null)
+
+  // The provider's own quote for each job. Marking complete acts on the quote
+  // (or one of its stages), so Your Work needs it to offer the same action as
+  // Your Quotes (UAT Round 4 7).
+  const [quoteByJob, setQuoteByJob] = useState<Record<string, ProviderQuote>>({})
 
   function loadProgress(jobId: string) {
     return api<ProgressEntry[]>(`/jobs/${jobId}/progress`, 'GET')
@@ -38,8 +57,34 @@ export default function MyWork() {
         })
         js.filter((j) => j.status === 'IN_PROGRESS' || j.status === 'COMPLETED')
           .forEach((j) => loadProgress(j.id))
+        loadQuotes()
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load your work.'))
+  }
+
+  function loadQuotes() {
+    return api<ProviderQuote[]>('/quotes/mine', 'GET')
+      .then((qs) => {
+        const byJob: Record<string, ProviderQuote> = {}
+        qs.forEach((q) => { if (q.jobId) byJob[q.jobId] = q })
+        setQuoteByJob(byJob)
+      })
+      .catch(() => { /* the Mark complete action simply won't offer itself */ })
+  }
+
+  /**
+   * Mark the work complete from here, exactly as Your Quotes does — same
+   * endpoint, same effect (UAT Round 4 7). A staged quote is completed one
+   * stage at a time, which is how the settlement ladder works.
+   */
+  async function markComplete(quoteId: string, stageId: string | null) {
+    setActionError(''); setBusyId(stageId ?? quoteId)
+    try {
+      await api<SettlementResult>('/settlement/complete', 'POST', { quoteId, stageId })
+      await Promise.all([load(), loadQuotes()])
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not mark complete.')
+    } finally { setBusyId(null) }
   }
 
   useEffect(() => { load() }, [])
@@ -109,6 +154,14 @@ export default function MyWork() {
             const review = reviewByJob[job.id]
             const history = progressByJob[job.id] ?? []
             const latest = history[0]
+            const myQuote = quoteByJob[job.id]
+            // "Mark Complete becomes available once staged progress sums to
+            // 100%" (UAT Round 4 7). Progress entries are cumulative, so the
+            // latest posted figure is the total.
+            const atFullProgress = (latest?.percent ?? 0) >= 100
+            // This provider's own Quote Request ID for the job (UAT Round 4 8.4),
+            // so the same reference follows the work through to completion.
+            const myRef = (job.targetProviders ?? []).find((t) => t.userId === user?.id)?.requestRef
             return (
               <div className="job-card" key={job.id}>
                 <div className="job-top">
@@ -201,6 +254,51 @@ export default function MyWork() {
                   </form>
                 )}
 
+                {myRef && (
+                  <div className="ref-list">
+                    <span className="ref-item"><code className="req-ref">{myRef}</code></span>
+                  </div>
+                )}
+
+                {/* Mark complete, available here as well as under Your Quotes
+                    (UAT Round 4 7). Offered once the posted progress reaches
+                    100%, and only for units still awaiting completion. */}
+                {job.status === 'IN_PROGRESS' && myQuote && atFullProgress && (
+                  <div className="work-complete">
+                    {myQuote.stages && myQuote.stages.length > 0 ? (
+                      <>
+                        <span className="work-complete-head">Mark each stage complete as you finish it</span>
+                        {myQuote.stages.map((st) => (
+                          <div className="stage-row" key={st.id}>
+                            <span className="stage-name">{st.name} · {formatMoney(st.customerTotal)}</span>
+                            {st.settlementStatus === 'PENDING_COMPLETION' ? (
+                              <button
+                                className="btn btn-green btn-sm"
+                                disabled={busyId === st.id}
+                                onClick={() => markComplete(myQuote.id, st.id)}
+                              >
+                                {busyId === st.id ? 'Marking…' : 'Mark complete'}
+                              </button>
+                            ) : (
+                              <span className="stage-settle">{settlementLabel(st.settlementStatus ?? 'PENDING_COMPLETION')}</span>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    ) : myQuote.settlementStatus === 'PENDING_COMPLETION' ? (
+                      <button
+                        className="btn btn-green btn-sm"
+                        disabled={busyId === myQuote.id}
+                        onClick={() => markComplete(myQuote.id, null)}
+                      >
+                        {busyId === myQuote.id ? 'Marking…' : 'Mark job complete'}
+                      </button>
+                    ) : (
+                      <span className="stage-settle">{settlementLabel(myQuote.settlementStatus ?? 'PENDING_COMPLETION')}</span>
+                    )}
+                  </div>
+                )}
+
                 {job.status === 'COMPLETED' && review && (
                   <div className="review-done">
                     <span className="review-label">Customer rating:</span> <Stars value={review.rating} />
@@ -211,7 +309,9 @@ export default function MyWork() {
                 <div className="job-foot">
                   <span className="job-by">
                     {job.status === 'ACCEPTED' && 'Ready to start'}
-                    {job.status === 'IN_PROGRESS' && 'In progress — mark completion under “Your quotes”'}
+                    {job.status === 'IN_PROGRESS' && (atFullProgress
+                      ? 'Progress complete — mark it complete to request payment'
+                      : 'In progress — post progress as you go')}
                     {job.status === 'COMPLETED' && review === null && 'Completed 🎉 — awaiting review'}
                     {job.status === 'COMPLETED' && review && 'Completed 🎉'}
                     {job.status === 'CANCELLED' && 'Cancelled'}

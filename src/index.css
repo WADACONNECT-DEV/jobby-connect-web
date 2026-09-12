@@ -2711,3 +2711,139 @@ textarea.input { font-family: inherit; }
   font-size: 13px;
   color: var(--grey);
 }
+
+/* ==========================================================================
+   UAT ROUND 4 — R4-1 : search ranking figures
+   ========================================================================== */
+
+/* The three numbers the ranking is built on, shown on each result so the order
+   is explainable rather than mysterious. */
+.prov-stats {
+  gap: 12px;
+  font-size: 12.5px;
+}
+.prov-stats strong { color: var(--navy); }
+.prov-points {
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* Search now has four controls rather than three: industry, suburb, sort, Apply.
+   The base rule is a 3-column grid, so widen it here. */
+.search-filters { grid-template-columns: 1fr 1fr minmax(150px, 0.8fr) auto; }
+
+@media (max-width: 900px) {
+  .search-filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .search-filters { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   UAT ROUND 4 — R4-3 : in-app confirmation dialog
+   Replaces window.confirm, which rendered the browser's own pop-up.
+   ========================================================================== */
+
+.dlg-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 42, 67, 0.45);
+}
+
+.dlg {
+  width: 100%;
+  max-width: 430px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(16, 42, 67, 0.28);
+  padding: 18px;
+}
+
+.dlg-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--navy);
+}
+
+.dlg-body p {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  color: var(--grey);
+  line-height: 1.55;
+}
+.dlg-body p:last-child { margin-bottom: 0; }
+
+.dlg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 480px) {
+  .dlg-actions { flex-direction: column-reverse; }
+  .dlg-actions .btn { width: 100%; }
+}
+
+/* ==========================================================================
+   UAT ROUND 4 — R4-6 : Mark Complete in the Work area
+   ========================================================================== */
+
+/* Sits between the progress panel and the job footer, so the action is next to
+   the progress it depends on rather than on another screen. */
+.work-complete {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f9f2;
+  border: 1px solid #cfe8d6;
+  border-radius: 10px;
+}
+.work-complete-head {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--green);
+}
+.work-complete .stage-row { margin-bottom: 6px; }
+.work-complete .stage-row:last-child { margin-bottom: 0; }
+
+/* ==========================================================================
+   UAT ROUND 4 — R4-7 : Quote Request ID
+   ========================================================================== */
+
+/* The ID is a reference people read out, quote in emails and search for, so it
+   is monospaced and selectable rather than styled as decoration. */
+.req-ref {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: var(--navy);
+  background: var(--mist);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  user-select: all;
+}
+
+.ref-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+}
+
+.ref-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--grey);
+}

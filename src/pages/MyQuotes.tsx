@@ -5,7 +5,7 @@ import { ListControls } from '../components/ListControls'
 import { byDate, byNumber, byText, optionsFrom, useListView } from '../listView'
 import {
   formatDate, formatMoney, settlementLabel,
-  type ProviderQuote, type SettlementResult, type SettlementStatus,
+  type ProviderQuote, type ProviderRequestRow, type SettlementResult, type SettlementStatus,
 } from '../types'
 
 interface ReviewTarget { quoteId: string; stageId: string | null; label: string }
@@ -24,6 +24,11 @@ export default function MyQuotes() {
   const [quotes, setQuotes] = useState<ProviderQuote[] | null>(null)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // The Quote Request ID belongs to the request, not the quote, so it comes
+  // from the pipeline and is matched by job (UAT Round 4 8.4). Showing it here
+  // means the same reference is on screen at the payment and review stages too.
+  const [refByJob, setRefByJob] = useState<Record<string, string>>({})
 
   const [review, setReview] = useState<ReviewTarget | null>(null)
   const [difficulty, setDifficulty] = useState(3)
@@ -74,7 +79,16 @@ export default function MyQuotes() {
       .then(setQuotes)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load your quotes.'))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    api<ProviderRequestRow[]>('/provider/pipeline', 'GET')
+      .then((rows) => {
+        const map: Record<string, string> = {}
+        rows.forEach((r) => { if (r.requestRef) map[r.jobId] = r.requestRef })
+        setRefByJob(map)
+      })
+      .catch(() => { /* the reference simply won't show */ })
+  }, [])
 
   async function complete(quoteId: string, stageId: string | null) {
     setError(''); setBusyId(stageId ?? quoteId)
@@ -205,6 +219,12 @@ export default function MyQuotes() {
                     </button>
                   </span>
                 </div>
+
+                {q.jobId && refByJob[q.jobId] && (
+                  <div className="ref-list">
+                    <span className="ref-item"><code className="req-ref">{refByJob[q.jobId]}</code></span>
+                  </div>
+                )}
 
                 {open && (
                   <>

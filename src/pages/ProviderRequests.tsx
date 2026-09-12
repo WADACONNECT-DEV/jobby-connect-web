@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ListControls } from '../components/ListControls'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
@@ -53,6 +54,7 @@ export default function ProviderRequests() {
   const [savingDraft, setSavingDraft] = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const inTab = rows === null ? null : rows.filter((r) => r.outcome === tab)
 
@@ -169,9 +171,18 @@ export default function ProviderRequests() {
   /**
    * Close the quote form. Discards unsaved edits only - it does NOT touch the
    * customer's request, and it does NOT delete a saved draft (UAT Round 3 s5).
+   *
+   * With unsaved edits this asks first, through the in-app dialog rather than
+   * the browser's own pop-up (UAT Round 4 s5).
    */
   function cancelQuote() {
-    if (dirty && !window.confirm('Discard your unsaved changes? Anything you saved as a draft is kept.')) return
+    if (dirty) { setConfirmCancel(true); return }
+    setOpenFor(null)
+    setDirty(false)
+  }
+
+  function discardAndClose() {
+    setConfirmCancel(false)
     setOpenFor(null)
     setDirty(false)
   }
@@ -317,6 +328,21 @@ export default function ProviderRequests() {
 
   return (
     <>
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Discard your unsaved changes?"
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        danger
+        onConfirm={discardAndClose}
+        onCancel={() => setConfirmCancel(false)}
+      >
+        <p>
+          Anything you saved as a draft is kept — only the edits made since your last save will be
+          lost. The customer's request is not affected either way.
+        </p>
+      </ConfirmDialog>
+
       <div className="page-head"><h2>Requests to me</h2></div>
       <p className="page-intro">Customers who've asked you for a quote, and where each one ended up.</p>
 
@@ -405,6 +431,12 @@ export default function ProviderRequests() {
                     <span className="tag-muted">{OUTCOME_LABELS[row.outcome]}</span>
                   )}
                 </div>
+
+                {row.requestRef && (
+                  <div className="ref-list">
+                    <span className="ref-item"><code className="req-ref">{row.requestRef}</code></span>
+                  </div>
+                )}
 
                 {row.outcome === 'DECLINED' && row.declineMessage && (
                   <div className="decline-note">

@@ -37,6 +37,18 @@ export default function Account() {
           <span className="acct-label">Address</span>
           <span className="acct-value">{user?.registeredAddress ?? 'Not set'}</span>
         </div>
+        {/* Permanent account IDs. Quote every one of these when asking us about
+            a particular job (UAT Round 4 8.1). */}
+        <div className="acct-row">
+          <span className="acct-label">Customer ID</span>
+          <span className="acct-value"><code className="req-ref">{user?.customerRef ?? '—'}</code></span>
+        </div>
+        {user?.providerRef && (
+          <div className="acct-row">
+            <span className="acct-label">Provider ID</span>
+            <span className="acct-value"><code className="req-ref">{user.providerRef}</code></span>
+          </div>
+        )}
         <div className="acct-actions">
           <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate('/customer-profile')}>
             {customerReady ? 'Update your details' : 'Complete your profile'}

@@ -9,6 +9,9 @@ export interface User {
   mobile: string | null
   /** Defaults the job address on a quote request (UAT Round 2 s5.2). */
   registeredAddress: string | null
+  /** Permanent account IDs, e.g. CAS001 / PAS002 (UAT Round 4 s8.1). */
+  customerRef: string | null
+  providerRef: string | null
   roles: Role[]
   customerProfileComplete: boolean
   hasProviderProfile: boolean
@@ -64,6 +67,8 @@ export interface JobTargetProvider {
   status: string
   /** Present when the provider declined — shown to the customer (Round 3 9.1). */
   declineMessage: string | null
+  /** Full Quote Request ID for this provider (UAT Round 4 s8.4). */
+  requestRef: string | null
 }
 
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN'
@@ -125,6 +130,8 @@ export interface ProviderProfile {
   contactEmail: string | null
   contactPhone: string | null
   contactHours: string | null
+  /** Promotional Mate Points advertised on quotes, in dollars. */
+  promoPoints: number
   createdAt: string
 }
 
@@ -136,6 +143,20 @@ export interface ProviderSummary {
   categories: ServiceCategory[]
   averageRating: number
   reviewCount: number
+  /** Stars earned as a % of the maximum possible (UAT Round 4 s3.3). */
+  ratingPercent: number
+  jobsCompleted: number
+  /** Promotional Mate Points this provider advertises, in dollars. */
+  promoPoints: number
+}
+
+/** How search results are ordered (UAT Round 4 s3.5). */
+export type ProviderSearchSort = 'RATING' | 'JOB_COUNT' | 'POINTS_OFFERED'
+
+export const SEARCH_SORT_LABELS: Record<ProviderSearchSort, string> = {
+  RATING: 'Rating',
+  JOB_COUNT: 'Job count',
+  POINTS_OFFERED: 'Special points offered',
 }
 
 export type SiteTheme = 'CLASSIC' | 'COASTAL' | 'SLATE'
@@ -683,6 +704,8 @@ export interface ProviderRequestRow {
   /** Set only on a request this provider declined (UAT Round 3 s6/s8). */
   declineMessage: string | null
   declinedAt: string | null
+  /** Full Quote Request ID for this record (UAT Round 4 s8.4). */
+  requestRef: string | null
 }
 
 /** A saved, unpriced quote form (UAT Round 3 s7). One per request. */

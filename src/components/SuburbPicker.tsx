@@ -27,13 +27,20 @@ function loadSuburbs(): Promise<MasterSuburb[]> {
 interface Props {
   value: string
   onChange: (value: string) => void
+  /**
+   * Fires with the master-data suburb when one is picked from the list, and with
+   * null when the text no longer matches one. Search needs the suburb's id, not
+   * just its name (UAT Round 4 §3.2); the quote form only needs the name and can
+   * ignore this.
+   */
+  onSelect?: (suburb: MasterSuburb | null) => void
   placeholder?: string
   id?: string
 }
 
 const MAX_SUGGESTIONS = 8
 
-export function SuburbPicker({ value, onChange, placeholder, id }: Props) {
+export function SuburbPicker({ value, onChange, onSelect, placeholder, id }: Props) {
   const [all, setAll] = useState<MasterSuburb[]>([])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
@@ -73,6 +80,7 @@ export function SuburbPicker({ value, onChange, placeholder, id }: Props) {
 
   function choose(s: MasterSuburb) {
     onChange(s.name)
+    onSelect?.(s)
     setOpen(false)
   }
 
@@ -99,7 +107,15 @@ export function SuburbPicker({ value, onChange, placeholder, id }: Props) {
         value={value}
         autoComplete="off"
         placeholder={placeholder ?? 'e.g. Pakenham'}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlight(0) }}
+        onChange={(e) => {
+          onChange(e.target.value)
+          // Typing after a selection invalidates it — the caller must not keep a
+          // stale id for text the customer has since edited.
+          const exactMatch = all.find((s) => s.name.toLowerCase() === e.target.value.trim().toLowerCase())
+          onSelect?.(exactMatch ?? null)
+          setOpen(true)
+          setHighlight(0)
+        }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         aria-autocomplete="list"

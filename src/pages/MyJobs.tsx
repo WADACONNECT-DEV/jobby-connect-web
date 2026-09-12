@@ -4,6 +4,7 @@ import { api } from '../api'
 import { Stars, StarInput } from '../components/Stars'
 import { ListControls } from '../components/ListControls'
 import { ProgressBar } from '../components/ProgressBar'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageUploader } from '../components/ImageUploader'
 import { byDate, byText, optionsFrom, useListView } from '../listView'
 import { CATEGORY_LABELS, METHOD_LABELS, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type ServiceCategory, type Wallet } from '../types'
@@ -16,6 +17,7 @@ export default function MyJobs() {
   const [quotesByJob, setQuotesByJob] = useState<Record<string, CustomerQuote[]>>({})
   const [loadingQuotes, setLoadingQuotes] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [pendingAccept, setPendingAccept] = useState<{ jobId: string; quoteId: string; waiting: number } | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pointsBalance, setPointsBalance] = useState<number>(0)
   const [redeemFor, setRedeemFor] = useState<string | null>(null)
@@ -154,6 +156,19 @@ export default function MyJobs() {
     return Math.min(pointsBalance, due)
   }
 
+  /**
+   * Accepting while other invited providers haven't replied yet (UAT Round 4 6).
+   * The customer is allowed to, but is told what they're giving up first.
+   */
+  function askAccept(job: Job, quoteId: string) {
+    const stillPending = (job.targetProviders ?? []).filter((t) => t.status === 'REQUESTED').length
+    if (stillPending > 0) {
+      setPendingAccept({ jobId: job.id, quoteId, waiting: stillPending })
+      return
+    }
+    acceptQuote(job.id, quoteId)
+  }
+
   async function acceptQuote(jobId: string, quoteId: string) {
     setActionError(''); setBusyId(quoteId)
     try {
@@ -191,6 +206,27 @@ export default function MyJobs() {
 
   return (
     <>
+      <ConfirmDialog
+        open={pendingAccept !== null}
+        title="Accept this quote now?"
+        confirmLabel="Accept Anyway"
+        cancelLabel="Wait for the others"
+        busy={busyId !== null}
+        onConfirm={() => {
+          if (!pendingAccept) return
+          const { jobId, quoteId } = pendingAccept
+          setPendingAccept(null)
+          acceptQuote(jobId, quoteId)
+        }}
+        onCancel={() => setPendingAccept(null)}
+      >
+        <p>
+          You're still awaiting a reply from {pendingAccept?.waiting}{' '}
+          other provider{pendingAccept?.waiting === 1 ? '' : 's'}. Accepting now closes the request,
+          so you won't receive their quotes.
+        </p>
+      </ConfirmDialog>
+
       <div className="page-head">
         <h2>Your requests &amp; jobs</h2>
         <button className="btn btn-amber" onClick={() => navigate('/search')}>New request</button>
@@ -292,6 +328,18 @@ export default function MyJobs() {
                       <>Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</>
                     )}
                   </p>
+                )}
+
+                {/* The Quote Request ID for each invited provider (UAT Round 4
+                    8.4) — the reference to quote when asking about this job. */}
+                {(job.targetProviders ?? []).some((t) => t.requestRef) && (
+                  <div className="ref-list">
+                    {(job.targetProviders ?? []).filter((t) => t.requestRef).map((t) => (
+                      <span className="ref-item" key={t.userId}>
+                        <code className="req-ref">{t.requestRef}</code> {t.name}
+                      </span>
+                    ))}
+                  </div>
                 )}
 
                 {/* A provider who declined, with their reason, so the customer
@@ -442,7 +490,7 @@ export default function MyJobs() {
                                 <span className={`status status-settle`}>{settlementLabel(q.settlementStatus)}</span>
                               )}
                               {q.status === 'PENDING' && (
-                                <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => acceptQuote(job.id, q.id)}>
+                                <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => askAccept(job, q.id)}>
                                   {busyId === q.id ? 'Accepting…' : 'Accept'}
                                 </button>
                               )}
