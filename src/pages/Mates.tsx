@@ -114,9 +114,9 @@ export default function Mates() {
 
   return (
     <>
-      {/* Back to wherever they came from — the dashboard, a provider's mini-site
-          or the request form (UAT Round 2 §4.1). */}
-      <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(-1)} style={{ marginBottom: 14 }}>← Back</button>
+      {/* The Back button that used to sit here moved up to the dashboard in
+          UAT Round 7 §3, where it now sits beneath the tab bar for both roles.
+          Two Back buttons stacked on this one tab would be worse than none. */}
 
       <div className="page-head">
         <h2>Your Jobby Mates</h2>

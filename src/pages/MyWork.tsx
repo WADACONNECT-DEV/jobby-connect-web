@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { usePersistedValue } from '../listView'
 import { Stars } from '../components/Stars'
 import { ProgressBar } from '../components/ProgressBar'
 import { ImageUploader } from '../components/ImageUploader'
@@ -19,6 +20,25 @@ import {
   type SettlementResult,
   type SettlementStatus,
 } from '../types'
+
+/**
+ * Your Work, split into status sub-pages (UAT Round 7 §6).
+ *
+ * Presentation only. Nothing here decides when a job moves between states —
+ * that is the settlement ladder's job and is untouched. This only groups the
+ * same jobs, in the same statuses, onto three pages instead of one list.
+ *
+ * "Completed" is a short-term holding view, not a destination: once payment
+ * and the post-job review are both done the job leaves Your Work entirely and
+ * appears in Work History, exactly as decided in Round 5.
+ */
+const WORK_TABS = [
+  { key: 'OPEN', label: 'Open' },
+  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'COMPLETED', label: 'Completed' },
+] as const
+
+type WorkTab = (typeof WORK_TABS)[number]['key']
 
 export default function MyWork() {
   const navigate = useNavigate()
@@ -40,6 +60,10 @@ export default function MyWork() {
   // (or one of its stages), so Your Work needs it to offer the same action as
   // Your Quotes (UAT Round 4 7).
   const [quoteByJob, setQuoteByJob] = useState<Record<string, ProviderQuote>>({})
+
+  // Which sub-page is open survives leaving the tab and coming back, the same
+  // way the pipeline tab does — Round 1 §5.3, restated in Round 7 check 3.3.
+  const [tab, setTab] = usePersistedValue<WorkTab>('work.tab', 'OPEN')
 
   function loadProgress(jobId: string) {
     return api<ProgressEntry[]>(`/jobs/${jobId}/progress`, 'GET')
@@ -90,7 +114,10 @@ export default function MyWork() {
 
   useEffect(() => { load() }, [])
 
-  async function action(jobId: string, verb: 'start' | 'cancel') {
+  // 'start' is the only job action a provider has from this screen. There was
+  // a 'cancel' here until UAT Round 7 §9: one click ended a live, possibly
+  // already paid job. The endpoint behind it is gone too, not just the button.
+  async function action(jobId: string, verb: 'start') {
     setActionError(''); setBusyId(jobId)
     try {
       await api<Job>(`/jobs/${jobId}/${verb}`, 'POST')
@@ -129,11 +156,55 @@ export default function MyWork() {
     } finally { setBusyId(null) }
   }
 
+  /**
+   * Every job with the figures each sub-page needs, and which sub-page it
+   * belongs to. Worked out once, here, so the tab counts and the list can
+   * never disagree with each other.
+   *
+   * "Marked complete" is read from the settlement units, not from the progress
+   * bar and not from job.status. Progress reaching 100% only means the provider
+   * CAN mark it complete; the job's own status stays IN_PROGRESS until the last
+   * unit is paid out. A unit that has left PENDING_COMPLETION is one the
+   * provider has actually marked.
+   */
+  const classified = (jobs ?? []).map((job) => {
+    const myQuote = quoteByJob[job.id]
+    const units: (SettlementStatus | null)[] = myQuote
+      ? (myQuote.stages && myQuote.stages.length > 0
+          ? myQuote.stages.map((st) => st.settlementStatus)
+          : [myQuote.settlementStatus])
+      : []
+    const awaitingCompletion = units.some((u) => u === 'PENDING_COMPLETION')
+    const awaitingPayment = units.some((u) => u === 'PENDING_PAYMENT')
+    const awaitingReview = units.some((u) => u === 'PENDING_REVIEW')
+
+    // Fails safe: with no quote loaded, units is empty and this stays false, so
+    // the progress control keeps working rather than vanishing on a failed fetch.
+    const markedComplete = job.status === 'COMPLETED'
+      || (units.length > 0 && !awaitingCompletion)
+
+    let sub: WorkTab
+    if (job.status === 'ACCEPTED') sub = 'OPEN'
+    else if (job.status === 'CANCELLED' || markedComplete) sub = 'COMPLETED'
+    else sub = 'IN_PROGRESS'
+
+    return { job, myQuote, units, awaitingCompletion, awaitingPayment, awaitingReview, markedComplete, sub }
+  })
+
+  const inTab = classified.filter((c) => c.sub === tab)
+  const countOf = (key: WorkTab) => classified.filter((c) => c.sub === key).length
+
+  const emptyCopy: Record<WorkTab, string> = {
+    OPEN: "Nothing waiting to start. Win a quote and it'll show up here.",
+    IN_PROGRESS: 'No jobs underway right now.',
+    COMPLETED: 'Nothing marked complete and waiting on payment or review.',
+  }
+
   return (
     <>
       <div className="page-head">
         <h2>Your work</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/requests')}>See requests</button>
+        <button className="btn btn-amber" onClick={() => navigate('/home/requests')}>See requests</button>
       </div>
       <p className="page-intro">Jobs you've won. Start the work, keep the customer posted on progress, then mark completion and submit your review under “Your quotes” to get paid.</p>
 
@@ -144,35 +215,42 @@ export default function MyWork() {
       {jobs !== null && jobs.length === 0 && (
         <div className="empty">
           <p>No assigned work yet. Win a quote and it'll show up here.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/requests')} style={{ marginTop: 12 }}>See requests to me</button>
+          <button className="btn btn-amber" onClick={() => navigate('/home/requests')} style={{ marginTop: 12 }}>See requests to me</button>
         </div>
       )}
 
-      {jobs && jobs.length > 0 && (
+      {jobs !== null && jobs.length > 0 && (
+        <div className="pipe-tabs" role="tablist">
+          {WORK_TABS.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`pipe-tab${tab === t.key ? ' active' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+              <span className="pipe-count">{countOf(t.key)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
+        <div className="empty"><p>{emptyCopy[tab]}</p></div>
+      )}
+
+      {inTab.length > 0 && (
         <div className="job-list">
-          {jobs.map((job) => {
+          {inTab.map(({ job, myQuote, awaitingCompletion, awaitingPayment, awaitingReview, markedComplete }) => {
             const busy = busyId === job.id
             const review = reviewByJob[job.id]
             const history = progressByJob[job.id] ?? []
             const latest = history[0]
-            const myQuote = quoteByJob[job.id]
             // "Mark Complete becomes available once staged progress sums to
             // 100%" (UAT Round 4 7). Progress entries are cumulative, so the
             // latest posted figure is the total.
             const atFullProgress = (latest?.percent ?? 0) >= 100
-
-            // Where each payable unit actually sits. Progress reaching 100% is
-            // NOT the same as the job being settled, and the job's own status
-            // stays IN_PROGRESS until every unit is paid out - so the footer
-            // below has to read the settlement status, not the progress bar.
-            const units: (SettlementStatus | null)[] = myQuote
-              ? (myQuote.stages && myQuote.stages.length > 0
-                  ? myQuote.stages.map((st) => st.settlementStatus)
-                  : [myQuote.settlementStatus])
-              : []
-            const awaitingCompletion = units.some((u) => u === 'PENDING_COMPLETION')
-            const awaitingPayment = units.some((u) => u === 'PENDING_PAYMENT')
-            const awaitingReview = units.some((u) => u === 'PENDING_REVIEW')
             // This provider's own Quote Request ID for the job (UAT Round 4 8.4),
             // so the same reference follows the work through to completion.
             const myRef = (job.targetProviders ?? []).find((t) => t.userId === user?.id)?.requestRef
@@ -239,7 +317,11 @@ export default function MyWork() {
                   />
                 )}
 
-                {job.status === 'IN_PROGRESS' && progressOpenFor === job.id && (
+                {/* Gone the moment the job is marked complete, not disabled —
+                    UAT Round 7 §8 tightened Round 5's lock to removal. There
+                    must be no control to attempt an entry through, so both the
+                    form and the button that opens it disappear together. */}
+                {job.status === 'IN_PROGRESS' && !markedComplete && progressOpenFor === job.id && (
                   <form className="prog-form" onSubmit={(e) => postProgress(e, job.id)}>
                     {progressError && <div className="msg err">{progressError}</div>}
                     <div className="row2">
@@ -318,7 +400,7 @@ export default function MyWork() {
                     {awaitingReview && (
                       <div className="work-next">
                         <span>The customer has paid. Submit your post-job review to release the payout.</span>
-                        <button className="btn btn-amber btn-sm" onClick={() => navigate('/my-quotes')}>
+                        <button className="btn btn-amber btn-sm" onClick={() => navigate('/home/quotes')}>
                           Review &amp; get paid
                         </button>
                       </div>
@@ -343,20 +425,20 @@ export default function MyWork() {
                       : 'In progress — post progress as you go')}
                     {job.status === 'COMPLETED' && review === null && 'Completed 🎉 — awaiting review'}
                     {job.status === 'COMPLETED' && review && 'Completed 🎉'}
-                    {job.status === 'CANCELLED' && 'Cancelled'}
+                    {job.status === 'CANCELLED' && 'Closed'}
                   </span>
                   <div className="job-actions">
                     {job.status === 'ACCEPTED' && (
                       <button className="btn btn-green btn-sm" disabled={busy} onClick={() => action(job.id, 'start')}>{busy ? 'Starting…' : 'Start work'}</button>
                     )}
-                    {job.status === 'IN_PROGRESS' && progressOpenFor !== job.id && (
+                    {job.status === 'IN_PROGRESS' && !markedComplete && progressOpenFor !== job.id && (
                       <button className="btn btn-amber btn-sm" onClick={() => openProgress(job.id)}>
                         {latest ? 'Update progress' : 'Post progress'}
                       </button>
                     )}
-                    {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
-                      <button className="btn btn-ghost-dark btn-sm" disabled={busy} onClick={() => action(job.id, 'cancel')}>Cancel</button>
-                    )}
+                    {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
+                        form edits and nothing else. A job is ended by Decline
+                        before acceptance, or by Dispute after it. */}
                   </div>
                 </div>
               </div>

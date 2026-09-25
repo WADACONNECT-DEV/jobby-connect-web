@@ -263,6 +263,14 @@ export function parseSearch(text: string): { category: ServiceCategory | null; s
 }
 
 export function statusLabel(s: JobStatus | QuoteStatus | string): string {
+  // UAT Round 7 §7: there is no "Cancelled" status anywhere in the product.
+  // Nothing can produce this value any more (Round 7 §9 removed the only path
+  // to it), but jobs cancelled before that still hold it and must still read
+  // sensibly. "Not Proceeded" is the label the customer's sub-page uses for
+  // this whole group, so a stray badge agrees with the page it sits on.
+  //
+  // Display only — the stored value is untouched.
+  if (s === 'CANCELLED') return 'Not proceeded'
   return s.replace('_', ' ')
 }
 
@@ -803,7 +811,10 @@ export const EVENT_LABELS: Record<EventType, string> = {
   JOB_STARTED: 'Job started',
   PROGRESS_UPDATED: 'Progress updated',
   JOB_COMPLETED: 'Job completed',
-  JOB_CANCELLED: 'Job cancelled',
+  // Kept for notifications sent before UAT Round 7 §9 removed the only action
+  // that could raise this event. Relabelled for the same reason statusLabel is:
+  // the word does not appear in the product any more.
+  JOB_CANCELLED: 'Job closed',
   PAYMENT_RECEIVED: 'Payment received',
   REVIEW_SUBMITTED: 'Review submitted',
   PAYOUT_RELEASED: 'Payout released',

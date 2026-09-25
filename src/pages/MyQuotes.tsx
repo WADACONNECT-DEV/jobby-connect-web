@@ -2,13 +2,36 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { ListControls } from '../components/ListControls'
-import { byDate, byNumber, byText, optionsFrom, useListView } from '../listView'
+import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
+  CATEGORY_LABELS, OUTCOME_LABELS,
   formatDate, formatMoney, settlementLabel,
   type ProviderQuote, type ProviderRequestRow, type SettlementResult, type SettlementStatus,
 } from '../types'
 
 interface ReviewTarget { quoteId: string; stageId: string | null; label: string }
+
+/**
+ * Your Quotes, split into three sub-pages (UAT Round 7 §5).
+ *
+ * Two of the three are not quote data at all. "Action needed" and "Declined"
+ * are the provider's request pipeline — the same rows behind Requests to Me's
+ * Received, Lost and Declined pills — surfaced here so the provider can see
+ * what is waiting on them without changing tabs. Display separation only:
+ * every item still appears in Requests to Me exactly as before.
+ *
+ * "Accepted" is the quote data this page has always shown, narrowed to the
+ * ones the customer accepted. It keeps the full card, because that is where
+ * Mark complete and Review & get paid live — the settlement ladder's only
+ * route to a payout.
+ */
+const QUOTE_TABS = [
+  { key: 'ACCEPTED', label: 'Accepted' },
+  { key: 'ACTION', label: 'Action needed' },
+  { key: 'DECLINED', label: 'Declined' },
+] as const
+
+type QuoteTab = (typeof QUOTE_TABS)[number]['key']
 
 /** Does this quote (or any of its stages) need the provider to do something? */
 function needsAction(q: ProviderQuote): boolean {
@@ -30,13 +53,33 @@ export default function MyQuotes() {
   // means the same reference is on screen at the payment and review stages too.
   const [refByJob, setRefByJob] = useState<Record<string, string>>({})
 
+  // The pipeline rows themselves, not just their references — two of the three
+  // sub-pages are built from these rather than from quotes.
+  const [pipeline, setPipeline] = useState<ProviderRequestRow[] | null>(null)
+
+  const [tab, setTab] = usePersistedValue<QuoteTab>('provider.quotes.tab', 'ACCEPTED')
+
   const [review, setReview] = useState<ReviewTarget | null>(null)
   const [difficulty, setDifficulty] = useState(3)
   const [cooperation, setCooperation] = useState(3)
   const [hazards, setHazards] = useState('')
   const [notes, setNotes] = useState('')
 
-  const list = useListView<ProviderQuote>('provider.quotes', quotes, {
+  // Accepted quotes only — the sub-page the quote cards belong to.
+  const acceptedQuotes = (quotes ?? []).filter((q) => q.status === 'ACCEPTED')
+
+  // "Action needed" is Requests to Me → Received: sent to this provider, still
+  // open, not yet replied to. "Declined" is Lost or Declined — the customer
+  // went elsewhere, or this provider declined it.
+  const actionRows = (pipeline ?? []).filter((r) => r.outcome === 'RECEIVED')
+  const declinedRows = (pipeline ?? []).filter((r) => r.outcome === 'LOST' || r.outcome === 'DECLINED')
+
+  const countOf = (key: QuoteTab) =>
+    key === 'ACCEPTED' ? acceptedQuotes.length
+      : key === 'ACTION' ? actionRows.length
+      : declinedRows.length
+
+  const list = useListView<ProviderQuote>('provider.quotes', acceptedQuotes, {
     search: (q) => `${q.jobTitle} ${q.message ?? ''}`,
     filters: [
       {
@@ -83,11 +126,12 @@ export default function MyQuotes() {
     load()
     api<ProviderRequestRow[]>('/provider/pipeline', 'GET')
       .then((rows) => {
+        setPipeline(rows)
         const map: Record<string, string> = {}
         rows.forEach((r) => { if (r.requestRef) map[r.jobId] = r.requestRef })
         setRefByJob(map)
       })
-      .catch(() => { /* the reference simply won't show */ })
+      .catch(() => { setPipeline([]) /* the reference simply won't show */ })
   }, [])
 
   async function complete(quoteId: string, stageId: string | null) {
@@ -141,17 +185,27 @@ export default function MyQuotes() {
     <>
       <div className="page-head">
         <h2>Your quotes</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/requests')}>See requests</button>
+        <button className="btn btn-amber" onClick={() => navigate('/home/requests')}>See requests</button>
       </div>
       <p className="page-intro">Quotes you've sent, what you'll be paid, and where they stand. Open a quote to see the full breakdown.</p>
 
       {error && <div className="msg err">{error}</div>}
       {quotes === null && !error && <div className="loading">Loading…</div>}
 
-      {quotes !== null && quotes.length === 0 && (
-        <div className="empty">
-          <p>You haven't sent any quotes yet.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/requests')} style={{ marginTop: 12 }}>See requests to me</button>
+      {quotes !== null && (
+        <div className="pipe-tabs" role="tablist">
+          {QUOTE_TABS.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`pipe-tab${tab === t.key ? ' active' : ''}${t.key === 'ACTION' && actionRows.length > 0 ? ' due' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+              <span className="pipe-count">{countOf(t.key)}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -186,18 +240,25 @@ export default function MyQuotes() {
         </div>
       )}
 
-      {quotes && quotes.length > 0 && (
+      {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && (
         <ListControls list={list} searchPlaceholder="Search your quotes" countLabel="quotes" />
       )}
 
-      {quotes && quotes.length > 0 && list.shown === 0 && (
+      {tab === 'ACCEPTED' && acceptedQuotes.length === 0 && quotes !== null && (
+        <div className="empty">
+          <p>No accepted quotes yet. Quotes the customer accepts appear here, with the actions that get you paid.</p>
+          <button className="btn btn-amber" onClick={() => navigate('/home/requests')} style={{ marginTop: 12 }}>See requests to me</button>
+        </div>
+      )}
+
+      {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && list.shown === 0 && (
         <div className="empty">
           <p>No quotes match these filters.</p>
           <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
         </div>
       )}
 
-      {list.shown > 0 && (
+      {tab === 'ACCEPTED' && list.shown > 0 && (
         <div className="job-list">
           {list.visible.map((q) => {
             const rowId = q.id ?? q.jobId
@@ -275,6 +336,66 @@ export default function MyQuotes() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Action needed and Declined are request rows, not quotes — the same
+          records Requests to Me shows, so a provider can act without leaving
+          this tab. Nothing here changes where those items also appear. */}
+      {(tab === 'ACTION' || tab === 'DECLINED') && pipeline === null && !error && (
+        <div className="loading">Loading…</div>
+      )}
+
+      {tab === 'ACTION' && pipeline !== null && actionRows.length === 0 && (
+        <div className="empty"><p>Nothing waiting on a reply from you.</p></div>
+      )}
+
+      {tab === 'DECLINED' && pipeline !== null && declinedRows.length === 0 && (
+        <div className="empty"><p>No declined or lost requests.</p></div>
+      )}
+
+      {(tab === 'ACTION' || tab === 'DECLINED') && (
+        <div className="job-list">
+          {(tab === 'ACTION' ? actionRows : declinedRows).map((row) => (
+            <div className="job-card" key={row.jobId}>
+              <div className="sum-row">
+                <span className="sum-main">
+                  <span className="sum-title">{row.jobTitle}</span>
+                  <span className="tag-muted">{OUTCOME_LABELS[row.outcome]}</span>
+                </span>
+                <span className="sum-right">
+                  {row.quoteTotal !== null && <span className="sum-amt">{formatMoney(row.quoteTotal)}</span>}
+                  {tab === 'ACTION' && (
+                    <button className="btn btn-amber btn-xs" onClick={() => navigate('/home/requests')}>
+                      Send a quote
+                    </button>
+                  )}
+                </span>
+              </div>
+
+              <div className="job-meta">
+                <span className="chip">{CATEGORY_LABELS[row.category]}</span>
+                <span>{row.suburb}</span>
+                {row.timeFrame && <span>· {row.timeFrame}</span>}
+                <span className="job-date">· {formatDate(row.requestedAt)}</span>
+              </div>
+
+              <p className="job-assigned">Customer: <strong>{row.customerName}</strong></p>
+
+              {row.requestRef && (
+                <div className="ref-list">
+                  <span className="ref-item"><code className="req-ref">{row.requestRef}</code></span>
+                </div>
+              )}
+
+              {row.outcome === 'DECLINED' && row.declineMessage && (
+                <div className="decline-note">
+                  <span className="decline-note-head">You declined this request</span>
+                  <p>{row.declineMessage}</p>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </>

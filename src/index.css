@@ -2964,3 +2964,42 @@ textarea.input { font-family: inherit; }
   font-weight: 700;
   color: var(--navy);
 }
+
+/* ---------------------------------------------------------------------------
+   UAT Round 7 — status sub-pages and the provider tab bar
+   ---------------------------------------------------------------------------
+   Round 7 splits three long mixed-status lists onto sub-pages and converts the
+   provider dashboard from a grid of boxes to the customer side's tab bar.
+
+   Almost nothing new is needed for that: the sub-page rows reuse .pipe-tabs
+   from the Requests to Me pipeline, and the provider tab bar reuses .dash-tabs
+   from the customer dashboard — which is the point of the round, one way of
+   navigating rather than two. Only two additions below.
+   --------------------------------------------------------------------------- */
+
+/* A pill whose sub-page is holding something the person needs to act on:
+   money owed on the customer's Completed page, requests awaiting a reply on
+   the provider's Action needed page. Splitting one list into four hides three
+   of them at any moment, and the Pay button was hard enough to find already
+   (Round 5 item 1) — this marks the page holding it from wherever you are.
+   Colour is not the only signal: the count beside it carries the same fact. */
+.pipe-tab.due {
+  border-color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber);
+}
+.pipe-tab.due .pipe-count {
+  background: var(--amber);
+  color: var(--navy);
+}
+.pipe-tab.due.active {
+  border-color: var(--amberd);
+  box-shadow: none;
+}
+
+/* Back, beneath the tab bar and above the content — the placement UAT Round 7
+   §3 asks for, now identical in both roles. It used to live inside individual
+   pages, which is why it appeared on some tabs and not others. */
+.dash-back {
+  display: inline-block;
+  margin: 0 0 12px;
+}

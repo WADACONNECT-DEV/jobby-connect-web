@@ -6,8 +6,74 @@ import { ListControls } from '../components/ListControls'
 import { ProgressBar } from '../components/ProgressBar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageUploader } from '../components/ImageUploader'
-import { byDate, byText, optionsFrom, useListView } from '../listView'
-import { CATEGORY_LABELS, METHOD_LABELS, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type ServiceCategory, type Wallet } from '../types'
+import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
+import { CATEGORY_LABELS, METHOD_LABELS, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type ServiceCategory, type SettlementStatus, type Wallet } from '../types'
+
+/**
+ * Your Requests & Jobs, split into status sub-pages (UAT Round 7 §7).
+ *
+ * Presentation only — no status value, transition or count changes. The same
+ * jobs in the same states, grouped onto four pages instead of one list.
+ *
+ * "Not Proceeded" is a display label, not a job status. Round 2 settled that
+ * there is no Cancelled status in this product, and Round 7 §7 restates it:
+ * this page groups requests that ended before acceptance with jobs whose
+ * Dispute has resolved to Closed, and calls the group something a customer
+ * can read.
+ */
+const JOBS_TABS = [
+  { key: 'OPEN', label: 'Open' },
+  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'COMPLETED', label: 'Completed' },
+  { key: 'NOT_PROCEEDED', label: 'Not Proceeded' },
+] as const
+
+type JobsTab = (typeof JOBS_TABS)[number]['key']
+
+const EMPTY_COPY: Record<JobsTab, string> = {
+  OPEN: 'No open requests. Find a provider and ask for a quote.',
+  IN_PROGRESS: 'Nothing underway right now.',
+  COMPLETED: 'Nothing waiting on payment or a review.',
+  NOT_PROCEEDED: "Nothing here — requests that didn't go ahead would appear on this page.",
+}
+
+/**
+ * Which sub-page a job belongs on.
+ *
+ * Completion is read from the accepted quote's settlement units rather than
+ * from job.status, because a job stays IN_PROGRESS until the last unit is paid
+ * out — so "marked complete, waiting to be paid" would otherwise read as still
+ * in progress. A unit that has left PENDING_COMPLETION is one the provider has
+ * actually marked.
+ *
+ * With no quotes loaded yet the job stays under In Progress and moves when they
+ * arrive, rather than flickering into Completed on incomplete data.
+ */
+function subPageOf(job: Job, quotes: CustomerQuote[] | undefined): JobsTab {
+  // Historical only — nothing can produce this status any more (Round 7 §9).
+  // Dispute-Closed jobs will join it here once Dispute is built (spec §5).
+  if (job.status === 'CANCELLED') return 'NOT_PROCEEDED'
+
+  if (job.status === 'OPEN' || job.status === 'QUOTED') {
+    const targets = job.targetProviders ?? []
+    const everyoneEnded = targets.length > 0
+      && targets.every((t) => t.status === 'DECLINED' || t.status === 'EXPIRED')
+    const pastExpiry = job.expiresAt !== null
+      && new Date(job.expiresAt).getTime() < Date.now()
+    return (everyoneEnded || pastExpiry) ? 'NOT_PROCEEDED' : 'OPEN'
+  }
+
+  const accepted = (quotes ?? []).find((q) => q.status === 'ACCEPTED')
+  const units: (SettlementStatus | null)[] = accepted
+    ? (accepted.stages && accepted.stages.length > 0
+        ? accepted.stages.map((st) => st.settlementStatus)
+        : [accepted.settlementStatus])
+    : []
+  const markedComplete = job.status === 'COMPLETED'
+    || (units.length > 0 && !units.some((u) => u === 'PENDING_COMPLETION'))
+
+  return markedComplete ? 'COMPLETED' : 'IN_PROGRESS'
+}
 
 export default function MyJobs() {
   const navigate = useNavigate()
@@ -38,9 +104,30 @@ export default function MyJobs() {
   const [comment, setComment] = useState('')
   const [reviewError, setReviewError] = useState('')
 
+  // Which sub-page is open survives leaving the tab and coming back
+  // (Round 1 §5.3, restated in Round 7 check 3.3).
+  const [tab, setTab] = usePersistedValue<JobsTab>('customer.jobs.tab', 'OPEN')
+
+  const inTab = (jobs ?? []).filter((job) => subPageOf(job, quotesByJob[job.id]) === tab)
+  const countOf = (key: JobsTab) =>
+    (jobs ?? []).filter((job) => subPageOf(job, quotesByJob[job.id]) === key).length
+
+  // Money outstanding anywhere, so the Completed pill can say so from whichever
+  // sub-page the customer happens to be on. Without this the Pay button is one
+  // tab away and invisible — the same trap as Round 5 item 1, reintroduced by
+  // splitting the list.
+  const owingCount = (jobs ?? []).filter((job) =>
+    (quotesByJob[job.id] ?? []).some((q) => q.settlementStatus === 'PENDING_PAYMENT'
+      || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))).length
+
   // Filter / sort / expand state for this box. Held outside the component so
   // it survives leaving the page and coming Back (UAT §5.3).
-  const list = useListView<Job>('customer.jobs', jobs, {
+  //
+  // One store across all four sub-pages, deliberately. Per-tab stores would
+  // give each page its own expanded set, and the auto-expand that makes the
+  // Pay button reachable (Round 5 item 1) writes into whichever store is
+  // active at load time — which would silently stop working.
+  const list = useListView<Job>('customer.jobs', inTab, {
     search: (job) => `${job.title} ${job.description} ${job.suburb} ${job.providerName ?? ''}`,
     filters: [
       {
@@ -190,15 +277,11 @@ export default function MyJobs() {
     } finally { setBusyId(null) }
   }
 
-  async function jobAction(jobId: string, action: 'cancel') {
-    setActionError(''); setBusyId(jobId)
-    try {
-      await api<Job>(`/jobs/${jobId}/${action}`, 'POST')
-      await loadJobs()
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : `Could not ${action} the job.`)
-    } finally { setBusyId(null) }
-  }
+  // jobAction() used to exist here with one verb, 'cancel', wired to a Cancel
+  // button on every accepted or in-progress job card. One click ended a live —
+  // possibly already paid — job. Removed in UAT Round 7 §9, along with the
+  // endpoint behind it. A customer ends a request by declining it before
+  // acceptance; after acceptance the only exit is Dispute, resolving to Closed.
 
   function openReview(jobId: string) { setReviewOpenFor(jobId); setRating(5); setComment(''); setReviewError('') }
 
@@ -252,11 +335,40 @@ export default function MyJobs() {
         </div>
       )}
 
-      {jobs && jobs.length > 0 && (
+      {jobs !== null && jobs.length > 0 && (
+        <div className="pipe-tabs" role="tablist">
+          {JOBS_TABS.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`pipe-tab${tab === t.key ? ' active' : ''}${t.key === 'COMPLETED' && owingCount > 0 ? ' due' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+              <span className="pipe-count">{countOf(t.key)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {jobs !== null && jobs.length > 0 && owingCount > 0 && tab !== 'COMPLETED' && (
+        <div className="banner banner-pending">
+          <strong>Payment due.</strong> {owingCount === 1 ? 'A job is' : `${owingCount} jobs are`} waiting
+          to be paid — {owingCount === 1 ? "it's" : "they're"} under Completed.{' '}
+          <button className="link-btn" onClick={() => setTab('COMPLETED')}>Open Completed</button>
+        </div>
+      )}
+
+      {jobs && jobs.length > 0 && inTab.length > 0 && (
         <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
       )}
 
-      {jobs && jobs.length > 0 && list.shown === 0 && (
+      {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
+        <div className="empty"><p>{EMPTY_COPY[tab]}</p></div>
+      )}
+
+      {jobs && inTab.length > 0 && list.shown === 0 && (
         <div className="empty">
           <p>No requests match these filters.</p>
           <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
@@ -373,9 +485,9 @@ export default function MyJobs() {
                       : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
                   </button>
                   <div className="job-actions">
-                    {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
-                      <button className="btn btn-ghost-dark btn-sm" disabled={busy} onClick={() => jobAction(job.id, 'cancel')}>Cancel</button>
-                    )}
+                    {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
+                        form edits and nothing else, on this screen and on the
+                        provider's. */}
                     {job.status === 'COMPLETED' && review === null && reviewOpenFor !== job.id && (
                       <button className="btn btn-amber btn-sm" onClick={() => openReview(job.id)}>Leave a review</button>
                     )}

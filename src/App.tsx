@@ -87,26 +87,52 @@ export default function App() {
         <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
         <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
 
-        {/* The customer dashboard. Each of the five tabs (UAT Round 2 §3) is a
-            real child route, so the back button, deep links and the persisted
-            filter/sort/view state all behave. Home renders the tab bar and the
-            Outlet; for an approved provider viewing their provider role it
-            renders the provider tiles instead. */}
+        {/* The dashboard. Both roles now work the same way (UAT Round 7 §3):
+            every tab is a real child route, so the back button, deep links and
+            the persisted filter/sort/view state all behave. Home renders the
+            role switcher, the tab bar for whichever role is open, and this
+            Outlet underneath.
+
+            The provider tabs used to be a grid of five clickable boxes on a
+            landing page of their own. That is gone — same tab pattern, same
+            styling, same Back behaviour as the customer side. */}
         <Route path="/home" element={<RequireAuth><Home /></RequireAuth>}>
           <Route index element={<Navigate to="/home/mates" replace />} />
+
+          {/* Customer tabs (UAT Round 2 §3) */}
           <Route path="mates" element={<Mates />} />
           <Route path="jobs" element={<MyJobs />} />
           <Route path="points" element={<WalletPage />} />
           <Route path="referrals" element={<JobbyMate />} />
           <Route path="find" element={<Search />} />
+
+          {/* Provider tabs (UAT Round 7 §3), in the order the round specifies.
+              "Provider Profile" is the same page previously called My Provider
+              — renamed on the tab bar only, contents untouched. */}
+          <Route path="requests" element={<ProviderRequests />} />
+          <Route path="quotes" element={<MyQuotes />} />
+          <Route path="work" element={<MyWork />} />
+          <Route path="provider-profile" element={<ProviderProfile />} />
+          <Route path="referrals-provider" element={<JobbyMate />} />
         </Route>
 
-        {/* Old customer-side links keep working — anything that still points at
-            the pre-tab routes lands on the right tab instead of 404ing. */}
+        {/* Old links keep working — anything that still points at a pre-tab
+            route lands on the right tab instead of 404ing. That includes every
+            provider path, which moved in Round 7, and any bookmark or
+            notification link created before it. */}
         <Route path="/mates" element={<Navigate to="/home/mates" replace />} />
         <Route path="/jobs" element={<Navigate to="/home/jobs" replace />} />
         <Route path="/wallet" element={<Navigate to="/home/points" replace />} />
         <Route path="/search" element={<Navigate to="/home/find" replace />} />
+        <Route path="/requests" element={<Navigate to="/home/requests" replace />} />
+        <Route path="/my-quotes" element={<Navigate to="/home/quotes" replace />} />
+        <Route path="/my-work" element={<Navigate to="/home/work" replace />} />
+
+        {/* /provider stays a real page, NOT a redirect into the provider tab.
+            Account settings sends people here while their application is still
+            pending or was rejected — they have no provider tab bar yet, so a
+            redirect would bounce them straight back out to a customer tab. */}
+        <Route path="/provider" element={<RequireAuth><ProviderProfile /></RequireAuth>} />
 
         {/* Pushed pages: opened from a tab, with their own back button. These
             stay top level so they cover the whole width and don't nest a page
@@ -117,12 +143,6 @@ export default function App() {
         {/* Referrals are reachable from both roles, so this one keeps its own
             route as well as being customer tab 4. */}
         <Route path="/jobby-mate" element={<RequireAuth><JobbyMate /></RequireAuth>} />
-
-        {/* Provider role */}
-        <Route path="/my-quotes" element={<RequireAuth><MyQuotes /></RequireAuth>} />
-        <Route path="/my-work" element={<RequireAuth><MyWork /></RequireAuth>} />
-        <Route path="/requests" element={<RequireAuth><ProviderRequests /></RequireAuth>} />
-        <Route path="/provider" element={<RequireAuth><ProviderProfile /></RequireAuth>} />
 
         {/* Account-level */}
         <Route path="/customer-profile" element={<RequireAuth><CustomerProfile /></RequireAuth>} />
