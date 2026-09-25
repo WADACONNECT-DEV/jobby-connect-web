@@ -40,6 +40,24 @@ const WORK_TABS = [
 
 type WorkTab = (typeof WORK_TABS)[number]['key']
 
+/**
+ * Where "Review & get paid" sends the provider.
+ *
+ * It used to point at the Your Quotes tab and stop there, leaving the provider
+ * to find the job, expand its card and press a second button with the same
+ * name. This carries the quote — and, on a staged job, the one stage actually
+ * awaiting review — so the form opens on arrival.
+ *
+ * A link rather than router state, so it survives a refresh and can be reached
+ * from a notification later.
+ */
+function reviewLink(quote: ProviderQuote): string {
+  const stage = (quote.stages ?? []).find((st) => st.settlementStatus === 'PENDING_REVIEW')
+  const params = new URLSearchParams({ review: quote.id ?? '' })
+  if (stage?.id) params.set('stage', stage.id)
+  return `/home/quotes?${params.toString()}`
+}
+
 export default function MyWork() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -397,10 +415,10 @@ export default function MyWork() {
                         on Your Quotes. Without this the provider hits a dead end
                         here after being paid (UAT Round 5 3.1.4) - the same trap
                         that put Mark Complete on the wrong screen in Round 4. */}
-                    {awaitingReview && (
+                    {awaitingReview && myQuote && (
                       <div className="work-next">
                         <span>The customer has paid. Submit your post-job review to release the payout.</span>
-                        <button className="btn btn-amber btn-sm" onClick={() => navigate('/home/quotes')}>
+                        <button className="btn btn-amber btn-sm" onClick={() => navigate(reviewLink(myQuote))}>
                           Review &amp; get paid
                         </button>
                       </div>

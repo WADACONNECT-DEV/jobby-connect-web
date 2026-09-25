@@ -798,16 +798,30 @@ export interface ImageLimits {
 
 /* ---- Notifications + message outbox (Spec 2.3 / 3.3) ---- */
 
+/**
+ * Must stay in step with EventType on the API side — an event with no entry in
+ * EVENT_LABELS below renders as a blank line in the notification centre.
+ *
+ * Three request events were missing here: the API has sent REQUEST_DECLINED and
+ * REQUEST_EXPIRED all along, and REQUEST_SENT has never once been delivered
+ * because the notification write failed every time (fixed separately today).
+ * Now that it works, those notifications start arriving — with no label unless
+ * they are listed.
+ */
 export type EventType =
   | 'QUOTE_RECEIVED' | 'QUOTE_ACCEPTED' | 'QUOTE_DECLINED'
+  | 'REQUEST_SENT' | 'REQUEST_DECLINED' | 'REQUEST_EXPIRED'
   | 'JOB_STARTED' | 'PROGRESS_UPDATED' | 'JOB_COMPLETED' | 'JOB_CANCELLED'
-  | 'PAYMENT_RECEIVED' | 'REVIEW_SUBMITTED' | 'PAYOUT_RELEASED'
+  | 'PAYMENT_RECEIVED' | 'REVIEW_SUBMITTED' | 'PAYOUT_RELEASED' | 'REVIEW_REQUESTED'
   | 'REFERRAL_INVITED' | 'REFERRAL_REWARDED'
 
 export const EVENT_LABELS: Record<EventType, string> = {
   QUOTE_RECEIVED: 'Quote received',
   QUOTE_ACCEPTED: 'Quote accepted',
   QUOTE_DECLINED: 'Quote declined',
+  REQUEST_SENT: 'New quote request',
+  REQUEST_DECLINED: 'Request declined',
+  REQUEST_EXPIRED: 'Request expired',
   JOB_STARTED: 'Job started',
   PROGRESS_UPDATED: 'Progress updated',
   JOB_COMPLETED: 'Job completed',
@@ -818,6 +832,7 @@ export const EVENT_LABELS: Record<EventType, string> = {
   PAYMENT_RECEIVED: 'Payment received',
   REVIEW_SUBMITTED: 'Review submitted',
   PAYOUT_RELEASED: 'Payout released',
+  REVIEW_REQUESTED: 'Rate your provider',
   REFERRAL_INVITED: 'Referral invited',
   REFERRAL_REWARDED: 'Referral rewarded',
 }

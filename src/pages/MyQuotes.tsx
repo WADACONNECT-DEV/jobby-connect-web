@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { ListControls } from '../components/ListControls'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
@@ -44,6 +44,7 @@ function needsAction(q: ProviderQuote): boolean {
 
 export default function MyQuotes() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [quotes, setQuotes] = useState<ProviderQuote[] | null>(null)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -133,6 +134,39 @@ export default function MyQuotes() {
       })
       .catch(() => { setPipeline([]) /* the reference simply won't show */ })
   }, [])
+
+  /**
+   * Arriving from "Review & get paid" in Your Work.
+   *
+   * The link carries the quote and, on a staged job, the stage awaiting review.
+   * This opens the form for that unit directly — switching to the sub-page that
+   * holds it and expanding its card on the way, so closing the form leaves the
+   * provider looking at the right job rather than a collapsed list.
+   *
+   * Runs once the quotes are in, since the label needs the job title. The
+   * parameters are cleared afterwards so a refresh, or a Back into this page,
+   * doesn't reopen a form the provider has already dealt with.
+   */
+  useEffect(() => {
+    const quoteId = searchParams.get('review')
+    if (!quoteId || quotes === null) return
+
+    const target = quotes.find((q) => q.id === quoteId)
+    if (target) {
+      const stageId = searchParams.get('stage')
+      const stage = stageId ? (target.stages ?? []).find((st) => st.id === stageId) : undefined
+      setTab('ACCEPTED')
+      list.setExpanded(target.id ?? target.jobId, true)
+      openReview(quoteId, stage?.id ?? null,
+        stage ? `${target.jobTitle} — ${stage.name}` : target.jobTitle)
+    }
+
+    // Clear either way: a quote that cannot be found is a stale link, and
+    // leaving the parameter on would retry it on every render.
+    const rest = new URLSearchParams(searchParams)
+    rest.delete('review'); rest.delete('stage')
+    setSearchParams(rest, { replace: true })
+  }, [quotes, searchParams])
 
   async function complete(quoteId: string, stageId: string | null) {
     setError(''); setBusyId(stageId ?? quoteId)
