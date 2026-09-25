@@ -2847,3 +2847,120 @@ textarea.input { font-family: inherit; }
   font-size: 12.5px;
   color: var(--grey);
 }
+
+/* ==========================================================================
+   UAT ROUND 6 — transparent pricing
+   ========================================================================== */
+
+/* --- Provider: the 4th "Customer sees" column on the Send Quote form ------ */
+
+.qline-sees {
+  flex: 0 0 116px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.qline-head {
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.qline-head .qline-sees { font-weight: 700; color: var(--grey); }
+.qline-x-space { flex: 0 0 auto; width: 20px; }
+
+@media (max-width: 720px) {
+  .qline-head { display: none; }
+  .qline-sees { flex: 1 1 100%; text-align: left; }
+  .qline-sees::before {
+    content: 'Customer sees: ';
+    font-weight: 400;
+    color: var(--grey);
+  }
+}
+
+/* --- Provider: the Preview breakdown, in the workbook's order ------------- */
+
+/* "Less" heading above the three deductions. */
+.qb-less {
+  margin-top: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.qb-sub {
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+  padding-top: 7px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* --- Customer: the line-item and totals table ----------------------------- */
+
+.cq-lines {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.cq-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.cq-row span:last-child {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.cq-head {
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.cq-sub {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 7px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.cq-pay {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--navy);
+}
+
+/* The Mate Points block sits below what the customer pays. */
+.cq-points-head {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+  padding-top: 9px;
+}
+.cq-points-head span:last-child,
+.cq-points-total span:last-child { color: var(--green); }
+
+.cq-points-total {
+  font-weight: 700;
+  color: var(--navy);
+}

@@ -15,6 +15,7 @@ import {
   type ProviderRequestOutcome,
   type ProviderRequestRow,
   type QuoteDraftResponse,
+  type QuoteRate,
   type QuoteLineInput,
   type QuoteStageInput,
   type ServiceCategory,
@@ -55,6 +56,12 @@ export default function ProviderRequests() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+
+  // The commission + Mate Points uplift applying to the open request, so the
+  // "Customer sees" column is live and correct (UAT Round 6 3.1). Read from the
+  // admin rate matrix rather than assumed to be 10% - the rates are set per
+  // industry, suburb and plan, so a hardcoded figure would quietly go wrong.
+  const [rate, setRate] = useState<QuoteRate | null>(null)
 
   const inTab = rows === null ? null : rows.filter((r) => r.outcome === tab)
 
@@ -110,6 +117,11 @@ export default function ProviderRequests() {
     setBonus(''); setPaymentType('FULL'); setMessage(''); setStages([{ name: '', percent: '' }])
     setPreview(null); setPreviewError(''); setFormError('')
     setDraftSavedAt(null); setDirty(false)
+    setRate(null)
+
+    api<QuoteRate>(`/jobs/${jobId}/quotes/rate`, 'GET')
+      .then(setRate)
+      .catch(() => { /* the column falls back to a dash rather than a wrong figure */ })
 
     // Reopen where they left off if they saved a draft (UAT Round 3 s7 / 6.9).
     try {
@@ -235,6 +247,18 @@ export default function ProviderRequests() {
   }
   function addLine() { setLines((prev) => [...prev, { description: '', amount: '', gstApplicable: true }]); edited() }
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); edited() }
+
+  /**
+   * What the customer will be shown for this line: the provider's amount plus
+   * the uplift. Returns null until the rate is known, so the column shows a dash
+   * rather than a figure that might be wrong.
+   */
+  function customerSees(amount: string): number | null {
+    if (rate === null) return null
+    const value = Number(amount)
+    if (!amount || Number.isNaN(value) || value < 0) return null
+    return Math.round(value * (1 + rate.upliftPercent / 100) * 100) / 100
+  }
 
   function validLines() {
     return lines
@@ -486,6 +510,13 @@ export default function ProviderRequests() {
                     {formError && <div className="msg err">{formError}</div>}
 
                     <label>Line items</label>
+                    <div className="qline qline-head">
+                      <span className="qline-desc">Line item</span>
+                      <span className="qline-amt">Amount</span>
+                      <span className="qline-gst">GST</span>
+                      <span className="qline-sees">Customer sees</span>
+                      {lines.length > 1 && <span className="qline-x-space" />}
+                    </div>
                     {lines.map((l, i) => (
                       <div className="qline" key={i}>
                         <input
@@ -510,12 +541,22 @@ export default function ProviderRequests() {
                           <option value="INC">+ GST</option>
                           <option value="FREE">GST-free</option>
                         </select>
+                        {/* What the customer will be shown for this line, live as
+                            the provider types (UAT Round 6 3.1). */}
+                        <span className="qline-sees" title="What the customer will see for this line">
+                          {customerSees(l.amount) === null ? '—' : formatMoney(customerSees(l.amount) as number)}
+                        </span>
                         {lines.length > 1 && (
                           <button type="button" className="qline-x" onClick={() => removeLine(i)} title="Remove">×</button>
                         )}
                       </div>
                     ))}
                     <button type="button" className="btn btn-ghost-dark btn-xs" onClick={addLine} style={{ marginTop: 4 }}>+ Add line</button>
+                    <p className="field-hint">
+                      <strong>Customer sees</strong> is your amount plus the platform's{' '}
+                      {rate === null ? 'uplift' : `${rate.upliftPercent}% uplift`} — it is the figure the
+                      customer is shown for that line, and the one they'll ask you about.
+                    </p>
                     <p className="field-hint">
                       Mark a line GST-free for anything you don't charge GST on — a government fee, a
                       permit, a disbursement passed on at cost. If you aren't GST-registered, no GST is
@@ -574,14 +615,21 @@ export default function ProviderRequests() {
 
                     {preview && (
                       <div className="quote-breakdown">
-                        <div className="qb-row"><span>Your price</span><span>{formatMoney(preview.providerNet)}</span></div>
-                        {preview.providerGst > 0 && <div className="qb-row"><span>GST on your price</span><span>{formatMoney(preview.providerGst)}</span></div>}
-                        <div className="qb-row"><span>Platform commission ({preview.commissionRate}%)</span><span>{formatMoney(preview.commission + preview.commissionGst)}</span></div>
-                        <div className="qb-row"><span>Customer Mate Points ({preview.pointsRate}%)</span><span>{formatMoney(preview.points + preview.pointsGst)}</span></div>
-                        {preview.bonus > 0 && <div className="qb-row qb-bonus"><span>Bonus points (you fund)</span><span>−{formatMoney(preview.bonus + preview.bonusGst)}</span></div>}
-                        <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(preview.customerTotal)}</span></div>
+                        {/* The workbook's "Provider receive" chain (UAT Round 6 3.2).
+                            Each amount below is shown EXCLUSIVE of GST - previously
+                            each line added its own GST before display, which is where
+                            the reported $33 / $33 / -$11 came from. The figures
+                            themselves were always calculated on the raw line total. */}
+                        <div className="qb-row"><span>Total before other charges</span><span>{formatMoney(preview.providerNet + preview.commission + preview.points)}</span></div>
+                        <div className="qb-less">Less</div>
+                        <div className="qb-row"><span>Platform commission ({preview.commissionRate}%)</span><span>−{formatMoney(preview.commission)}</span></div>
+                        <div className="qb-row"><span>Customer Mate Points ({preview.pointsRate}%)</span><span>−{formatMoney(preview.points)}</span></div>
+                        <div className="qb-row qb-bonus"><span>Bonus points (you fund)</span><span>−{formatMoney(preview.bonus)}</span></div>
+                        <div className="qb-row qb-sub"><span>Sub total</span><span>{formatMoney(preview.providerNet - preview.bonus)}</span></div>
+                        <div className="qb-row"><span>GST 10%</span><span>{formatMoney(preview.providerPayable - (preview.providerNet - preview.bonus))}</span></div>
                         <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(preview.providerPayable)}</span></div>
                         <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(preview.pointsEarned)} in points</span></div>
+                        <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(preview.customerTotal)}</span></div>
                         {preview.stages && preview.stages.length > 0 && (
                           <div className="stage-preview">
                             <div className="stage-preview-head">Payment stages</div>

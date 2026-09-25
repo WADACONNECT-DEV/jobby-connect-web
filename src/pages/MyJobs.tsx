@@ -81,7 +81,17 @@ export default function MyJobs() {
         // and payment was unreachable. Load them for every job past OPEN.
         js.filter((j) => j.status !== 'OPEN').forEach((j) => {
           api<CustomerQuote[]>(`/jobs/${j.id}/quotes`, 'GET')
-            .then((qs) => setQuotesByJob((prev) => ({ ...prev, [j.id]: qs })))
+            .then((qs) => {
+              setQuotesByJob((prev) => ({ ...prev, [j.id]: qs }))
+              // BUGFIX (UAT Round 5 3.1.2): the "Pay with" method selector sits
+              // outside this panel, but every actual Pay button lives INSIDE it.
+              // With the panel collapsed the customer saw a payment control with
+              // nothing to press - which is what "payment option is not
+              // available" was describing. Open it whenever money is due.
+              const owing = qs.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
+                || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))
+              if (owing) list.setExpanded(j.id, true)
+            })
             .catch(() => { /* leave it unset; the panel shows its own error */ })
         })
         // Progress the provider has posted, so the customer sees the same figure.
@@ -436,7 +446,54 @@ export default function MyJobs() {
                               <span className="quote-provider">{q.providerName}</span>
                               <span className="quote-price">{formatMoney(q.total)}</span>
                             </div>
-                            <div className="quote-points">Earn {formatMoney(q.pointsEarned)} in Mate Points</div>
+
+                            {/* What the quote is made up of (UAT Round 6 2). Each
+                                amount is the figure that applies to the customer -
+                                the provider's own pricing is not shown here, and
+                                nothing on this screen names a platform charge. */}
+                            {q.lineItems && q.lineItems.length > 0 && (
+                              <div className="cq-lines">
+                                <div className="cq-row cq-head">
+                                  <span>Line item</span>
+                                  <span>Amount</span>
+                                </div>
+                                {q.lineItems.map((li, i) => (
+                                  <div className="cq-row" key={i}>
+                                    <span>{li.description}</span>
+                                    <span>{formatMoney(li.amount)}</span>
+                                  </div>
+                                ))}
+                                <div className="cq-row cq-sub">
+                                  <span>Total</span>
+                                  <span>{formatMoney(q.subTotal)}</span>
+                                </div>
+                                <div className="cq-row">
+                                  <span>GST</span>
+                                  <span>{formatMoney(q.gst)}</span>
+                                </div>
+                                <div className="cq-row cq-pay">
+                                  <span>Customer pay</span>
+                                  <span>{formatMoney(q.total)}</span>
+                                </div>
+
+                                <div className="cq-row cq-points-head">
+                                  <span>Standard Mate Points earned</span>
+                                  <span>{formatMoney(q.standardPoints)}</span>
+                                </div>
+                                <div className="cq-row">
+                                  <span>Bonus Mate Points earned</span>
+                                  <span>{formatMoney(q.bonusPoints ?? 0)}</span>
+                                </div>
+                                <div className="cq-row cq-points-total">
+                                  <span>Total Mate Points earned</span>
+                                  <span>{formatMoney(q.pointsEarned)}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {(!q.lineItems || q.lineItems.length === 0) && (
+                              <div className="quote-points">Earn {formatMoney(q.pointsEarned)} in Mate Points</div>
+                            )}
                             {q.paymentType === 'STAGED' && q.stages && q.stages.length > 0 && (
                               <div className="stage-preview">
                                 <div className="stage-preview-head">Paid in stages</div>

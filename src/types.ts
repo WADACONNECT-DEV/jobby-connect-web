@@ -367,13 +367,30 @@ export interface CustomerQuoteStage {
   settlementStatus: SettlementStatus | null
 }
 
+/** One quote line as the customer sees it - already uplifted (UAT Round 6 s2). */
+export interface CustomerQuoteLine {
+  description: string
+  amount: number
+}
+
 export interface CustomerQuote {
   id: string
   jobId: string
   jobTitle: string
   providerId: string
   providerName: string
+  /** Each line at the customer-facing amount. Never the provider's raw price. */
+  lineItems: CustomerQuoteLine[]
+  /** Sum of the lines, before GST. */
+  subTotal: number
+  /** One combined GST figure. */
+  gst: number
+  /** What the customer pays: subTotal + gst. */
   total: number
+  /** The standard loyalty share, in dollars. */
+  standardPoints: number
+  /** The provider-funded bonus. Zero, never null, when none was offered. */
+  bonusPoints: number
   pointsEarned: number
   paymentType: PaymentType
   stages: CustomerQuoteStage[]
@@ -381,6 +398,14 @@ export interface CustomerQuote {
   status: QuoteStatus
   settlementStatus: SettlementStatus | null
   createdAt: string
+}
+
+/** The rates applying to a job, for the live "Customer sees" column (Round 6 s3.1). */
+export interface QuoteRate {
+  commissionPercent: number
+  pointsPercent: number
+  /** What turns the provider's price into the customer-facing figure. */
+  upliftPercent: number
 }
 
 export interface ProviderQuoteLine {

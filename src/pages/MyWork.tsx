@@ -17,6 +17,7 @@ import {
   type ProviderQuote,
   type Review,
   type SettlementResult,
+  type SettlementStatus,
 } from '../types'
 
 export default function MyWork() {
@@ -159,6 +160,19 @@ export default function MyWork() {
             // 100%" (UAT Round 4 7). Progress entries are cumulative, so the
             // latest posted figure is the total.
             const atFullProgress = (latest?.percent ?? 0) >= 100
+
+            // Where each payable unit actually sits. Progress reaching 100% is
+            // NOT the same as the job being settled, and the job's own status
+            // stays IN_PROGRESS until every unit is paid out - so the footer
+            // below has to read the settlement status, not the progress bar.
+            const units: (SettlementStatus | null)[] = myQuote
+              ? (myQuote.stages && myQuote.stages.length > 0
+                  ? myQuote.stages.map((st) => st.settlementStatus)
+                  : [myQuote.settlementStatus])
+              : []
+            const awaitingCompletion = units.some((u) => u === 'PENDING_COMPLETION')
+            const awaitingPayment = units.some((u) => u === 'PENDING_PAYMENT')
+            const awaitingReview = units.some((u) => u === 'PENDING_REVIEW')
             // This provider's own Quote Request ID for the job (UAT Round 4 8.4),
             // so the same reference follows the work through to completion.
             const myRef = (job.targetProviders ?? []).find((t) => t.userId === user?.id)?.requestRef
@@ -263,7 +277,7 @@ export default function MyWork() {
                 {/* Mark complete, available here as well as under Your Quotes
                     (UAT Round 4 7). Offered once the posted progress reaches
                     100%, and only for units still awaiting completion. */}
-                {job.status === 'IN_PROGRESS' && myQuote && atFullProgress && (
+                {job.status === 'IN_PROGRESS' && myQuote && (atFullProgress || awaitingPayment || awaitingReview) && (
                   <div className="work-complete">
                     {myQuote.stages && myQuote.stages.length > 0 ? (
                       <>
@@ -296,6 +310,19 @@ export default function MyWork() {
                     ) : (
                       <span className="stage-settle">{settlementLabel(myQuote.settlementStatus ?? 'PENDING_COMPLETION')}</span>
                     )}
+
+                    {/* The payout is released by the post-job review, which lives
+                        on Your Quotes. Without this the provider hits a dead end
+                        here after being paid (UAT Round 5 3.1.4) - the same trap
+                        that put Mark Complete on the wrong screen in Round 4. */}
+                    {awaitingReview && (
+                      <div className="work-next">
+                        <span>The customer has paid. Submit your post-job review to release the payout.</span>
+                        <button className="btn btn-amber btn-sm" onClick={() => navigate('/my-quotes')}>
+                          Review &amp; get paid
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -309,7 +336,9 @@ export default function MyWork() {
                 <div className="job-foot">
                   <span className="job-by">
                     {job.status === 'ACCEPTED' && 'Ready to start'}
-                    {job.status === 'IN_PROGRESS' && (atFullProgress
+                    {job.status === 'IN_PROGRESS' && awaitingReview && 'Paid by the customer — submit your review to get paid'}
+                    {job.status === 'IN_PROGRESS' && !awaitingReview && awaitingPayment && 'Marked complete — awaiting customer payment'}
+                    {job.status === 'IN_PROGRESS' && !awaitingReview && !awaitingPayment && (atFullProgress && awaitingCompletion
                       ? 'Progress complete — mark it complete to request payment'
                       : 'In progress — post progress as you go')}
                     {job.status === 'COMPLETED' && review === null && 'Completed 🎉 — awaiting review'}
