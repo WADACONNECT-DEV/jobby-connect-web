@@ -5982,3 +5982,857 @@ main.wrap:has(> .fr) {
     gap: 12px;
   }
 }
+
+/* ==========================================================================
+   Your Requests & Jobs (HANDOFF-jobs-find Part C). Built on the Mates `pg-`
+   pieces; `jb-` adds the job and quote cards. Card sizing follows the List-view
+   mate card (padding 18, radius 14, 1.5px border). Scoped under `.jb`, so the
+   provider pages that share ProgressBar / ImageUploader / Stars keep their look.
+   ========================================================================== */
+.pg-btn-green {
+  background: #2e9e5b;
+  color: #fff;
+}
+.jb-btn-sm {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.jb-btn-xs {
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* ---- Secondary sub-tab bar ----
+   Same style as the main tab pills (.fr-tab), about 80% of their size:
+   14px text, 8px x 16px padding, 8px corners. Active = solid navy pill.
+   A little more space above than below, so they sit under the page title.
+   Scrolls sideways inside its own strip on phones. */
+.jb-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  margin-bottom: -6px;
+  padding: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.jb-subtabs::-webkit-scrollbar {
+  display: none;
+}
+.jb-subtab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f2a4a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.jb-subtab:hover {
+  background: #eaf4fc;
+}
+.jb-subtab.on,
+.jb-subtab.on:hover {
+  background: #0f2a4a;
+  color: #fff;
+  font-weight: 700;
+}
+.jb-badge {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e4eaf1;
+  color: #24405f;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.jb-subtab.on .jb-badge {
+  background: #fff;
+  color: #0f2a4a;
+}
+/* Something waiting for the customer: yellow on any tab, active or not. */
+.jb-badge.is-attention,
+.jb-subtab.on .jb-badge.is-attention {
+  background: #f7c21b;
+  color: #0f2a4a;
+  font-weight: 800;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jb-subtab {
+    transition: none;
+  }
+}
+
+/* ---- Payment-due bar + filter row ---- */
+.jb-owing {
+  justify-content: space-between;
+  font-size: 14px;
+}
+.pg-searchrow.jb-filters {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+.jb-sortbox {
+  display: flex;
+  gap: 6px;
+}
+.pg .jb-sortbox select {
+  width: auto;
+  min-width: 160px;
+}
+.jb-sortbox .pg-dir {
+  height: 48px;
+  width: 44px;
+  border-radius: 10px;
+}
+
+/* ---- Job card ---- */
+.jb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+  background: #fff;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 14px;
+}
+.jb-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.jb-title {
+  margin: 0;
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  color: #0f2a4a;
+  overflow-wrap: anywhere;
+}
+.jb-date {
+  margin-left: auto;
+  font-size: 13.5px;
+  color: #5a6e86;
+  white-space: nowrap;
+}
+.jb-status {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+/* Different hue AND lightness, so they still differ without colour. */
+.jb-status-open {
+  background: #dcebfb;
+  color: #124a8c;
+}
+.jb-status-progress {
+  background: #0f2a4a;
+  color: #fff;
+}
+.jb-status-done {
+  background: #2e7d4f;
+  color: #fff;
+}
+.jb-status-ended {
+  background: #eef1f5;
+  color: #5a6e86;
+}
+.jb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 14px;
+  color: #24405f;
+}
+.jb-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.jb-ref {
+  padding: 3px 8px;
+  border: 1px solid #d6e0ea;
+  border-radius: 6px;
+  background: #f5f8fc;
+  color: #24405f;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.jb-desc {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #5a6e86;
+  white-space: pre-line;
+}
+.jb-desc.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.jb-more {
+  font-size: 13.5px;
+  padding: 2px 0 0;
+}
+
+/* Sent to + declines */
+.jb-sent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 14px;
+  color: #24405f;
+}
+.jb-sent-label {
+  font-weight: 700;
+  color: #0f2a4a;
+}
+.jb-sent-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jb-sent-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 2px;
+  border: 1px solid #e4eaf1;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.jb-sent-list li .pg-avatar-sm {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+.jb-sent-list li.is-declined {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.jb-sent-note {
+  font-size: 13.5px;
+  color: #5a6e86;
+}
+.jb-decline {
+  padding: 10px 12px;
+  border-left: 3px solid #b9c6d4;
+  border-radius: 0 8px 8px 0;
+  background: #f5f8fc;
+  font-size: 13.5px;
+  color: #5a6e86;
+}
+.jb-decline-head {
+  font-weight: 700;
+  color: #24405f;
+}
+.jb-decline p {
+  margin-top: 4px;
+}
+
+/* Photos: the uploader's own box becomes a light card on this page. */
+.jb .img-block {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #e4eaf1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+/* Progress: yellow on light grey, on this page only. */
+.jb .prog-wrap {
+  margin: 0;
+}
+.jb .prog-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #e4eaf1;
+}
+.jb .prog-fill,
+.jb .prog-fill.full {
+  border-radius: 999px;
+  background: #f7c21b;
+}
+.jb .prog-label,
+.jb .prog-pct {
+  font-weight: 700;
+  color: #0f2a4a;
+}
+.jb .prog-caption {
+  font-size: 13px;
+  color: #5a6e86;
+}
+.jb-history-btn {
+  align-self: flex-start;
+  font-size: 13.5px;
+}
+
+.jb-assigned {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #24405f;
+}
+.jb-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #eef1f5;
+}
+.jb-waiting {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5f8fc;
+  font-size: 14px;
+  color: #3e5571;
+}
+.jb-testbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px dashed #cbd6e2;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #5a6e86;
+}
+.pg .jb-testbar label {
+  font-weight: 700;
+}
+.pg .jb-testbar select,
+.pg .jb-paywith select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f2a4a;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* ---- Review ---- */
+.jb-review-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.jb .jb-review-done .stars {
+  font-size: 20px;
+}
+.jb-review-comment {
+  font-size: 14px;
+  font-style: italic;
+  color: #3e5571;
+}
+.jb-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e4eaf1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.jb-review-stars {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.jb-review-stars legend {
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.jb .stars-input .star {
+  font-size: 36px;
+  line-height: 1;
+  padding: 2px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.pg .jb-review label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f2a4a;
+}
+.pg .jb-review textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd6e2;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+}
+.jb-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- Quotes panel ---- */
+.jb-quotes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jb-quotes-empty {
+  font-size: 14px;
+  color: #5a6e86;
+}
+.jb-quote-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jb-quote {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 14px 18px;
+  padding: 16px;
+  background: #fff;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 14px;
+}
+.jb-quote.is-accepted {
+  border-color: #f7c21b;
+  background: #fffbea;
+}
+.jb-quote.is-declined {
+  opacity: 0.6;
+  background: #f8fafc;
+}
+.jb-quote-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.jb-quote-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.jb-quote-provider {
+  font-weight: 800;
+  font-size: 15.5px;
+}
+.jb-qstatus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #5a6e86;
+  font-size: 12px;
+  font-weight: 700;
+}
+.jb-qstatus-accepted {
+  background: #f7c21b;
+  color: #0f2a4a;
+}
+.jb-qstatus-pending {
+  background: #dcebfb;
+  color: #124a8c;
+}
+.jb-quote-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.jb-quote-price {
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  color: #0f2a4a;
+}
+.jb-points-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff6d9;
+  color: #6b4e00;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Price table in clean rows */
+.jb-lines {
+  border: 1px solid #eef1f5;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 14px;
+}
+.jb-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  border-top: 1px solid #eef1f5;
+  color: #24405f;
+}
+.jb-line:first-child {
+  border-top: 0;
+}
+.jb-line > span:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.jb-line-head {
+  background: #f5f8fc;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a6e86;
+}
+.jb-line-sub {
+  border-top: 1px solid #d6e0ea;
+}
+.jb-line-pay {
+  font-weight: 800;
+  color: #0f2a4a;
+}
+.jb-line-points-head {
+  border-top: 1px solid #d6e0ea;
+  background: #fffbea;
+}
+.jb-line-points-head ~ .jb-line {
+  background: #fffbea;
+}
+.jb-line-points-total {
+  font-weight: 700;
+}
+
+/* Staged payments as a small timeline */
+.jb-stages-head {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a6e86;
+}
+.jb-stages ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.jb-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 14px;
+}
+.jb-stage:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 24px;
+  bottom: -8px;
+  width: 2px;
+  background: #e4eaf1;
+}
+.jb-stage-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #b9c6d4;
+  background: #fff;
+  z-index: 1;
+}
+.jb-stage.is-paid .jb-stage-dot {
+  border-color: #2e9e5b;
+  background: #2e9e5b;
+}
+.jb-stage.is-due .jb-stage-dot {
+  border-color: #d9a400;
+  background: #f7c21b;
+}
+.jb-stage-name {
+  color: #24405f;
+}
+.jb-stage-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.jb-stage-state {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5a6e86;
+}
+
+/* Provider message */
+.jb-bubble {
+  position: relative;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px 12px 12px 4px;
+  background: #eaf4fc;
+  color: #24405f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Actions on the right */
+.jb-quote-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.jb-quote-actions > .pg-btn {
+  width: 100%;
+}
+.pg label.jb-paywith {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #24405f;
+}
+.jb-redeem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pg .jb-redeem-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #24405f;
+}
+.pg .jb-redeem-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.jb-redeem .pg-link {
+  align-self: center;
+  font-size: 13px;
+}
+.jb-settle {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e5f4ea;
+  color: #2e7d4f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ---- Smaller screens ---- */
+@media (max-width: 860px) {
+  .pg-searchrow.jb-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .jb-filters .pg-field:last-child {
+    grid-column: 1 / -1;
+  }
+  .pg .jb-sortbox select {
+    flex: 1;
+  }
+}
+@media (max-width: 640px) {
+  .jb-quote {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jb-date {
+    margin-left: 0;
+    width: 100%;
+  }
+  .jb-foot .pg-btn,
+  .jb-review-actions .pg-btn {
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 480px) {
+  .pg-searchrow.jb-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jb-card {
+    padding: 14px;
+  }
+  .jb-quote {
+    padding: 12px;
+  }
+}
+
+/* ---- Your Requests & Jobs: Grid view ----
+   3 compact cards a row (2 tablet, 1 phone), sized like the grid mate cards.
+   An opened card spans the whole row and shows the full List-view card. */
+.jb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.jb-span {
+  grid-column: 1 / -1;
+}
+.jb-less {
+  align-self: flex-end;
+  margin-bottom: -4px;
+  font-size: 13.5px;
+}
+.jb-cc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  background: #fff;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.jb-cc:hover {
+  border-color: #cbd6e2;
+  box-shadow: 0 2px 8px rgba(15, 42, 74, 0.06);
+}
+.jb-cc.is-attention {
+  border-color: #f7c21b;
+  background: #fffbea;
+}
+.jb-cc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+/* Always the full title: it wraps rather than being cut. */
+.jb-cc-title {
+  min-width: 0;
+  margin: 0;
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.2;
+  color: #0f2a4a;
+  overflow-wrap: anywhere;
+}
+.jb-cc-top .jb-status {
+  flex: 0 0 auto;
+}
+.jb-cc-date {
+  margin-top: -4px;
+  font-size: 13px;
+  color: #5a6e86;
+}
+.jb-cc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13.5px;
+  color: #24405f;
+}
+.jb-cc-refs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.jb-cc-refs .jb-ref {
+  font-size: 11.5px;
+}
+.jb-cc-more {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #5a6e86;
+}
+.jb-cc-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #24405f;
+}
+.jb-cc-who .pg-avatar-sm {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+.jb-cc-prog {
+  height: 5px;
+  border-radius: 999px;
+  background: #e4eaf1;
+  overflow: hidden;
+}
+.jb-cc-prog > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #f7c21b;
+}
+.jb-cc-action {
+  width: 100%;
+  min-height: 38px;
+  margin-top: auto;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+@media (max-width: 1180px) {
+  .jb-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .jb-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jb-cc {
+    transition: none;
+  }
+}

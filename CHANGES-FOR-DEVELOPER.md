@@ -232,3 +232,86 @@ Same checkbox, buttons, cap and tooltip; nothing else changed.
 - Everything else as before (suburbs line still cut with "…", stats line, the two small links).
 
 **Files touched:** `src/components/ProviderCard.tsx` (compact card markup), `src/index.css` (compact card rules, grid columns).
+
+## 2026-10-30 — Your Requests & Jobs (design/HANDOFF-jobs-find.md, Part C)
+
+**Screen:** customer dashboard → Your Requests & Jobs, restyled to match Your Jobby Mates. Card sizes follow the List-view mate card.
+
+**What changed visually**
+- Header row: clipboard icon, "Your Requests & Jobs", "Every request, quote and job in one place.", yellow "New request" (still `/search`).
+- Open · In Progress · Completed · Not Proceeded as a smaller white sub-tab bar under the main tabs. The active tab has
+  navy text and a navy underline. Each has a round count badge: **yellow** when something waits for the customer, grey otherwise.
+  Completed = payment due (the existing `owingCount`); **Open = an open request whose job status is Quoted** (new display-only
+  check on jobs already loaded, approved by the owner). On phones the bar scrolls sideways.
+- Payment-due banner in the yellow selection-bar style, same text, same "Open Completed".
+- Search / Status / Industry / Sort laid out like the Mates search row (same `useListView('customer.jobs')` state), with
+  "{n} requests" and "Clear filters".
+- Job card: title, status chip (Open/Quoted blue, Accepted/In progress navy, Completed green, Not proceeded grey; same label
+  text), date; industry chip, suburb, time frame, Quote Request IDs as monospace pills (exactly as issued); description cut
+  to 2 lines with "Show more"; "Sent to" name chips (declined ones greyed) and the decline notes, same text; photos in a
+  light card; progress bar yellow on grey (this page only; Your Work keeps its look); "Progress history (n)" link;
+  "Assigned to" with an initials avatar; "View quote(s)" / "Leave a review".
+- Quote card: provider avatar + name + status, big total, "Earn $x in Mate Points" chip, the price table in clean rows
+  (same rows, figures and **UAT Round 6 wording**: Total / GST / Customer pay / points rows), staged payments as a small
+  timeline with each stage's state and Pay button, the provider message as a speech bubble, and actions on the right in the same
+  order. An accepted quote gets the yellow border; declined quotes are greyed.
+- **"Pay with" moved** from the bar above the quotes into the owing quote's action column (owner decision). The test-only
+  "Test outcome" select stays where it was, shown only while test payments are on.
+- Review form: five large stars, and the submit button's label follows the stars (Functional Spec §2.8): 5★ "Great Job Mate",
+  4★ "Good Job Mate", 3★ "Thanks for the Job", 2★ "Do Better Next Time Mate", 1★ "Not Up to Standard". Same submit.
+- Empty states keep their text, in the Mates style. The per-sub-tab empty state also gets the "Find providers" button (`/search`).
+
+**Not changed:** everything above `return (` in `MyJobs.tsx` apart from the imports and the new `REVIEW_LABELS` constant:
+the loading of jobs, quotes, reviews, progress, wallet and capabilities, `subPageOf`, counts, `owingCount`, auto-expand when owing,
+toggleQuotes, pay, use points, askAccept / "Accept Anyway", acceptQuote, openReview, submitReview.
+All calls, timings, grouping rules and money figures are unchanged.
+
+**Files touched:** `src/pages/MyJobs.tsx` (markup + `REVIEW_LABELS`), new `src/components/JobParts.tsx` (sub-tab bar, status
+chip, ID pill, sent-to chips, 2-line text; display only), `src/index.css` (new `jb-` block scoped under `.jb`, plus
+`.pg-btn-green`). Reuses `PageParts.tsx` (header, empty state, avatar, icons). No new BACKEND-REQUESTS.
+
+## 2026-10-30 — Your Requests & Jobs: segmented sub-tabs + List / Grid
+
+**Screen:** customer dashboard → Your Requests & Jobs.
+
+**Sub-tabs (CSS only).** Open / In Progress / Completed / Not Proceeded are now a soft segmented switch:
+- One light-blue track (`#EAF4FC`, 4px padding, fully rounded), sized to its content.
+- Active tab: white pill with a soft shadow, navy bold text and a navy count badge.
+- Inactive tabs: grey-navy text with a light-grey badge, slightly darker on hover.
+- The yellow badge still shows on any tab when something waits for the customer.
+- 150ms transition (none with reduced motion). It scrolls sideways inside itself on phones.
+
+Same tabs, counts and behaviour.
+
+**List / Grid toggle.** Same buttons and place as Your Jobby Mates, on every sub-tab. Remembered with
+`usePersistedValue('customer.jobs.layout', 'list')` (new display preference, default List; same mechanism as Mates).
+- List: the full job card, unchanged.
+- Grid: 3 compact cards a row (2 under 1180px, 1 under 640px):
+  - title (full, wraps), status chip, date
+  - industry chip, suburb
+  - the first Quote Request ID pill (+N if several; all on hover)
+  - the assigned provider's initials + name, or "Sent to n providers"
+  - a thin progress bar when there is progress
+  - one full-width main button: "Pay now" (payment due) → "Review" (completed, not yet reviewed) → "View quotes (n)"
+    (Open sub-tab; n only when the quotes are already loaded, so no new call) → otherwise "View details"
+  - Yellow highlight when a payment is due or a quote has arrived on an open request (same rule as the badges).
+- Clicking the main button or the card calls the existing `toggleQuotes(job.id)`, the same expand state and the same quote
+  load as "View quotes" in List. The card then spans the full row and shows the full List-view card with a "Show less" link.
+  "Review" also calls the existing `openReview`. Every button inside the opened card is the List-view button.
+- Note: jobs with a payment due are already opened on load by the existing auto-expand, so in Grid they appear opened,
+  with Pay reachable.
+
+**Files touched:** `src/pages/MyJobs.tsx` (layout preference, toolbar toggle, grid branch), `src/components/JobParts.tsx`
+(`JobCompactCard`), `src/index.css` (segmented sub-tabs, `jb-grid` / `jb-cc` rules).
+
+## 2026-10-30 — Your Requests & Jobs: sub-tabs match the main tabs
+
+**Screen:** Your Requests & Jobs, Open / In Progress / Completed / Not Proceeded. CSS only (`.jb-subtabs` / `.jb-subtab` / `.jb-badge`).
+- The light-blue track is gone. The sub-tabs use the main tab pill style at about 80% size: 14px text, 8px × 16px padding,
+  8px corners, the same 6px gap.
+- Active: solid navy pill, white bold text, white count badge with a navy number.
+- Inactive: no background, navy text, light-blue background on hover, light-grey count badge.
+- The yellow badge still shows on any tab when something waits for the customer.
+- A little more space above the sub-tabs than below. They scroll sideways inside their own strip on phones.
+
+Same tabs, counts and behaviour.

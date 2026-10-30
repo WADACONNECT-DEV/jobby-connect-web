@@ -2,7 +2,8 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Stars, StarInput } from '../components/Stars'
-import { ListControls } from '../components/ListControls'
+import { ClipboardIcon, ClockIcon, EmptyState, GridIcon, InitialsAvatar, ListIcon, PageHead, PinIcon, SearchIcon } from '../components/PageParts'
+import { ClampText, JobCompactCard, RefPill, SentTo, StatusChip, SubTabs } from '../components/JobParts'
 import { ProgressBar } from '../components/ProgressBar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageUploader } from '../components/ImageUploader'
@@ -35,6 +36,16 @@ const EMPTY_COPY: Record<JobsTab, string> = {
   IN_PROGRESS: 'Nothing underway right now.',
   COMPLETED: 'Nothing waiting on payment or a review.',
   NOT_PROCEEDED: "Nothing here — requests that didn't go ahead would appear on this page.",
+}
+
+/** Review button label by stars — Functional Spec §2.8, exactly. Display only:
+ *  the button submits the same review whatever it says. */
+const REVIEW_LABELS: Record<number, string> = {
+  5: 'Great Job Mate',
+  4: 'Good Job Mate',
+  3: 'Thanks for the Job',
+  2: 'Do Better Next Time Mate',
+  1: 'Not Up to Standard',
 }
 
 /**
@@ -107,6 +118,9 @@ export default function MyJobs() {
   // Which sub-page is open survives leaving the tab and coming back
   // (Round 1 §5.3, restated in Round 7 check 3.3).
   const [tab, setTab] = usePersistedValue<JobsTab>('customer.jobs.tab', 'OPEN')
+
+  // List / Grid, remembered the same way as Your Jobby Mates. Display only.
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('customer.jobs.layout', 'list')
 
   const inTab = (jobs ?? []).filter((job) => subPageOf(job, quotesByJob[job.id]) === tab)
   const countOf = (key: JobsTab) =>
@@ -298,7 +312,7 @@ export default function MyJobs() {
   }
 
   return (
-    <>
+    <div className="pg jb">
       <ConfirmDialog
         open={pendingAccept !== null}
         title="Accept this quote now?"
@@ -320,63 +334,144 @@ export default function MyJobs() {
         </p>
       </ConfirmDialog>
 
-      <div className="page-head">
-        <h2>Your requests &amp; jobs</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/search')}>New request</button>
-      </div>
+      <PageHead
+        icon={<ClipboardIcon />}
+        title="Your Requests & Jobs"
+        intro="Every request, quote and job in one place."
+        action={
+          <button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/search')}>New request</button>
+        }
+      />
 
-      {error && <div className="msg err">{error}</div>}
-      {jobs === null && !error && <div className="loading">Loading…</div>}
+      {error && <div className="pg-error" role="alert">{error}</div>}
+      {jobs === null && !error && <div className="pg-loading">Loading…</div>}
 
       {jobs !== null && jobs.length === 0 && (
-        <div className="empty">
-          <p>You haven't requested any quotes yet.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/search')} style={{ marginTop: 12 }}>Find providers</button>
-        </div>
+        <EmptyState
+          action={<button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/search')}>Find providers</button>}
+        >
+          You haven't requested any quotes yet.
+        </EmptyState>
       )}
 
+      {/* Sub-pages. The badge is yellow when something there is waiting for the
+          customer: a payment due (Completed, as before) or a quote that has
+          arrived on an open request. Display only, from jobs already loaded. */}
       {jobs !== null && jobs.length > 0 && (
-        <div className="pipe-tabs" role="tablist">
-          {JOBS_TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`pipe-tab${tab === t.key ? ' active' : ''}${t.key === 'COMPLETED' && owingCount > 0 ? ' due' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-              <span className="pipe-count">{countOf(t.key)}</span>
-            </button>
-          ))}
-        </div>
+        <SubTabs
+          label="Your requests by stage"
+          active={tab}
+          onChange={setTab}
+          tabs={JOBS_TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            count: countOf(t.key),
+            attention:
+              (t.key === 'COMPLETED' && owingCount > 0)
+              || (t.key === 'OPEN' && (jobs ?? []).some((job) => job.status === 'QUOTED' && subPageOf(job, quotesByJob[job.id]) === 'OPEN')),
+          }))}
+        />
       )}
 
       {jobs !== null && jobs.length > 0 && owingCount > 0 && tab !== 'COMPLETED' && (
-        <div className="banner banner-pending">
-          <strong>Payment due.</strong> {owingCount === 1 ? 'A job is' : `${owingCount} jobs are`} waiting
-          to be paid — {owingCount === 1 ? "it's" : "they're"} under Completed.{' '}
-          <button className="link-btn" onClick={() => setTab('COMPLETED')}>Open Completed</button>
+        <div className="pg-selbar jb-owing" role="status">
+          <span>
+            <strong>Payment due.</strong> {owingCount === 1 ? 'A job is' : `${owingCount} jobs are`} waiting
+            to be paid — {owingCount === 1 ? "it's" : "they're"} under Completed.
+          </span>
+          <button type="button" className="pg-link" onClick={() => setTab('COMPLETED')}>Open Completed</button>
         </div>
       )}
 
+      {/* Search, filters and sort — the same list state as before, laid out
+          like the Mates search row. */}
       {jobs && jobs.length > 0 && inTab.length > 0 && (
-        <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
+        <>
+          <div className="pg-searchrow jb-filters">
+            <div className="pg-field pg-field-grow">
+              <label htmlFor="jobs-search">Search your requests</label>
+              <span className="pg-input-ico">
+                <SearchIcon />
+                <input
+                  id="jobs-search"
+                  type="search"
+                  value={list.view.search}
+                  placeholder="Title, suburb or provider"
+                  onChange={(e) => list.setSearch(e.target.value)}
+                />
+              </span>
+            </div>
+            {list.filters.map((f) => (
+              <div className="pg-field" key={f.key}>
+                <label htmlFor={`jobs-${f.key}`}>{f.key === 'status' ? 'Status' : 'Industry'}</label>
+                <select id={`jobs-${f.key}`} value={list.view.filters[f.key] ?? ''} onChange={(e) => list.setFilter(f.key, e.target.value)}>
+                  <option value="">All {f.label.toLowerCase()}</option>
+                  {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
+            <div className="pg-field">
+              <label htmlFor="jobs-sort">Sort by</label>
+              <span className="jb-sortbox">
+                <select id="jobs-sort" value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+                  {list.sorts.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+                <button
+                  type="button"
+                  className="pg-dir"
+                  aria-label={list.view.sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                  title={list.view.sortDir === 'asc' ? 'Lowest first' : 'Highest first'}
+                  onClick={list.toggleDir}
+                >
+                  {list.view.sortDir === 'asc' ? '↑' : '↓'}
+                </button>
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Count, Clear and the List / Grid toggle (same buttons and place as
+          Your Jobby Mates). Shown on every sub-tab. */}
+      {jobs && jobs.length > 0 && (
+        <div className="pg-toolbar">
+          {inTab.length > 0 ? (
+            <h3 className="pg-count">
+              {list.shown === list.total ? `${list.total} requests` : `${list.shown} of ${list.total} requests`}
+            </h3>
+          ) : <span />}
+          <div className="pg-toolbar-end">
+            {inTab.length > 0 && list.dirty && (
+              <button type="button" className="pg-link" onClick={list.clear}>Clear filters</button>
+            )}
+            <div className="pg-seg" role="group" aria-label="View">
+              <button type="button" className={layout === 'list' ? 'on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
+                <ListIcon /> List
+              </button>
+              <button type="button" className={layout === 'grid' ? 'on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+                <GridIcon /> Grid
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
-        <div className="empty"><p>{EMPTY_COPY[tab]}</p></div>
+        <EmptyState
+          action={<button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/search')}>Find providers</button>}
+        >
+          {EMPTY_COPY[tab]}
+        </EmptyState>
       )}
 
       {jobs && inTab.length > 0 && list.shown === 0 && (
-        <div className="empty">
-          <p>No requests match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
-        </div>
+        <EmptyState action={<button type="button" className="pg-btn pg-btn-ghost" onClick={list.clear}>Clear filters</button>}>
+          No requests match these filters.
+        </EmptyState>
       )}
 
       {jobs && list.shown > 0 && (
-        <div className="job-list">
+        <div className={layout === 'grid' ? 'jb-grid' : 'jb-list'}>
           {list.visible.map((job) => {
             const quotes = quotesByJob[job.id]
             const isOpen = list.isExpanded(job.id)
@@ -384,19 +479,84 @@ export default function MyJobs() {
             const review = reviewByJob[job.id]
             const history = progressByJob[job.id] ?? []
             const latest = history[0]
+            const targets = job.targetProviders ?? []
+            const isOwing = (q: CustomerQuote) => q.settlementStatus === 'PENDING_PAYMENT'
+              || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')
+
+            /* Grid view, closed: the compact card. Opening it uses the same
+               expand state as "View quotes" in List view (toggleQuotes), and
+               the card then shows the full List-view content below. */
+            if (layout === 'grid' && !isOpen) {
+              const payDue = (quotes ?? []).some(isOwing)
+              const reviewReady = job.status === 'COMPLETED' && review === null
+              const onOpenTab = subPageOf(job, quotes) === 'OPEN'
+              const quoteWaiting = onOpenTab && job.status === 'QUOTED'
+              const open = () => toggleQuotes(job.id)
+              const action = payDue
+                ? { label: 'Pay now', run: open }
+                : reviewReady
+                  ? { label: 'Review', run: () => { open(); openReview(job.id) } }
+                  : onOpenTab
+                    ? { label: quotes ? `View quotes (${quotes.length})` : 'View quotes', run: open }
+                    : { label: 'View details', run: open }
+              return (
+                <JobCompactCard
+                  key={job.id}
+                  title={job.title}
+                  status={job.status}
+                  date={formatDate(job.createdAt)}
+                  industry={CATEGORY_LABELS[job.category]}
+                  suburb={job.suburb}
+                  refs={targets.filter((t) => t.requestRef).map((t) => ({ value: t.requestRef as string, owner: t.name }))}
+                  assignedTo={job.status !== 'OPEN' ? job.providerName : null}
+                  sentCount={targets.length > 0 ? targets.length : job.targetCount}
+                  progress={latest ? latest.percent : null}
+                  attention={payDue || quoteWaiting}
+                  actionLabel={action.label}
+                  onAction={action.run}
+                  onOpen={open}
+                />
+              )
+            }
+
             return (
-              <div className="job-card" key={job.id}>
-                <div className="job-top">
-                  <span className="job-title">{job.title}</span>
-                  <span className={`status status-${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
+              <article className={`jb-card${layout === 'grid' ? ' jb-span' : ''}`} key={job.id}>
+                {layout === 'grid' && (
+                  <button type="button" className="pg-link jb-less" aria-expanded="true" onClick={() => toggleQuotes(job.id)}>
+                    Show less
+                  </button>
+                )}
+                <div className="jb-top">
+                  <h3 className="jb-title">{job.title}</h3>
+                  <StatusChip status={job.status} />
+                  <span className="jb-date">{formatDate(job.createdAt)}</span>
                 </div>
-                <div className="job-meta">
-                  <span className="chip">{CATEGORY_LABELS[job.category]}</span>
-                  <span>{job.suburb}</span>
-                  {job.timeFrame && <span>· {job.timeFrame}</span>}
-                  <span className="job-date">· {formatDate(job.createdAt)}</span>
+
+                {/* The Quote Request ID for each invited provider (UAT Round 4
+                    8.4) — the reference to quote when asking about this job. */}
+                <div className="jb-meta">
+                  <span className="pg-chip">{CATEGORY_LABELS[job.category]}</span>
+                  <span className="jb-meta-item"><PinIcon />{job.suburb}</span>
+                  {job.timeFrame && <span className="jb-meta-item"><ClockIcon />{job.timeFrame}</span>}
+                  {targets.filter((t) => t.requestRef).map((t) => (
+                    <RefPill key={t.userId} value={t.requestRef as string} owner={t.name} />
+                  ))}
                 </div>
-                <p className="job-desc">{job.description}</p>
+
+                <ClampText text={job.description} />
+
+                {job.status === 'OPEN' && <SentTo targets={targets} fallbackCount={job.targetCount} />}
+
+                {/* A provider who declined, with their reason, so the customer
+                    isn't left waiting on a quote that will never come. */}
+                {targets
+                  .filter((t) => t.status === 'DECLINED')
+                  .map((t) => (
+                    <div className="jb-decline" key={t.userId}>
+                      <span className="jb-decline-head">{t.name} declined this request</span>
+                      {t.declineMessage && <p>{t.declineMessage}</p>}
+                    </div>
+                  ))}
 
                 {/* Photos the customer sent with the request; editable while it's still open. */}
                 <ImageUploader
@@ -415,8 +575,9 @@ export default function MyJobs() {
 
                 {history.length > 1 && (
                   <button
-                    className="btn btn-ghost-dark btn-xs"
-                    style={{ marginTop: 8 }}
+                    type="button"
+                    className="pg-link jb-history-btn"
+                    aria-expanded={historyFor === job.id}
                     onClick={() => setHistoryFor(historyFor === job.id ? null : job.id)}
                   >
                     {historyFor === job.id ? 'Hide progress history' : `Progress history (${history.length})`}
@@ -442,75 +603,61 @@ export default function MyJobs() {
                   <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
                 )}
 
-                {job.status === 'OPEN' && (
-                  <p className="job-assigned">
-                    {job.targetProviders && job.targetProviders.length > 0 ? (
-                      <>Sent to: <strong>{job.targetProviders.map((t) => t.name).join(', ')}</strong> · awaiting quotes</>
-                    ) : (
-                      <>Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</>
-                    )}
+                {job.providerName && job.status !== 'OPEN' && (
+                  <p className="jb-assigned">
+                    <InitialsAvatar name={job.providerName} size="sm" />
+                    <span>Assigned to <strong>{job.providerName}</strong></span>
                   </p>
                 )}
 
-                {/* The Quote Request ID for each invited provider (UAT Round 4
-                    8.4) — the reference to quote when asking about this job. */}
-                {(job.targetProviders ?? []).some((t) => t.requestRef) && (
-                  <div className="ref-list">
-                    {(job.targetProviders ?? []).filter((t) => t.requestRef).map((t) => (
-                      <span className="ref-item" key={t.userId}>
-                        <code className="req-ref">{t.requestRef}</code> {t.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* A provider who declined, with their reason, so the customer
-                    isn't left waiting on a quote that will never come. */}
-                {(job.targetProviders ?? [])
-                  .filter((t) => t.status === 'DECLINED')
-                  .map((t) => (
-                    <div className="decline-note" key={t.userId}>
-                      <span className="decline-note-head">{t.name} declined this request</span>
-                      {t.declineMessage && <p>{t.declineMessage}</p>}
-                    </div>
-                  ))}
-                {job.providerName && job.status !== 'OPEN' && (
-                  <p className="job-assigned">Assigned to <strong>{job.providerName}</strong></p>
-                )}
-
-                <div className="job-foot">
-                  <button className="btn btn-ghost-dark btn-sm" onClick={() => toggleQuotes(job.id)}>
+                <div className="jb-foot">
+                  <button type="button" className="pg-btn pg-btn-ghost jb-btn-sm" aria-expanded={isOpen} onClick={() => toggleQuotes(job.id)}>
                     {isOpen
                       ? (job.status === 'OPEN' ? 'Hide quotes' : 'Hide quote')
                       : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
                   </button>
-                  <div className="job-actions">
-                    {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
-                        form edits and nothing else, on this screen and on the
-                        provider's. */}
-                    {job.status === 'COMPLETED' && review === null && reviewOpenFor !== job.id && (
-                      <button className="btn btn-amber btn-sm" onClick={() => openReview(job.id)}>Leave a review</button>
-                    )}
-                  </div>
+                  {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
+                      form edits and nothing else, on this screen and on the
+                      provider's. */}
+                  {job.status === 'COMPLETED' && review === null && reviewOpenFor !== job.id && (
+                    <button type="button" className="pg-btn pg-btn-yellow jb-btn-sm" onClick={() => openReview(job.id)}>Leave a review</button>
+                  )}
                 </div>
 
                 {job.status === 'COMPLETED' && review && (
-                  <div className="review-done">
+                  <div className="jb-review-done">
                     <Stars value={review.rating} />
-                    {review.comment && <p className="review-comment">"{review.comment}"</p>}
+                    {review.comment && <p className="jb-review-comment">"{review.comment}"</p>}
                   </div>
                 )}
 
                 {reviewOpenFor === job.id && (
-                  <form className="review-form" onSubmit={(e) => submitReview(e, job.id)}>
-                    {reviewError && <div className="msg err">{reviewError}</div>}
-                    <label>How was {job.providerName}?</label>
-                    <StarInput value={rating} onChange={setRating} />
-                    <label style={{ marginTop: 10 }}>Comment (optional)</label>
-                    <textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="How did the job go?" />
-                    <div className="quote-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => setReviewOpenFor(null)}>Cancel</button>
-                      <button type="submit" className="btn btn-amber btn-sm" disabled={busy}>{busy ? 'Submitting…' : 'Submit review'}</button>
+                  <form className="jb-review" onSubmit={(e) => submitReview(e, job.id)}>
+                    {reviewError && <div className="pg-error" role="alert">{reviewError}</div>}
+                    <fieldset className="jb-review-stars">
+                      <legend>How was {job.providerName}?</legend>
+                      <StarInput value={rating} onChange={setRating} />
+                    </fieldset>
+                    <label htmlFor={`review-comment-${job.id}`}>Comment (optional)</label>
+                    <textarea
+                      id={`review-comment-${job.id}`}
+                      rows={2}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="How did the job go?"
+                    />
+                    <div className="jb-review-actions">
+                      <button type="button" className="pg-btn pg-btn-ghost" onClick={() => setReviewOpenFor(null)}>Cancel</button>
+                      {/* The label follows the stars (Functional Spec §2.8); it
+                          submits the same review as before. */}
+                      <button
+                        type="submit"
+                        className="pg-btn pg-btn-yellow"
+                        disabled={busy}
+                        aria-label={busy ? undefined : `Submit review: ${REVIEW_LABELS[rating]}`}
+                      >
+                        {busy ? 'Submitting…' : REVIEW_LABELS[rating]}
+                      </button>
                     </div>
                   </form>
                 )}
@@ -520,146 +667,163 @@ export default function MyJobs() {
                     || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))
                   && quotes.some((q) => q.settlementStatus === 'PENDING_COMPLETION'
                     || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_COMPLETION')) && (
-                  <p className="pay-waiting">
+                  <p className="jb-waiting">
                     Waiting for the provider to mark the work complete — you'll be able to pay here once they do.
                   </p>
                 )}
 
-                {caps && quotes && quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
-                  || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')) && (
-                  <div className="pay-bar">
-                    <label className="pay-label">Pay with</label>
-                    <select className="lv-select" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
-                      {caps.methods.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
+                {/* Test-only payment outcome — stays where it was shown before.
+                    "Pay with" moved into the owing quote, next to Pay. */}
+                {caps && caps.simulationEnabled && quotes && quotes.some(isOwing) && (
+                  <div className="jb-testbar">
+                    <label htmlFor={`simulate-${job.id}`}>Test outcome</label>
+                    <select id={`simulate-${job.id}`} value={simulate} onChange={(e) => setSimulate(e.target.value as PaymentSimulation)}>
+                      {caps.simulations.map((sim) => (
+                        <option key={sim} value={sim}>{SIMULATION_LABELS[sim]}</option>
+                      ))}
                     </select>
-                    {caps.simulationEnabled && (
-                      <>
-                        <label className="pay-label">Test outcome</label>
-                        <select className="lv-select" value={simulate} onChange={(e) => setSimulate(e.target.value as PaymentSimulation)}>
-                          {caps.simulations.map((sim) => (
-                            <option key={sim} value={sim}>{SIMULATION_LABELS[sim]}</option>
-                          ))}
-                        </select>
-                      </>
-                    )}
                   </div>
                 )}
 
                 {isOpen && (
-                  <div className="quotes-panel">
-                    {actionError && <div className="msg err">{actionError}</div>}
-                    {loadingQuotes && !quotes && <div className="loading">Loading quotes…</div>}
-                    {quotes && quotes.length === 0 && <p className="quotes-empty">No quotes yet — your providers haven't replied.</p>}
+                  <div className="jb-quotes">
+                    {actionError && <div className="pg-error" role="alert">{actionError}</div>}
+                    {loadingQuotes && !quotes && <div className="pg-loading">Loading quotes…</div>}
+                    {quotes && quotes.length === 0 && <p className="jb-quotes-empty">No quotes yet — your providers haven't replied.</p>}
                     {quotes && quotes.length > 0 && (
-                      <div className="quote-list">
+                      <div className="jb-quote-list">
                         {quotes.map((q) => (
-                          <div className="quote-item" key={q.id}>
-                            <div className="quote-item-main">
-                              <span className="quote-provider">{q.providerName}</span>
-                              <span className="quote-price">{formatMoney(q.total)}</span>
+                          <div
+                            key={q.id}
+                            className={`jb-quote${q.status === 'ACCEPTED' ? ' is-accepted' : ''}${q.status === 'DECLINED' ? ' is-declined' : ''}`}
+                          >
+                            <div className="jb-quote-main">
+                              <div className="jb-quote-head">
+                                <InitialsAvatar name={q.providerName} size="sm" />
+                                <span className="jb-quote-provider">{q.providerName}</span>
+                                <span className={`jb-qstatus jb-qstatus-${q.status.toLowerCase()}`}>{q.status}</span>
+                              </div>
+                              <div className="jb-quote-total">
+                                <span className="jb-quote-price">{formatMoney(q.total)}</span>
+                                <span className="jb-points-chip">Earn {formatMoney(q.pointsEarned)} in Mate Points</span>
+                              </div>
+
+                              {/* What the quote is made up of (UAT Round 6 2). Each
+                                  amount is the figure that applies to the customer -
+                                  the provider's own pricing is not shown here, and
+                                  nothing on this screen names a platform charge. */}
+                              {q.lineItems && q.lineItems.length > 0 && (
+                                <div className="jb-lines">
+                                  <div className="jb-line jb-line-head">
+                                    <span>Line item</span>
+                                    <span>Amount</span>
+                                  </div>
+                                  {q.lineItems.map((li, i) => (
+                                    <div className="jb-line" key={i}>
+                                      <span>{li.description}</span>
+                                      <span>{formatMoney(li.amount)}</span>
+                                    </div>
+                                  ))}
+                                  <div className="jb-line jb-line-sub">
+                                    <span>Total</span>
+                                    <span>{formatMoney(q.subTotal)}</span>
+                                  </div>
+                                  <div className="jb-line">
+                                    <span>GST</span>
+                                    <span>{formatMoney(q.gst)}</span>
+                                  </div>
+                                  <div className="jb-line jb-line-pay">
+                                    <span>Customer pay</span>
+                                    <span>{formatMoney(q.total)}</span>
+                                  </div>
+
+                                  <div className="jb-line jb-line-points-head">
+                                    <span>Standard Mate Points earned</span>
+                                    <span>{formatMoney(q.standardPoints)}</span>
+                                  </div>
+                                  <div className="jb-line">
+                                    <span>Bonus Mate Points earned</span>
+                                    <span>{formatMoney(q.bonusPoints ?? 0)}</span>
+                                  </div>
+                                  <div className="jb-line jb-line-points-total">
+                                    <span>Total Mate Points earned</span>
+                                    <span>{formatMoney(q.pointsEarned)}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {q.paymentType === 'STAGED' && q.stages && q.stages.length > 0 && (
+                                <div className="jb-stages">
+                                  <div className="jb-stages-head">Paid in stages</div>
+                                  <ol>
+                                    {q.stages.map((st) => (
+                                      <li
+                                        key={st.id}
+                                        className={`jb-stage${st.settlementStatus === 'PAID' ? ' is-paid' : ''}${st.settlementStatus === 'PENDING_PAYMENT' ? ' is-due' : ''}`}
+                                      >
+                                        <span className="jb-stage-dot" aria-hidden="true" />
+                                        <span className="jb-stage-name">{st.name} · {st.percent}%</span>
+                                        <span className="jb-stage-end">
+                                          {formatMoney(st.amount)}
+                                          {st.settlementStatus === 'PENDING_PAYMENT' && (
+                                            <button type="button" className="pg-btn pg-btn-green jb-btn-xs" disabled={busyId === st.id}
+                                                    onClick={() => pay(job.id, q.id, st.id)}>
+                                              {busyId === st.id ? 'Paying…' : 'Pay'}
+                                            </button>
+                                          )}
+                                          {st.settlementStatus && st.settlementStatus !== 'PENDING_PAYMENT' && (
+                                            <span className="jb-stage-state">{settlementLabel(st.settlementStatus)}</span>
+                                          )}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+
+                              {q.message && <blockquote className="jb-bubble">{q.message}</blockquote>}
                             </div>
 
-                            {/* What the quote is made up of (UAT Round 6 2). Each
-                                amount is the figure that applies to the customer -
-                                the provider's own pricing is not shown here, and
-                                nothing on this screen names a platform charge. */}
-                            {q.lineItems && q.lineItems.length > 0 && (
-                              <div className="cq-lines">
-                                <div className="cq-row cq-head">
-                                  <span>Line item</span>
-                                  <span>Amount</span>
-                                </div>
-                                {q.lineItems.map((li, i) => (
-                                  <div className="cq-row" key={i}>
-                                    <span>{li.description}</span>
-                                    <span>{formatMoney(li.amount)}</span>
-                                  </div>
-                                ))}
-                                <div className="cq-row cq-sub">
-                                  <span>Total</span>
-                                  <span>{formatMoney(q.subTotal)}</span>
-                                </div>
-                                <div className="cq-row">
-                                  <span>GST</span>
-                                  <span>{formatMoney(q.gst)}</span>
-                                </div>
-                                <div className="cq-row cq-pay">
-                                  <span>Customer pay</span>
-                                  <span>{formatMoney(q.total)}</span>
-                                </div>
-
-                                <div className="cq-row cq-points-head">
-                                  <span>Standard Mate Points earned</span>
-                                  <span>{formatMoney(q.standardPoints)}</span>
-                                </div>
-                                <div className="cq-row">
-                                  <span>Bonus Mate Points earned</span>
-                                  <span>{formatMoney(q.bonusPoints ?? 0)}</span>
-                                </div>
-                                <div className="cq-row cq-points-total">
-                                  <span>Total Mate Points earned</span>
-                                  <span>{formatMoney(q.pointsEarned)}</span>
-                                </div>
-                              </div>
-                            )}
-
-                            {(!q.lineItems || q.lineItems.length === 0) && (
-                              <div className="quote-points">Earn {formatMoney(q.pointsEarned)} in Mate Points</div>
-                            )}
-                            {q.paymentType === 'STAGED' && q.stages && q.stages.length > 0 && (
-                              <div className="stage-preview">
-                                <div className="stage-preview-head">Paid in stages</div>
-                                {q.stages.map((st) => (
-                                  <div className="stage-row" key={st.id}>
-                                    <span>{st.name} · {st.percent}%</span>
-                                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                      {formatMoney(st.amount)}
-                                      {st.settlementStatus === 'PENDING_PAYMENT' && (
-                                        <button className="btn btn-green btn-xs" disabled={busyId === st.id}
-                                                onClick={() => pay(job.id, q.id, st.id)}>
-                                          {busyId === st.id ? 'Paying…' : 'Pay'}
-                                        </button>
-                                      )}
-                                      {st.settlementStatus && st.settlementStatus !== 'PENDING_PAYMENT' && (
-                                        <span className="stage-settle">{settlementLabel(st.settlementStatus)}</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {q.message && <p className="quote-message">{q.message}</p>}
-                            <div className="quote-item-foot">
-                              <span className={`status status-${q.status.toLowerCase()}`}>{q.status}</span>
+                            <div className="jb-quote-actions">
+                              {caps && isOwing(q) && (
+                                <label className="jb-paywith">
+                                  <span>Pay with</span>
+                                  <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+                                    {caps.methods.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
+                                  </select>
+                                </label>
+                              )}
                               {q.paymentType !== 'STAGED' && q.settlementStatus === 'PENDING_PAYMENT' && (
                                 redeemFor === q.id ? (
-                                  <span className="redeem-box">
-                                    <span className="redeem-label">Use points (max {formatMoney(maxRedeem(q.total))}):</span>
-                                    <input className="redeem-input" type="number" min="0" step="0.01"
+                                  <div className="jb-redeem">
+                                    <label className="jb-redeem-label" htmlFor={`redeem-${q.id}`}>
+                                      Use points (max {formatMoney(maxRedeem(q.total))}):
+                                    </label>
+                                    <input id={`redeem-${q.id}`} className="jb-redeem-input" type="number" min="0" step="0.01"
                                            max={maxRedeem(q.total)} value={redeemAmt}
                                            onChange={(e) => setRedeemAmt(e.target.value)} placeholder="0.00" />
-                                    <button className="btn btn-green btn-xs" disabled={busyId === q.id}
+                                    <button type="button" className="pg-btn pg-btn-green jb-btn-sm" disabled={busyId === q.id}
                                             onClick={() => pay(job.id, q.id, null, Math.min(Number(redeemAmt) || 0, maxRedeem(q.total)))}>
                                       {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(Math.max(0, q.total - Math.min(Number(redeemAmt) || 0, maxRedeem(q.total))))}`}
                                     </button>
-                                    <button className="btn btn-ghost-dark btn-xs" onClick={() => { setRedeemFor(null); setRedeemAmt('') }}>Cancel</button>
-                                  </span>
+                                    <button type="button" className="pg-link" onClick={() => { setRedeemFor(null); setRedeemAmt('') }}>Cancel</button>
+                                  </div>
                                 ) : (
-                                  <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => pay(job.id, q.id, null)}>
+                                  <>
+                                    <button type="button" className="pg-btn pg-btn-green jb-btn-sm" disabled={busyId === q.id} onClick={() => pay(job.id, q.id, null)}>
                                       {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(q.total)}`}
                                     </button>
                                     {pointsBalance > 0 && (
-                                      <button className="btn btn-ghost-dark btn-sm" onClick={() => { setRedeemFor(q.id); setRedeemAmt('') }}>Use points</button>
+                                      <button type="button" className="pg-btn pg-btn-ghost jb-btn-sm" onClick={() => { setRedeemFor(q.id); setRedeemAmt('') }}>Use points</button>
                                     )}
-                                  </span>
+                                  </>
                                 )
                               )}
                               {q.paymentType !== 'STAGED' && q.status === 'ACCEPTED' && q.settlementStatus && q.settlementStatus !== 'PENDING_PAYMENT' && (
-                                <span className={`status status-settle`}>{settlementLabel(q.settlementStatus)}</span>
+                                <span className="jb-settle">{settlementLabel(q.settlementStatus)}</span>
                               )}
                               {q.status === 'PENDING' && (
-                                <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => askAccept(job, q.id)}>
+                                <button type="button" className="pg-btn pg-btn-green jb-btn-sm" disabled={busyId === q.id} onClick={() => askAccept(job, q.id)}>
                                   {busyId === q.id ? 'Accepting…' : 'Accept'}
                                 </button>
                               )}
@@ -670,11 +834,11 @@ export default function MyJobs() {
                     )}
                   </div>
                 )}
-              </div>
+              </article>
             )
           })}
         </div>
       )}
-    </>
+    </div>
   )
 }
