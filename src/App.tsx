@@ -81,9 +81,12 @@ export default function App() {
         <Route path="communications" element={<AdminCommunications />} />
       </Route>
 
+      {/* ---- Public landing page: has its own nav and footer band, so it
+          sits outside UserLayout (no standard site header/footer). ---- */}
+      <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
+
       {/* ---- Customer / Provider app ---- */}
       <Route element={<UserLayout />}>
-        <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
         <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
         <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
 
