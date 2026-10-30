@@ -114,3 +114,14 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
 - **Screens:** Jobby Mate Referrals (shows referral rewards as "{n} pts") vs Mate Points (shows dollars, e.g. "$20.00").
 - **Decision needed (owner):** one unit for referral rewards. With the spec's $-per-point rate the screen could show both,
   e.g. "20 pts · $2.00". That needs the rate (or the dollar value) returned with each connection.
+
+## 2026-10-30 — Request quotes: industry list and photo limits
+
+- **Screen:** Request quotes (`src/pages/NewRequest.tsx`).
+- **Service industry:** the dropdown still shows the 6 old categories, because a job can only store a `ServiceCategory`.
+  **API needed:** `POST /jobs` accepting an `industryId` (and returning it on the job). Then the dropdown becomes the active
+  industries list. **Why:** providers are now registered under the 120 new industries.
+- **Photo limits before sending:** the limits call is `GET /jobs/{id}/images/limits`, so the page can't read them until the
+  job exists. **API needed:** limits readable without a job, e.g. `GET /master/image-limits` (max photos, max MB, plan).
+  **Why:** the drop zone could then show "up to n photos, n MB each" and refuse oversize files before sending, instead of
+  reporting failed photos after the request has gone.

@@ -433,3 +433,37 @@ where it is today (Points overdue **and** "They referred you"), not on a "You re
 connection row; display only); `src/index.css` (new `rf-` block; old `jm-` rules left, unused).
 
 **BACKEND-REQUESTS.md:** invites sent but not joined yet; points unit (owner decision).
+
+## 2026-10-30 — Request quotes on one page (design/HANDOFF-request.md, Part G)
+
+**What changed visually**
+- Request quotes is now one page: "← Back", header (document icon, "Request quotes", new intro), then four numbered cards:
+  1 What do you need? (title, service industry, description with a live "n / 4000" counter),
+  2 Where is the job? (suburb type-ahead + job address side by side, green "Your registered address" tag while the
+  pre-filled address is unchanged, otherwise the existing "Use my registered address" link),
+  3 Photos (optional) (drop zone + thumbnails with × to remove, before sending),
+  4 When? (optional) (time-frame chips: As soon as possible · Within a week · Within 2 weeks · Within a month · Flexible ·
+  Other… which shows the free-text box; Request expires).
+- Send bar: "Your request goes only to the provider(s) you chose…", Cancel (= Back), yellow "Send request to n provider(s) →".
+- Sidebar: "Sending to" (initials avatar + business name, "← Change providers" = Back) and "What happens next" with the
+  Mate Points note. Under 900px it is one column with "Sending to" above the form.
+- Success screen replaces the old "add photos" step: green tick, "Request sent", "Sent to …", "n photo(s) attached" or the
+  partial-failure note listing each failed photo and the server's reason, the next steps, "View my request" (→ /home/jobs)
+  and "Find more providers" (→ /home/find).
+- "No providers selected" screen restyled only (same text, same button to /home/find).
+
+**Behaviour**
+- Unchanged: the `POST /jobs` call, body, validation check and messages; the providers passed in from Mates/Find; Enter
+  still submits the form. The time-frame chips just fill the same `timeFrame` text. The "n / 4000" counter only shows
+  the count (turns red over 4000); it doesn't block typing. The server's `@Size(max = 4000)` still decides.
+- **Exception approved by the owner (this task only):** photos are picked before sending. After `POST /jobs` succeeds, the
+  page uploads each chosen photo, one at a time, with the same call `ImageUploader` uses
+  (`apiUpload('/jobs/{id}/images?kind=REQUEST', form)`), and the button shows "Uploading photos 2 of 3…". A failed photo
+  doesn't undo the request. The page keeps going with the remaining photos and lists the failures on the success screen.
+  `ImageUploader` itself is unchanged.
+
+**Files touched:** `src/pages/NewRequest.tsx`; new `src/components/RequestParts.tsx` (section card, photo picker, time-frame
+chips, Sending to, next steps; display only, no API calls); `src/index.css` (new `rq-` block).
+
+`npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
+succeeds.
