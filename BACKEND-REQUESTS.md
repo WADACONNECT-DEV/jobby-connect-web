@@ -125,3 +125,19 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
   job exists. **API needed:** limits readable without a job, e.g. `GET /master/image-limits` (max photos, max MB, plan).
   **Why:** the drop zone could then show "up to n photos, n MB each" and refuse oversize files before sending, instead of
   reporting failed photos after the request has gone.
+
+## 2026-10-30 — Account: change password while logged in
+
+- **Screen:** Account (`src/pages/Account.tsx`), Sign-in & security → "Change password" (preview panel today).
+- **User need:** change their password from My Details (Functional Spec §2.9 "password reset").
+- **API needed:** `POST /me/password { currentPassword, newPassword }`. It checks the current password, requires at least 8
+  characters, then signs out other sessions.
+- **Why:** there is no logged-in password change today; the panel's fields and Save are ready to connect to it.
+
+## 2026-10-30 — Account: change login email (owner to confirm)
+
+- **Screen:** Account, Sign-in & security → Email (read only today).
+- **User need:** change the email they log in with.
+- **API needed:** a verified change, e.g. `POST /me/email { newEmail }` that emails a confirm link to the new address, and a
+  confirm endpoint that switches it.
+- **Why:** the login email can't be changed today. Owner to confirm whether this is wanted.

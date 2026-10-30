@@ -467,3 +467,37 @@ chips, Sending to, next steps; display only, no API calls); `src/index.css` (new
 
 `npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
 succeeds.
+
+## 2026-10-30 — Account + Your details form (design/HANDOFF-account.md, Part H)
+
+**What changed visually**
+- **Account (/account):** navy band like the dashboard welcome band (yellow initials circle, full name, CAS pill, PAS pill
+  when there is one, "Your details, sign-in and how you use Jobby-Connect."), then "← Back".
+  - **Your details** card: Name · Mobile (shown as `0498 000 204`; display only, other formats shown as stored) · Address
+    ("Not added" in grey when empty), "Edit details" → /customer-profile ("Complete your profile" while incomplete, as today).
+  - **Sign-in & security** card: login email (read only), password dots + "Change password", Your IDs with "Copy" links
+    (copies the ID, shows "Copied" for 2 s).
+  - "Change password" opens a **preview** panel (current / new / confirm with show-hide eyes, disabled Save, amber
+    "Preview — not connected yet"). Nothing is sent. The inputs aren't in a form and have no handler.
+  - **Offering your services**: the same 4 states, wording and `/provider` buttons. Adds the steps 1 Set up your profile →
+    2 Admin review → 3 Start quoting (step 1 highlighted when there's no profile; step 2 when PENDING; all ticked when
+    APPROVED; none when REJECTED). With no profile, a blue "Become a provider" box with the yellow button. PENDING and
+    REJECTED messages are now yellow / red banners.
+- **Your details form (/customer-profile):** new card style with icon inputs. Wording comes from
+  `customerProfileComplete` captured when the page opens. First time: "Complete your customer profile", today's intro,
+  "Save and continue". Editing: "Edit your details", "Keep your name, mobile and address up to date.", "Cancel" (back) and
+  "Save changes". The mobile input is `type="tel"` (phone keypad only; no browser validation).
+
+**Behaviour**
+- Unchanged: `/me` data, the `POST /me/customer-profile` call, body, validation message ("Please enter your name and
+  mobile."), `refresh()`, every `/provider` link, approval logic.
+- **Exception approved by the owner (this task only):** after a successful save **while editing**, the form goes to
+  `/account` (`replace`, with `state: { detailsUpdated: true }`), and Account shows a green "Your details were updated."
+  bar. Account then clears that history state so a reload doesn't show it again. First-time completion still goes to `/home`.
+
+**Files touched:** `src/pages/Account.tsx`, `src/pages/CustomerProfile.tsx`; new `src/components/AccountParts.tsx` (icons,
+info row, ID pill with Copy, provider steps, `formatMobile`; display only); `src/index.css` (new `ac-` block; old `acct-`
+rules left, unused).
+
+`npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
+succeeds. Not checked in the browser: the local API returned 500 on login (health 503) during this session.
