@@ -23,6 +23,8 @@ type Props = {
   averageRating: number
   reviewCount: number
   jobsCompleted: number
+  /** Find results: stars as a % of the maximum (UAT Round 4 §3.3), shown in List view. */
+  ratingPercent?: number
   actions: ReactNode
   /** Grid view: short card with every detail on one line. List view leaves this off. */
   compact?: boolean
@@ -79,6 +81,9 @@ export function ProviderCard(p: Props) {
           </p>
         ) : (
           <p className="pc-rating pc-rating-none">No reviews yet</p>
+        )}
+        {p.ratingPercent !== undefined && p.reviewCount > 0 && (
+          <p className="pc-jobs"><strong>{p.ratingPercent}%</strong> rating</p>
         )}
         <p className="pc-jobs">{p.jobsCompleted} job{p.jobsCompleted === 1 ? '' : 's'} completed</p>
       </div>

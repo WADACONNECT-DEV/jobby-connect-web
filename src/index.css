@@ -6836,3 +6836,29 @@ main.wrap:has(> .fr) {
     transition: none;
   }
 }
+
+/* ---- Find & Request Quotes (HANDOFF-jobs-find Part D) ----
+   Reuses the Mates `pg-` / `pc-` pieces; only the search row and hint differ. */
+.pg-searchrow.fd-search {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+}
+.fd-hint {
+  margin-top: -8px;
+  font-size: 13.5px;
+  color: #5a6e86;
+}
+.pg-link:disabled {
+  cursor: default;
+  text-decoration: none;
+  opacity: 0.7;
+}
+@media (max-width: 860px) {
+  .pg-searchrow.fd-search {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .pg-searchrow.fd-search {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

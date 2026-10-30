@@ -315,3 +315,34 @@ Same tabs, counts and behaviour.
 - A little more space above the sub-tabs than below. They scroll sideways inside their own strip on phones.
 
 Same tabs, counts and behaviour.
+
+## 2026-10-30 — Find & Request Quotes (design/HANDOFF-jobs-find.md, Part D)
+
+**Screen:** customer dashboard → Find & Request Quotes, restyled like Your Jobby Mates.
+
+**What changed visually**
+- Header: magnifier icon, "Find & Request Quotes", "Choose the service and the suburb — you'll see providers who cover both."
+- Search row in the Mates style: SERVICE INDUSTRY, SUBURB (same `SuburbPicker`), SORT BY, and a navy **Search** button (was "Apply";
+  still disabled until both are chosen, with the same tooltip). The "both are needed" hint is unchanged.
+- Selection bar at the top (the shared Mates `SelectionBar`): "{n} of {cap} providers selected | Only selected providers will
+  receive your request.", "Clear", "Continue with {n} →" (same `proceed`). It replaces the sticky bottom bar. "Clear" is new and
+  only empties the local selection.
+- "{n} providers found" + List / Grid toggle, remembered with `usePersistedValue('customer.find.layout', 'list')`
+  (default List, owner decision).
+- Result card = the shared `ProviderCard`.
+  - List: checkbox, initials avatar, name, "+$x Mate Points offered" chip (when `promoPoints > 0`), service area, ★ rating
+    "(n reviews)" or "No reviews yet", "% rating" (kept so the ranking stays explainable, UAT Round 4 §3.3–3.5), jobs completed,
+    "Add to request" / "✓ Selected", "View profile", "♡ Save as Jobby Mate" / "♥ Saved".
+  - Grid: the same compact card as Mates (3 a row), with "View profile" and "♡ Save" as small links.
+- The old category chips are no longer shown (empty for the new industries; see BACKEND-REQUESTS.md).
+- Before-search, searching, no-results and error states in the Mates style (no-results text unchanged).
+
+**Not changed:** the industries load, `runSearch`, `changeSort` (re-searches), `toggleSelect` and its cap, `saveMate`, `proceed`.
+Only the imports, a tooltip string and the layout preference were added above `return (`.
+
+**Files touched:** `src/pages/Search.tsx`; `src/components/ProviderCard.tsx` (optional `ratingPercent`, List view only;
+Mates doesn't pass it); `src/index.css` (small `fd-` block, `.pg-link:disabled`).
+
+**For you (existing gap, not changed):** the chosen industry, suburb, sort and results on this page are held in component state,
+so they are not restored after Back or reload, which CLAUDE.md / UAT Round 1 §5.3 asks of list screens. Fixing it means
+changing how that state is stored, so it's left for you.

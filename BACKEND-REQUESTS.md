@@ -56,3 +56,12 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
   (`CreateJobRequest.java:25`, `@NotEmpty @Size(min = 1, max = 3) List<UUID> providerIds`).
   A 4th selection fails when the request is sent.
 - **API needed:** the `POST /jobs` limit should read the same admin setting instead of a fixed 3.
+
+## 2026-10-30 — Find & Request Quotes: industries on search results
+
+- **Screen:** customer dashboard → Find & Request Quotes (`src/pages/Search.tsx`).
+- **User need:** see what each provider does on the result card, as on Your Jobby Mates.
+- **API needed:** `GET /providers/search` should return the provider's new **industries**, and ideally their subcategory names
+  and suburbs list, like `GET /mates` does.
+- **Why:** results only carry `categories` (the six old categories), which are empty for the 120 new industries, so the
+  cards no longer show category chips. The service-area line is shown instead until this exists.

@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { Stars } from '../components/Stars'
+import { CheckIcon, EmptyState, GridIcon, ListIcon, PageHead, SearchIcon, SelectionBar } from '../components/PageParts'
+import { ProviderCard } from '../components/ProviderCard'
+import { usePersistedValue } from '../listView'
 import { SuburbPicker } from '../components/SuburbPicker'
 import { useMaxProvidersPerRequest } from '../platform'
 import {
-  CATEGORY_LABELS,
   SEARCH_SORT_LABELS,
   formatMoney,
   type MasterIndustry,
@@ -42,6 +43,10 @@ export default function Search() {
 
   // The cap is admin-managed (UAT Round 2 open item 7.2) - never a literal here.
   const maxProviders = useMaxProvidersPerRequest()
+  const capTip = `You can request up to ${maxProviders} providers at once`
+
+  // List / Grid, remembered the same way as Your Jobby Mates. Display only; default List.
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('customer.find.layout', 'list')
 
   useEffect(() => {
     api<MasterIndustry[]>('/master/industries', 'GET')
@@ -106,18 +111,16 @@ export default function Search() {
   const isSelected = (id: string) => selected.some((s) => s.userId === id)
 
   return (
-    <>
-      <div className="page-head">
-        <h2>Find a provider</h2>
-      </div>
-      <p className="page-intro">
-        Choose the service you need and the suburb the work is in. You'll see the providers who
-        actually cover that industry in that suburb.
-      </p>
+    <div className="pg fd">
+      <PageHead
+        icon={<SearchIcon size={44} />}
+        title="Find & Request Quotes"
+        intro="Choose the service and the suburb — you'll see providers who cover both."
+      />
 
-      <form className="search-filters" onSubmit={onSearch}>
-        <div>
-          <label htmlFor="search-industry">Service Industry</label>
+      <form className="pg-searchrow fd-search" onSubmit={onSearch} role="search">
+        <div className="pg-field">
+          <label htmlFor="search-industry">Service industry</label>
           <select id="search-industry" value={industryId} onChange={(e) => setIndustryId(e.target.value)}>
             <option value="">Choose an industry…</option>
             {industries.map((i) => (
@@ -125,100 +128,136 @@ export default function Search() {
             ))}
           </select>
         </div>
-        <div>
+        <div className="pg-field">
           <label htmlFor="search-suburb">Suburb</label>
           <SuburbPicker id="search-suburb" value={suburbText} onChange={setSuburbText} onSelect={setSuburb} />
         </div>
-        <div>
+        <div className="pg-field">
           <label htmlFor="search-sort">Sort by</label>
           <select id="search-sort" value={sort} onChange={(e) => changeSort(e.target.value as ProviderSearchSort)}>
             {SORTS.map((s) => <option key={s} value={s}>{SEARCH_SORT_LABELS[s]}</option>)}
           </select>
         </div>
         <button
-          className="btn btn-amber"
+          className="pg-btn pg-btn-navy pg-searchbtn"
           type="submit"
           disabled={!canSearch || searching}
-          style={{ alignSelf: 'end' }}
           title={canSearch ? undefined : 'Choose an industry and a suburb first'}
         >
-          {searching ? 'Searching…' : 'Apply'}
+          <SearchIcon /> {searching ? 'Searching…' : 'Search'}
         </button>
       </form>
 
       {!canSearch && (
-        <p className="field-hint">
+        <p className="fd-hint">
           Both a service industry and a suburb are needed before searching — otherwise you'd see
           providers who don't work in your area.
         </p>
       )}
 
-      {error && <div className="msg err">{error}</div>}
-      {searching && <div className="loading">Searching…</div>}
+      {error && <div className="pg-error" role="alert">{error}</div>}
+
+      {results === null && !searching && (
+        <EmptyState>Your results will appear here.</EmptyState>
+      )}
+      {searching && <div className="pg-loading" role="status">Searching…</div>}
 
       {results !== null && !searching && results.length === 0 && (
-        <div className="empty">
-          <p>
-            No providers cover {industries.find((i) => i.id === industryId)?.name ?? 'that industry'} in{' '}
-            {suburb?.name ?? 'that suburb'} yet. Try a nearby suburb, or a different service.
-          </p>
-        </div>
+        <EmptyState>
+          No providers cover {industries.find((i) => i.id === industryId)?.name ?? 'that industry'} in{' '}
+          {suburb?.name ?? 'that suburb'} yet. Try a nearby suburb, or a different service.
+        </EmptyState>
+      )}
+
+      {selected.length > 0 && (
+        <SelectionBar
+          count={selected.length}
+          cap={maxProviders}
+          onContinue={proceed}
+          onClear={() => setSelected([])}
+        />
       )}
 
       {results && results.length > 0 && (
-        <div className="job-list" style={{ marginBottom: 90 }}>
-          {results.map((p) => (
-            <div className={`job-card prov-card${isSelected(p.userId) ? ' prov-selected' : ''}`} key={p.userId}>
-              <div className="job-top">
-                <span className="job-title">{p.businessName}</span>
-                <span className="prov-rating">
-                  {p.reviewCount > 0 ? (
-                    <><Stars value={p.averageRating} /><span className="prov-rating-num">{p.averageRating.toFixed(1)} ({p.reviewCount})</span></>
-                  ) : (<span className="prov-new">No reviews yet</span>)}
-                </span>
-              </div>
-
-              {/* The three figures the ranking is built on, so the order on
-                  screen is explainable rather than mysterious (3.3-3.5). */}
-              <div className="job-meta prov-stats">
-                {p.reviewCount > 0 && <span><strong>{p.ratingPercent}%</strong> rating</span>}
-                <span>{p.jobsCompleted} job{p.jobsCompleted === 1 ? '' : 's'} completed</span>
-                {p.promoPoints > 0 && (
-                  <span className="prov-points">+{formatMoney(p.promoPoints)} Mate Points offered</span>
-                )}
-              </div>
-
-              <div className="job-meta"><span>{p.serviceArea}</span></div>
-              <div className="prov-cats">
-                {p.categories.map((c) => <span className="chip" key={c}>{CATEGORY_LABELS[c]}</span>)}
-              </div>
-              <div className="job-foot">
-                <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(`/providers/${p.userId}`)}>View profile</button>
-                <div className="job-actions">
-                  <button className="btn btn-sm btn-ghost-dark" onClick={() => saveMate(p)} disabled={savedMates.has(p.userId)}>
-                    {savedMates.has(p.userId) ? '♥ Saved' : '♡ Save'}
-                  </button>
-                  <button
-                    className={`btn btn-sm ${isSelected(p.userId) ? 'btn-green' : 'btn-amber'}`}
-                    onClick={() => toggleSelect(p)}
-                    disabled={!isSelected(p.userId) && selected.length >= maxProviders}
-                  >
-                    {isSelected(p.userId) ? '✓ Added' : '+ Add to request'}
-                  </button>
-                </div>
+        <>
+          <div className="pg-toolbar">
+            <h3 className="pg-count">{results.length} provider{results.length === 1 ? '' : 's'} found</h3>
+            <div className="pg-toolbar-end">
+              <div className="pg-seg" role="group" aria-label="View">
+                <button type="button" className={layout === 'list' ? 'on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
+                  <ListIcon /> List
+                </button>
+                <button type="button" className={layout === 'grid' ? 'on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+                  <GridIcon /> Grid
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
 
-      {/* Sticky selection bar */}
-      {selected.length > 0 && (
-        <div className="select-bar">
-          <span>{selected.length} of {maxProviders} selected: {selected.map((s) => s.businessName).join(', ')}</span>
-          <button className="btn btn-amber" onClick={proceed}>Request quotes →</button>
-        </div>
+          {/* Category chips are left off: the six old categories are empty for
+              the new industries (BACKEND-REQUESTS.md). The three ranking figures
+              stay, so the order on screen is explainable (UAT Round 4 3.3-3.5). */}
+          <div className={layout === 'grid' ? 'pc-grid' : 'pc-list'}>
+            {results.map((p) => {
+              const sel = isSelected(p.userId)
+              const blocked = !sel && selected.length >= maxProviders
+              const saved = savedMates.has(p.userId)
+              const small = layout === 'grid'
+              return (
+                <ProviderCard
+                  key={p.userId}
+                  compact={small}
+                  name={p.businessName}
+                  selected={sel}
+                  selectDisabled={blocked}
+                  selectTitle={blocked ? capTip : 'Include in one request'}
+                  onToggle={() => toggleSelect(p)}
+                  badges={p.promoPoints > 0
+                    ? <span className="pg-chip pg-chip-saved">+{formatMoney(p.promoPoints)} Mate Points offered</span>
+                    : undefined}
+                  industries={[]}
+                  suburbs={[]}
+                  serviceArea={p.serviceArea}
+                  averageRating={p.averageRating}
+                  reviewCount={p.reviewCount}
+                  ratingPercent={p.ratingPercent}
+                  jobsCompleted={p.jobsCompleted}
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        className={`pg-btn ${sel ? 'pg-btn-yellow' : 'pg-btn-navy'}`}
+                        disabled={blocked}
+                        title={blocked ? capTip : undefined}
+                        aria-pressed={sel}
+                        onClick={() => toggleSelect(p)}
+                      >
+                        {sel ? <><CheckIcon /> Selected</> : 'Add to request'}
+                      </button>
+                      <button
+                        type="button"
+                        className={small ? 'pg-link' : 'pg-btn pg-btn-ghost'}
+                        onClick={() => navigate(`/providers/${p.userId}`)}
+                      >
+                        View profile
+                      </button>
+                      <button
+                        type="button"
+                        className={small ? 'pg-link' : 'pg-btn pg-btn-ghost'}
+                        onClick={() => saveMate(p)}
+                        disabled={saved}
+                        aria-label={saved ? 'Saved as a Jobby Mate' : `Save ${p.businessName} as a Jobby Mate`}
+                      >
+                        {saved ? '♥ Saved' : small ? '♡ Save' : '♡ Save as Jobby Mate'}
+                      </button>
+                    </>
+                  }
+                />
+              )
+            })}
+          </div>
+        </>
       )}
-    </>
+    </div>
   )
 }
