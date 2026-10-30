@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ListControls } from '../components/ListControls'
+import { ArrowIcon, EmptyState, GridIcon, InitialsAvatar, ListIcon, PageHead, PinIcon, SearchIcon } from '../components/PageParts'
+import { ClampText, RefPill, SubTabs } from '../components/JobParts'
+import { BubbleIcon, ClosesChip, DeclineDialog, RequestCompactCard } from '../components/RequestCards'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   CATEGORY_LABELS,
@@ -350,8 +352,13 @@ export default function ProviderRequests() {
     DECLINED: "You haven't declined any requests.",
   }
 
+  // List or Grid, remembered like the customer side (display option only).
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.requests.layout', 'list')
+
+  const anyQuotable = (rows ?? []).some((r) => r.outcome === 'RECEIVED' && r.quoteId === null)
+
   return (
-    <>
+    <div className="pg pr">
       <ConfirmDialog
         open={confirmCancel}
         title="Discard your unsaved changes?"
@@ -367,240 +374,362 @@ export default function ProviderRequests() {
         </p>
       </ConfirmDialog>
 
-      <div className="page-head"><h2>Requests to me</h2></div>
-      <p className="page-intro">Customers who've asked you for a quote, and where each one ended up.</p>
+      <DeclineDialog
+        open={declineFor !== null}
+        inputId={`decline-${declineFor ?? ''}`}
+        message={declineMessage}
+        onMessage={setDeclineMessage}
+        error={declineError}
+        busy={declining}
+        onConfirm={() => { if (declineFor) confirmDecline(declineFor) }}
+        onCancel={cancelDecline}
+      />
 
-      {error && <div className="msg err">{error}</div>}
-      {rows === null && !error && <div className="loading">Loading…</div>}
+      <PageHead
+        icon={<BubbleIcon />}
+        title="Requests to me"
+        intro="Customers who've asked you for a quote, and where each one ended up."
+      />
+
+      {error && <div className="pg-error" role="alert">{error}</div>}
+      {rows === null && !error && <div className="pg-loading">Loading…</div>}
 
       {rows !== null && (
-        <div className="pipe-tabs" role="tablist">
-          {TABS.map((key) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={tab === key}
-              className={`pipe-tab${tab === key ? ' active' : ''}`}
-              onClick={() => setTab(key)}
-            >
-              {OUTCOME_LABELS[key]}
-              <span className="pipe-count">{countOf(key)}</span>
-            </button>
+        <SubTabs
+          label="Requests by outcome"
+          active={tab}
+          onChange={setTab}
+          tabs={TABS.map((key) => ({
+            key,
+            label: OUTCOME_LABELS[key],
+            count: countOf(key),
+            attention: key === 'RECEIVED' && anyQuotable,
+          }))}
+        />
+      )}
+
+      {/* Search, filters and sort: the same list state as before, laid out
+          like the customer side. */}
+      {inTab && inTab.length > 0 && (
+        <div className="pg-searchrow jb-filters">
+          <div className="pg-field pg-field-grow">
+            <label htmlFor="pr-search">Search requests</label>
+            <span className="pg-input-ico">
+              <SearchIcon />
+              <input
+                id="pr-search"
+                type="search"
+                value={list.view.search}
+                placeholder="Title, suburb or customer"
+                onChange={(e) => list.setSearch(e.target.value)}
+              />
+            </span>
+          </div>
+          {list.filters.map((f) => (
+            <div className="pg-field" key={f.key}>
+              <label htmlFor={`pr-${f.key}`}>{f.key === 'category' ? 'Industry' : 'Status'}</label>
+              <select id={`pr-${f.key}`} value={list.view.filters[f.key] ?? ''} onChange={(e) => list.setFilter(f.key, e.target.value)}>
+                <option value="">All {f.label.toLowerCase()}</option>
+                {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
           ))}
+          <div className="pg-field">
+            <label htmlFor="pr-sort">Sort by</label>
+            <span className="jb-sortbox">
+              <select id="pr-sort" value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+                {list.sorts.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+              <button
+                type="button"
+                className="pg-dir"
+                aria-label={list.view.sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                title={list.view.sortDir === 'asc' ? 'Lowest first' : 'Highest first'}
+                onClick={list.toggleDir}
+              >
+                {list.view.sortDir === 'asc' ? '↑' : '↓'}
+              </button>
+            </span>
+          </div>
         </div>
       )}
 
-      {inTab && inTab.length > 0 && (
-        <ListControls list={list} searchPlaceholder="Search these requests" countLabel="requests" />
+      {rows !== null && (
+        <div className="pg-toolbar">
+          {inTab && inTab.length > 0 ? (
+            <h3 className="pg-count">
+              {list.shown === list.total ? `${list.total} request${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} requests`}
+            </h3>
+          ) : <span />}
+          <div className="pg-toolbar-end">
+            {inTab && inTab.length > 0 && list.dirty && (
+              <button type="button" className="pg-link" onClick={list.clear}>Clear filters</button>
+            )}
+            <div className="pg-seg" role="group" aria-label="View">
+              <button type="button" className={layout === 'list' ? 'on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
+                <ListIcon /> List
+              </button>
+              <button type="button" className={layout === 'grid' ? 'on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+                <GridIcon /> Grid
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {inTab && inTab.length === 0 && (
-        <div className="empty">
-          <p>{emptyCopy[tab]}</p>
-          {tab === 'RECEIVED' && (
-            <button className="btn btn-amber" style={{ marginTop: 12 }} onClick={() => navigate('/provider')}>My provider profile</button>
-          )}
-        </div>
+        <EmptyState
+          action={tab === 'RECEIVED'
+            ? <button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/provider')}>My provider profile</button>
+            : undefined}
+        >
+          {emptyCopy[tab]}
+        </EmptyState>
       )}
 
       {inTab && inTab.length > 0 && list.shown === 0 && (
-        <div className="empty">
-          <p>No requests match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
-        </div>
+        <EmptyState action={<button type="button" className="pg-btn pg-btn-ghost" onClick={list.clear}>Clear filters</button>}>
+          No requests match these filters.
+        </EmptyState>
       )}
 
       {list.shown > 0 && (
-        <div className="job-list">
+        <div className={layout === 'grid' ? 'jb-grid' : 'jb-list'}>
           {list.visible.map((row) => {
             const canQuote = row.outcome === 'RECEIVED' && row.quoteId === null
+            const formOpen = canQuote && openFor === row.jobId
+            const others = row.targetCount - 1
+
+            // Grid: a compact card until it's opened; opening shows the full
+            // card below in its place (same as the customer grid).
+            if (layout === 'grid' && !list.isExpanded(row.jobId) && !formOpen) {
+              return (
+                <RequestCompactCard
+                  key={row.jobId}
+                  title={row.jobTitle}
+                  customerName={row.customerName}
+                  industry={CATEGORY_LABELS[row.category]}
+                  suburb={row.suburb}
+                  date={`Requested ${formatDate(row.requestedAt)}`}
+                  refValue={row.requestRef}
+                  expiresAt={row.outcome === 'RECEIVED' ? row.expiresAt : null}
+                  outcomeLabel={OUTCOME_LABELS[row.outcome]}
+                  attention={canQuote}
+                  actionLabel={canQuote ? 'Send a quote' : 'View details'}
+                  onAction={() => {
+                    list.setExpanded(row.jobId, true)
+                    if (canQuote) openQuote(row.jobId)
+                  }}
+                  onOpen={() => list.setExpanded(row.jobId, true)}
+                />
+              )
+            }
+
             return (
-              <div className="job-card" key={row.jobId}>
-                <div className="job-top">
-                  <span className="job-title">{row.jobTitle}</span>
-                  <span className="chip">{CATEGORY_LABELS[row.category]}</span>
-                </div>
-                <div className="job-meta">
-                  <span>{row.suburb}</span>
-                  {row.timeFrame && <span>· {row.timeFrame}</span>}
-                  <span className="job-date">· from {row.customerName} on {formatDate(row.requestedAt)}</span>
-                  {row.expiresAt && <span className="job-date">· closes {formatDate(row.expiresAt)}</span>}
-                </div>
-                <p className="job-desc">{row.description}</p>
-
-                {row.quoteId && (
-                  <div className="pipe-quote">
-                    <span>Your quote{row.quotedAt ? ` · ${formatDate(row.quotedAt)}` : ''}</span>
-                    <span className="pipe-quote-amt">
-                      {row.quoteTotal !== null && <>Customer pays {formatMoney(row.quoteTotal)}</>}
-                      {row.providerPayable !== null && <> · you get {formatMoney(row.providerPayable)}</>}
-                    </span>
-                  </div>
+              <article
+                key={row.jobId}
+                className={`jb-card pr-card${canQuote ? ' is-attention' : ''}${layout === 'grid' ? ' jb-span' : ''}`}
+              >
+                {layout === 'grid' && (
+                  <button
+                    type="button"
+                    className="pg-link jb-less"
+                    aria-expanded="true"
+                    onClick={() => { list.setExpanded(row.jobId, false); if (formOpen) cancelQuote() }}
+                  >
+                    Show less
+                  </button>
                 )}
 
-                <div className="job-foot">
-                  <span className="job-by">{row.targetCount > 1 ? `You + ${row.targetCount - 1} other provider(s)` : 'Sent to you only'}</span>
-                  {canQuote ? (
-                    openFor === row.jobId || declineFor === row.jobId ? null : (
-                      <div className="job-actions">
-                        <button className="btn btn-ghost-dark btn-sm" onClick={() => openDecline(row.jobId)}>Decline</button>
-                        <button className="btn btn-amber btn-sm" onClick={() => openQuote(row.jobId)}>Send a quote</button>
+                <div className="pr-row">
+                  <InitialsAvatar name={row.customerName} />
+                  <div className="pr-main">
+                    <h3 className="pr-title">{row.jobTitle}</h3>
+                    <div className="pr-meta">
+                      <span className="pg-chip">{CATEGORY_LABELS[row.category]}</span>
+                      <span className="pr-meta-item"><PinIcon />{row.suburb}</span>
+                      {row.requestRef && <RefPill value={row.requestRef} />}
+                      {row.outcome === 'RECEIVED' && row.expiresAt && <ClosesChip expiresAt={row.expiresAt} />}
+                    </div>
+                    <p className="pr-sub">
+                      {row.customerName} · requested {formatDate(row.requestedAt)}
+                      {row.timeFrame && <> · {row.timeFrame}</>}
+                      {others > 0 && <> · also sent to {others} other provider{others === 1 ? '' : 's'}</>}
+                    </p>
+                  </div>
+
+                  <div className="pr-side">
+                    {row.quoteId && (
+                      <div className="pr-amount">
+                        {row.quoteTotal !== null && <span>Customer pays <strong>{formatMoney(row.quoteTotal)}</strong></span>}
+                        {row.providerPayable !== null && <span>You get <strong>{formatMoney(row.providerPayable)}</strong></span>}
+                        {row.quotedAt && <span className="pr-amount-date">Quoted {formatDate(row.quotedAt)}</span>}
                       </div>
-                    )
-                  ) : row.outcome === 'WON' ? (
-                    <span className="tag-ok">✓ Won · {statusLabel(row.jobStatus)}</span>
-                  ) : row.outcome === 'REPLIED' ? (
-                    <span className="tag-ok">✓ Quote sent</span>
-                  ) : (
-                    <span className="tag-muted">{OUTCOME_LABELS[row.outcome]}</span>
-                  )}
+                    )}
+                    {canQuote ? (
+                      formOpen ? null : (
+                        <div className="pr-actions">
+                          <button type="button" className="pg-btn pg-btn-ghost" onClick={() => openDecline(row.jobId)}>Decline</button>
+                          <button type="button" className="pg-btn pg-btn-yellow" onClick={() => openQuote(row.jobId)}>
+                            Send a quote <ArrowIcon />
+                          </button>
+                        </div>
+                      )
+                    ) : row.outcome === 'WON' ? (
+                      <span className="pr-tag is-ok">✓ Won · {statusLabel(row.jobStatus)}</span>
+                    ) : row.outcome === 'REPLIED' ? (
+                      <span className="pr-tag is-ok">✓ Quote sent</span>
+                    ) : (
+                      <span className="pr-tag">{OUTCOME_LABELS[row.outcome]}</span>
+                    )}
+                  </div>
                 </div>
 
-                {row.requestRef && (
-                  <div className="ref-list">
-                    <span className="ref-item"><code className="req-ref">{row.requestRef}</code></span>
-                  </div>
-                )}
+                <ClampText text={row.description} />
 
                 {row.outcome === 'DECLINED' && row.declineMessage && (
-                  <div className="decline-note">
-                    <span className="decline-note-head">
+                  <div className="pr-declined">
+                    <span className="pr-declined-head">
                       You declined this request{row.declinedAt ? ` on ${formatDate(row.declinedAt)}` : ''}
                     </span>
                     <p>{row.declineMessage}</p>
                   </div>
                 )}
 
-                {declineFor === row.jobId && (
-                  <div className="decline-form">
-                    <h4>Are you sure you want to decline this request?</h4>
-                    <p className="decline-lead">
-                      The customer will be told you can't take it on, and will see the message you write
-                      below. This cannot be undone, and you won't be able to quote on it afterwards.
-                    </p>
-                    {declineError && <div className="msg err">{declineError}</div>}
+                {formOpen && (
+                  <form className="pq" onSubmit={(e) => submitQuote(e, row.jobId)}>
+                    <h4 className="pq-title">Your quote</h4>
+                    {formError && <div className="pg-error" role="alert">{formError}</div>}
 
-                    <label htmlFor={`decline-${row.jobId}`}>Your message to the customer</label>
-                    <textarea
-                      id={`decline-${row.jobId}`}
-                      rows={3}
-                      value={declineMessage}
-                      onChange={(e) => setDeclineMessage(e.target.value)}
-                      placeholder="e.g. Sorry, we're fully booked until 20 October — happy to quote after that."
-                    />
-
-                    <div className="decline-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={cancelDecline}>
-                        Back — don't decline
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
-                        disabled={declineMessage.trim().length === 0 || declining}
-                        onClick={() => confirmDecline(row.jobId)}
-                      >
-                        {declining ? 'Declining…' : 'Confirm Decline'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {canQuote && openFor === row.jobId && (
-                  <form className="quote-form" onSubmit={(e) => submitQuote(e, row.jobId)}>
-                    {formError && <div className="msg err">{formError}</div>}
-
-                    <label>Line items</label>
-                    <div className="qline qline-head">
-                      <span className="qline-desc">Line item</span>
-                      <span className="qline-amt">Amount</span>
-                      <span className="qline-gst">GST</span>
-                      <span className="qline-sees">Customer sees</span>
-                      {lines.length > 1 && <span className="qline-x-space" />}
-                    </div>
-                    {lines.map((l, i) => (
-                      <div className="qline" key={i}>
-                        <input
-                          className="qline-desc"
-                          placeholder="Description (e.g. Vacate clean, 2-bed)"
-                          value={l.description}
-                          onChange={(e) => setLine(i, 'description', e.target.value)}
-                        />
-                        <input
-                          className="qline-amt"
-                          type="number" min="0" step="0.01" placeholder="0.00"
-                          value={l.amount}
-                          onChange={(e) => setLine(i, 'amount', e.target.value)}
-                        />
-                        <select
-                          className="qline-gst"
-                          value={l.gstApplicable ? 'INC' : 'FREE'}
-                          onChange={(e) => setLine(i, 'gstApplicable', e.target.value === 'INC')}
-                          title="Does GST apply to this line?"
-                          aria-label="GST treatment for this line"
-                        >
-                          <option value="INC">+ GST</option>
-                          <option value="FREE">GST-free</option>
-                        </select>
-                        {/* What the customer will be shown for this line, live as
-                            the provider types (UAT Round 6 3.1). */}
-                        <span className="qline-sees" title="What the customer will see for this line">
-                          {customerSees(l.amount) === null ? '—' : formatMoney(customerSees(l.amount) as number)}
-                        </span>
-                        {lines.length > 1 && (
-                          <button type="button" className="qline-x" onClick={() => removeLine(i)} title="Remove">×</button>
-                        )}
+                    <div className="pq-section">
+                      <span className="pq-label" id={`pq-lines-${row.jobId}`}>Line items</span>
+                      <div className="pq-table" role="table" aria-labelledby={`pq-lines-${row.jobId}`}>
+                        <div className="pq-tr pq-th" role="row">
+                          <span role="columnheader">Description</span>
+                          <span role="columnheader">Amount</span>
+                          <span role="columnheader">GST</span>
+                          <span role="columnheader">Customer sees</span>
+                          <span role="columnheader" className="pg-sr">Remove</span>
+                        </div>
+                        {lines.map((l, i) => (
+                          <div className="pq-tr" role="row" key={i}>
+                            <span role="cell" className="pq-desc">
+                              <input
+                                aria-label={`Line ${i + 1} description`}
+                                placeholder="Description (e.g. Vacate clean, 2-bed)"
+                                value={l.description}
+                                onChange={(e) => setLine(i, 'description', e.target.value)}
+                              />
+                            </span>
+                            <span role="cell" className="pq-amt">
+                              <span className="pq-dollar" aria-hidden="true">$</span>
+                              <input
+                                aria-label={`Line ${i + 1} amount`}
+                                type="number" min="0" step="0.01" placeholder="0.00"
+                                value={l.amount}
+                                onChange={(e) => setLine(i, 'amount', e.target.value)}
+                              />
+                            </span>
+                            <span role="cell" className="pq-gst">
+                              <button
+                                type="button"
+                                className={`pq-toggle${l.gstApplicable ? ' on' : ''}`}
+                                aria-pressed={l.gstApplicable}
+                                aria-label={`GST applies to line ${i + 1}`}
+                                title="Does GST apply to this line?"
+                                onClick={() => setLine(i, 'gstApplicable', !l.gstApplicable)}
+                              >
+                                {l.gstApplicable ? '+ GST' : 'GST-free'}
+                              </button>
+                            </span>
+                            {/* What the customer will be shown for this line, live as
+                                the provider types (UAT Round 6 3.1). */}
+                            <span role="cell" className="pq-sees" title="What the customer will see for this line">
+                              <span className="pq-sees-label" aria-hidden="true">Customer sees </span>
+                              {customerSees(l.amount) === null ? '—' : formatMoney(customerSees(l.amount) as number)}
+                            </span>
+                            <span role="cell" className="pq-x-cell">
+                              {lines.length > 1 && (
+                                <button type="button" className="pq-x" onClick={() => removeLine(i)} aria-label={`Remove line ${i + 1}`} title="Remove">×</button>
+                              )}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    <button type="button" className="btn btn-ghost-dark btn-xs" onClick={addLine} style={{ marginTop: 4 }}>+ Add line</button>
-                    <p className="field-hint">
-                      <strong>Customer sees</strong> is your amount plus the platform's{' '}
-                      {rate === null ? 'uplift' : `${rate.upliftPercent}% uplift`} — it is the figure the
-                      customer is shown for that line, and the one they'll ask you about.
-                    </p>
-                    <p className="field-hint">
-                      Mark a line GST-free for anything you don't charge GST on — a government fee, a
-                      permit, a disbursement passed on at cost. If you aren't GST-registered, no GST is
-                      added either way.
-                    </p>
+                      <button type="button" className="pg-link pq-add" onClick={addLine}>+ Add line</button>
+                      <p className="pq-hint">
+                        <strong>Customer sees</strong> is your amount plus the platform's{' '}
+                        {rate === null ? 'uplift' : `${rate.upliftPercent}% uplift`} — it is the figure the
+                        customer is shown for that line, and the one they'll ask you about.
+                      </p>
+                      <p className="pq-hint">
+                        Mark a line GST-free for anything you don't charge GST on — a government fee, a
+                        permit, a disbursement passed on at cost. If you aren't GST-registered, no GST is
+                        added either way.
+                      </p>
+                    </div>
 
-                    <div className="row2" style={{ marginTop: 12 }}>
-                      <div>
-                        <label>Bonus Mate Points (optional, A$)</label>
-                        <input type="number" min="0" step="0.01" value={bonus} onChange={(e) => { setBonus(e.target.value); edited() }} placeholder="0.00" />
+                    <div className="pq-pair">
+                      <div className="pg-field">
+                        <label htmlFor={`pq-bonus-${row.jobId}`}>Bonus Mate Points (optional, A$)</label>
+                        <input
+                          id={`pq-bonus-${row.jobId}`}
+                          type="number" min="0" step="0.01"
+                          value={bonus}
+                          onChange={(e) => { setBonus(e.target.value); edited() }}
+                          placeholder="0.00"
+                        />
                       </div>
-                      <div>
-                        <label>Payment</label>
-                        <select value={paymentType} onChange={(e) => { setPaymentType(e.target.value as PaymentType); edited() }}>
-                          <option value="FULL">Full payment</option>
-                          <option value="STAGED">Staged (milestones)</option>
-                        </select>
+                      <div className="pg-field">
+                        <span className="pq-label">Payment</span>
+                        <div className="pg-seg pq-seg" role="group" aria-label="Payment">
+                          <button
+                            type="button"
+                            className={paymentType === 'FULL' ? 'on' : ''}
+                            aria-pressed={paymentType === 'FULL'}
+                            onClick={() => { if (paymentType !== 'FULL') { setPaymentType('FULL'); edited() } }}
+                          >
+                            Full payment
+                          </button>
+                          <button
+                            type="button"
+                            className={paymentType === 'STAGED' ? 'on' : ''}
+                            aria-pressed={paymentType === 'STAGED'}
+                            onClick={() => { if (paymentType !== 'STAGED') { setPaymentType('STAGED'); edited() } }}
+                          >
+                            Staged (milestones)
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {paymentType === 'STAGED' && (
-                      <div className="stage-editor">
-                        <label>Payment stages (percentages)</label>
+                      <div className="pq-section pq-stages">
+                        <span className="pq-label">Payment stages (percentages)</span>
                         {stages.map((st, i) => (
-                          <div className="qline" key={i}>
+                          <div className="pq-stage" key={i}>
                             <input
-                              className="qline-desc"
+                              aria-label={`Stage ${i + 1} name`}
                               placeholder="Stage name (e.g. Advance, Inspection)"
                               value={st.name}
                               onChange={(e) => setStage(i, 'name', e.target.value)}
                             />
-                            <input
-                              className="qline-amt"
-                              type="number" min="0" max="100" step="0.01" placeholder="%"
-                              value={st.percent}
-                              onChange={(e) => setStage(i, 'percent', e.target.value)}
-                            />
-                            {stages.length > 1 && (
-                              <button type="button" className="qline-x" onClick={() => removeStage(i)} title="Remove">×</button>
-                            )}
+                            <span className="pq-pct">
+                              <input
+                                aria-label={`Stage ${i + 1} percent`}
+                                type="number" min="0" max="100" step="0.01" placeholder="%"
+                                value={st.percent}
+                                onChange={(e) => setStage(i, 'percent', e.target.value)}
+                              />
+                              <span aria-hidden="true">%</span>
+                            </span>
+                            {stages.length > 1 ? (
+                              <button type="button" className="pq-x" onClick={() => removeStage(i)} aria-label={`Remove stage ${i + 1}`} title="Remove">×</button>
+                            ) : <span />}
                           </div>
                         ))}
-                        <button type="button" className="btn btn-ghost-dark btn-xs" onClick={addStage} style={{ marginTop: 4 }}>+ Add stage</button>
-                        <div className={`stage-completion${completionPct() <= 0 ? ' bad' : ''}`}>
+                        <button type="button" className="pg-link pq-add" onClick={addStage}>+ Add stage</button>
+                        <div className={`pq-completion${completionPct() <= 0 ? ' bad' : ''}`}>
                           {completionPct() > 0
                             ? `Completion stage (auto): ${completionPct()}%`
                             : 'Stages must total less than 100% — leave room for the completion stage.'}
@@ -608,33 +737,41 @@ export default function ProviderRequests() {
                       </div>
                     )}
 
-                    <label style={{ marginTop: 12 }}>Message (optional)</label>
-                    <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="When you can start, what's included…" />
+                    <div className="pg-field">
+                      <label htmlFor={`pq-msg-${row.jobId}`}>Message to the customer (optional)</label>
+                      <input
+                        id={`pq-msg-${row.jobId}`}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="When you can start, what's included…"
+                      />
+                    </div>
 
-                    {previewError && <div className="msg err" style={{ marginTop: 10 }}>{previewError}</div>}
+                    {previewError && <div className="pg-error" role="alert">{previewError}</div>}
 
                     {preview && (
-                      <div className="quote-breakdown">
+                      <div className="pq-breakdown" aria-label="Quote preview">
+                        <h5>Preview</h5>
                         {/* The workbook's "Provider receive" chain (UAT Round 6 3.2).
                             Each amount below is shown EXCLUSIVE of GST - previously
                             each line added its own GST before display, which is where
                             the reported $33 / $33 / -$11 came from. The figures
                             themselves were always calculated on the raw line total. */}
-                        <div className="qb-row"><span>Total before other charges</span><span>{formatMoney(preview.providerNet + preview.commission + preview.points)}</span></div>
-                        <div className="qb-less">Less</div>
-                        <div className="qb-row"><span>Platform commission ({preview.commissionRate}%)</span><span>−{formatMoney(preview.commission)}</span></div>
-                        <div className="qb-row"><span>Customer Mate Points ({preview.pointsRate}%)</span><span>−{formatMoney(preview.points)}</span></div>
-                        <div className="qb-row qb-bonus"><span>Bonus points (you fund)</span><span>−{formatMoney(preview.bonus)}</span></div>
-                        <div className="qb-row qb-sub"><span>Sub total</span><span>{formatMoney(preview.providerNet - preview.bonus)}</span></div>
-                        <div className="qb-row"><span>GST 10%</span><span>{formatMoney(preview.providerPayable - (preview.providerNet - preview.bonus))}</span></div>
-                        <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(preview.providerPayable)}</span></div>
-                        <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(preview.pointsEarned)} in points</span></div>
-                        <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(preview.customerTotal)}</span></div>
+                        <div className="pq-br"><span>Total before other charges</span><span>{formatMoney(preview.providerNet + preview.commission + preview.points)}</span></div>
+                        <div className="pq-less">Less</div>
+                        <div className="pq-br"><span>Platform commission ({preview.commissionRate}%)</span><span>−{formatMoney(preview.commission)}</span></div>
+                        <div className="pq-br"><span>Customer Mate Points ({preview.pointsRate}%)</span><span>−{formatMoney(preview.points)}</span></div>
+                        <div className="pq-br pq-muted"><span>Bonus points (you fund)</span><span>−{formatMoney(preview.bonus)}</span></div>
+                        <div className="pq-br pq-sub"><span>Sub total</span><span>{formatMoney(preview.providerNet - preview.bonus)}</span></div>
+                        <div className="pq-br"><span>GST 10%</span><span>{formatMoney(preview.providerPayable - (preview.providerNet - preview.bonus))}</span></div>
+                        <div className="pq-br pq-you"><span>You get paid</span><span>{formatMoney(preview.providerPayable)}</span></div>
+                        <div className="pq-br pq-muted"><span>Customer earns</span><span>{formatMoney(preview.pointsEarned)} in points</span></div>
+                        <div className="pq-br pq-total"><span>Customer pays</span><span>{formatMoney(preview.customerTotal)}</span></div>
                         {preview.stages && preview.stages.length > 0 && (
-                          <div className="stage-preview">
-                            <div className="stage-preview-head">Payment stages</div>
+                          <div className="pq-stage-preview">
+                            <div className="pq-stage-preview-head">Payment stages</div>
                             {preview.stages.map((st, i) => (
-                              <div className="stage-row" key={i}>
+                              <div className="pq-br" key={i}>
                                 <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
                                 <span>{formatMoney(st.customerTotal)}</span>
                               </div>
@@ -644,36 +781,36 @@ export default function ProviderRequests() {
                       </div>
                     )}
 
-                    <div className="quote-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={cancelQuote}>Cancel</button>
-                      <button type="button" className="btn btn-ghost-dark btn-sm" disabled={savingDraft} onClick={() => saveDraft(row.jobId)}>
+                    <div className="pq-actions">
+                      <button type="button" className="pg-btn pg-btn-ghost" onClick={cancelQuote}>Cancel</button>
+                      <button type="button" className="pg-btn pg-btn-ghost" disabled={savingDraft} onClick={() => saveDraft(row.jobId)}>
                         {savingDraft ? 'Saving…' : 'Save'}
                       </button>
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => doPreview(row.jobId)}>Preview</button>
+                      <button type="button" className="pg-btn pg-btn-navy" onClick={() => doPreview(row.jobId)}>Preview</button>
                       <button
                         type="submit"
-                        className="btn btn-amber btn-sm"
+                        className="pg-btn pg-btn-yellow"
                         disabled={submitting || preview === null}
                         title={preview === null ? 'Run Preview first to see the full amounts' : undefined}
                       >
-                        {submitting ? 'Sending…' : 'Send quote'}
+                        {submitting ? 'Sending…' : 'Send Quote'}
                       </button>
                     </div>
 
-                    <p className="quote-hint">
+                    <p className="pq-status">
                       {preview === null
-                        ? 'Send quote unlocks once you have previewed the full amounts.'
+                        ? 'Send Quote unlocks once you have previewed the full amounts.'
                         : 'Previewed — you can still edit and save before sending.'}
                       {draftSavedAt && <> · Draft saved {formatDate(draftSavedAt)}.</>}
                       {dirty && <> · You have unsaved changes.</>}
                     </p>
                   </form>
                 )}
-              </div>
+              </article>
             )
           })}
         </div>
       )}
-    </>
+    </div>
   )
 }

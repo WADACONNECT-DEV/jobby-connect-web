@@ -530,3 +530,51 @@ block at the end).
 
 `npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
 succeeds. Not checked in the browser: the local API still returns 500 on login.
+
+## 2026-10-30 — Requests to Me (design/HANDOFF-provider.md, Part J)
+
+**What changed visually**
+- Header: speech-bubble icon, "Requests to me", same intro. Error in the red bar; "Loading…" in the new style.
+- Sub-tabs Received · Replied · Wins · Lost · Expired · Declined use the shared `SubTabs` bar (same keys, counts and
+  remembered tab `provider.pipeline.tab`). Received's badge is yellow while it holds a request you can still quote on.
+- Filter row like the customer side: search ("Title, suburb or customer"), Industry, Status, Sort + direction. These are
+  the same `useListView` filters, sorts and per-tab state as before; `ListControls` is no longer used on this page.
+  Count line ("3 requests" / "2 of 3 requests") and Clear filters.
+- **List / Grid** toggle, remembered under the new key `provider.requests.layout` (default List). Grid shows compact
+  cards (one main button: "Send a quote" on quotable rows, else "View details"). Opening one shows the full card across
+  the grid, with "Show less", using the list's existing expanded state.
+- **Request card**:
+  - Left: customer initials, job title, industry chip, suburb, Quote Request ID pill. On Received, a "Closes in n days"
+    chip, or a red "Closes today" chip, worked out from `expiresAt` already on the row, by calendar day.
+  - Under that: customer name · requested date · time frame · "also sent to n other provider(s)" (from `targetCount`).
+    The description is cut to two lines with "Show more".
+  - Right side:
+    - Received: Decline and Send a quote.
+    - Replied / Wins / Lost: "Customer pays $x" / "You get $y" / quoted date, with the same ✓ tags.
+    - Expired / Declined: a grey tag.
+  - Quotable Received rows have the yellow border. The decline note on Declined rows stays.
+- **Send Quote form** (opens under the card as before):
+  - Line items are a table: description, $ amount, a +GST / GST-free toggle (sets the same `gstApplicable` as the old
+    dropdown), live "Customer sees", and × to remove. On phones each line stacks into a small card.
+  - Payment is a Full payment / Staged (milestones) switch; it calls `edited()` only when the value changes, like the old
+    `<select>`. The stages editor gets % fields and the same completion line.
+  - The Preview breakdown card keeps the same rows, order and expressions, with "You get paid" and "Customer pays"
+    emphasised.
+  - Buttons: Cancel · Save · Preview · Send Quote. Only the label case changed ("Send quote" → "Send Quote").
+- **Decline**: the inline panel is now the in-app dialog (new `DeclineDialog`, `dlg-` styles with a yellow top line). Same
+  title, text, required message and "Back — don't decline" / "Confirm Decline". Confirm stays disabled until a message is
+  typed. Escape or a backdrop click is the same as Back.
+- Empty states: same text per tab in the new style; Received still offers "My provider profile" (→ `/provider`).
+
+**Behaviour:** unchanged. The file's logic (lines 26–353 now: state, `openQuote`, `saveDraft`, `cancelQuote`,
+`openDecline` / `cancelDecline` / `confirmDecline`, `edited`, line and stage helpers, `customerSees`, `doPreview`,
+`submitQuote`, `emptyCopy`) is byte-for-byte as before. Only imports and the returned markup changed. The known
+`gstApplicable` error is still there (now line 37, because of the new imports).
+
+**Files touched:** `src/pages/ProviderRequests.tsx`; new `src/components/RequestCards.tsx` (speech-bubble icon, closes
+chip, grid card, decline dialog; display only); `src/index.css` (new `pr-` / `pq-` block).
+
+**BACKEND-REQUESTS.md:** "draft saved" / "Continue quote" on cards.
+
+`npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
+local API still returns 500 on login.

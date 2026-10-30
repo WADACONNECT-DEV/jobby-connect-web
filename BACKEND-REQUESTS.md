@@ -141,3 +141,12 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
 - **API needed:** a verified change, e.g. `POST /me/email { newEmail }` that emails a confirm link to the new address, and a
   confirm endpoint that switches it.
 - **Why:** the login email can't be changed today. Owner to confirm whether this is wanted.
+
+## 2026-10-30 — Requests to Me: show which requests have a saved draft
+
+- **Screen:** provider dashboard → Requests to Me (`src/pages/ProviderRequests.tsx`), Received cards.
+- **User need:** see "draft saved" on a request they've started quoting, with the button reading "Continue quote"
+  instead of "Send a quote" (mockup).
+- **API needed:** `GET /provider/pipeline` rows to include `draftSavedAt` (null when there's no draft).
+- **Why:** the list doesn't say whether a draft exists. Checking would mean a `GET /jobs/{id}/quotes/draft` per row. Until
+  then, every card says "Send a quote"; opening the form still restores the draft and shows "Draft saved {date}".
