@@ -501,3 +501,32 @@ rules left, unused).
 
 `npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
 succeeds. Not checked in the browser: the local API returned 500 on login (health 503) during this session.
+
+## 2026-10-30 — Provider theme + frame (design/HANDOFF-provider.md, Part I)
+
+**What changed visually** (provider side only; the customer side is unchanged)
+- **Welcome band** when "As a provider" is open: dark navy (`#0B2038`) with a 4 px yellow top line, "Welcome back, {first
+  name}." + yellow PROVIDER badge, and "Win local work, run every job, get paid. · {PAS ID}" (from `user.providerRef`).
+  No Mate Points pill, as before. The customer band's JSX is unchanged.
+- **Role switch**: the underline is yellow on the provider side and stays navy on the customer side.
+- **Provider pane** (`.fr-card.provider`): cream `#FFF8E4` with cream borders `#E9DFC0` and a 3 px yellow top border.
+  This replaces the green-teal `--pane-provider` tint. The old `--pane-provider` / `.role-pane` rules are left in place
+  (unused).
+- **Main provider tabs**: active pill is yellow with dark-navy text; hover is deeper cream `#FFF1C7`.
+- **Inside the provider pane** (all provider tabs, including Provider Profile and Jobby Mate Referrals, without editing those
+  pages):
+  - The app tokens are re-pointed for that pane only: `--navy`/`--navy2` → dark navy, `--amber` → yellow,
+    `--line` → cream line, `--teal` → dark navy, `--mist` → cream. `--paper` stays white, so cards stay white.
+  - New-style parts: ghost buttons get cream borders; navy buttons, avatars and List/Grid "on" are dark navy;
+    light-blue chips and notices become deeper cream; card borders become cream. The yellow "needs action" and
+    "accepted" borders stay yellow.
+  - Sub-tab colours for Parts J–L are ready: active dark navy with a yellow count badge, and a yellow badge on inactive
+    tabs marked `is-attention`.
+
+**Behaviour:** none changed. Role/tab logic, remembered role and tab, the wallet call and routes are untouched.
+
+**Files touched:** `src/pages/Home.tsx` (welcome band markup only), `src/index.css` (new "Provider theme (Part I)"
+block at the end).
+
+`npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`. `vite build`
+succeeds. Not checked in the browser: the local API still returns 500 on login.

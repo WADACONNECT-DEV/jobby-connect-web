@@ -122,16 +122,30 @@ export default function Home() {
 
   return (
     <div className="fr">
-      <section className="fr-band">
+      {/* Provider side: dark navy band with a yellow line (HANDOFF-provider Part I).
+          Customer side: unchanged. */}
+      <section className={`fr-band${activeRole === 'provider' ? ' is-provider' : ''}`}>
         <div className="fr-band-in">
-          <div className="fr-band-copy">
-            <h1>Welcome back, {firstName}.</h1>
-            <p>
-              {isApprovedProvider
-                ? 'Switch between requesting work and providing it.'
-                : 'Your trusted local providers, ready for your next job.'}
-            </p>
-          </div>
+          {activeRole === 'provider' ? (
+            <div className="fr-band-copy">
+              <h1>
+                Welcome back, {firstName}. <span className="fr-badge">PROVIDER</span>
+              </h1>
+              <p>
+                Win local work, run every job, get paid.
+                {user?.providerRef && <> · <span className="fr-band-ref">{user.providerRef}</span></>}
+              </p>
+            </div>
+          ) : (
+            <div className="fr-band-copy">
+              <h1>Welcome back, {firstName}.</h1>
+              <p>
+                {isApprovedProvider
+                  ? 'Switch between requesting work and providing it.'
+                  : 'Your trusted local providers, ready for your next job.'}
+              </p>
+            </div>
+          )}
           {activeRole === 'customer' && points !== null && (
             <span className="fr-points">
               <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24">

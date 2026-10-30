@@ -8508,3 +8508,179 @@ main.wrap:has(> .fr) {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Provider theme + frame (design/HANDOFF-provider.md, Part I)
+   Customer = light blue / navy; provider = dark navy / yellow / cream.
+   Everything below is scoped to the provider side: the welcome band when the
+   provider role is open (.fr-band.is-provider) and the dashboard card that
+   holds the provider tabs (.fr-card.provider). Every provider tab — including
+   Provider Profile and Jobby Mate Referrals — inherits it without page edits.
+   Nothing on the customer side is changed by this block.
+   ========================================================================== */
+.fr-card.provider {
+  --pv-navy: #0b2038;
+  --pv-yellow: #f7c21b;
+  --pv-cream: #fff8e4;
+  --pv-line: #e9dfc0;
+  --pv-cream2: #fff1c7;
+
+  /* The older provider pages use the app-wide tokens; re-point them inside the
+     provider pane only, so their buttons, borders and links follow the theme.
+     --paper stays white, so cards stay white on the cream pane. */
+  --navy: var(--pv-navy);
+  --navy2: var(--pv-navy);
+  --amber: var(--pv-yellow);
+  --line: var(--pv-line);
+  --teal: var(--pv-navy);
+  --mist: var(--pv-cream);
+
+  background: var(--pv-cream);
+  border: 1px solid var(--pv-line);
+  border-top: 3px solid var(--pv-yellow);
+}
+
+/* ---- Welcome band (outside the card, so colours are literal here) ---- */
+.fr-band.is-provider {
+  background: #0b2038;
+  box-shadow: inset 0 4px 0 #f7c21b;
+}
+.fr-band.is-provider h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.fr-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f7c21b;
+  color: #0b2038;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+.fr-band-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+/* ---- Role switch + main tabs ---- */
+.fr-card.provider .fr-roles,
+.fr-card.provider .fr-tabs {
+  border-bottom-color: var(--pv-line);
+}
+.fr-card.provider .fr-role.on {
+  color: var(--pv-navy);
+  border-bottom-color: var(--pv-yellow);
+}
+.fr-card.provider .fr-tab,
+.fr-card.provider .fr-tab:hover {
+  color: var(--pv-navy);
+}
+.fr-card.provider .fr-tab:hover {
+  background: var(--pv-cream2);
+}
+.fr-card.provider .fr-tab.on,
+.fr-card.provider .fr-tab.on:hover {
+  background: var(--pv-yellow);
+  color: var(--pv-navy);
+  font-weight: 800;
+}
+.fr-card.provider .fr-back,
+.fr-card.provider .fr-textbtn {
+  color: var(--pv-navy);
+}
+
+/* ---- Shared new-style parts inside the provider pane ---- */
+.fr-card.provider .pg,
+.fr-card.provider .pg-link {
+  color: var(--pv-navy);
+}
+.fr-card.provider .pg-btn-yellow {
+  background: var(--pv-yellow);
+  color: var(--pv-navy);
+}
+.fr-card.provider .pg-btn-navy,
+.fr-card.provider .pg-avatar {
+  background: var(--pv-navy);
+}
+.fr-card.provider .pg-btn-ghost {
+  background: #fff;
+  border-color: var(--pv-line);
+  color: var(--pv-navy);
+}
+.fr-card.provider .pg-btn-ghost:hover:not(:disabled) {
+  border-color: var(--pv-navy);
+}
+.fr-card.provider .pg-seg button.on {
+  background: var(--pv-navy);
+  border-color: var(--pv-navy);
+}
+
+/* Cards stay white; their borders go cream. */
+.fr-card.provider .pg-refine,
+.fr-card.provider .jb-card,
+.fr-card.provider .jb-sent-list li,
+.fr-card.provider .jb-review,
+.fr-card.provider .jb-quote,
+.fr-card.provider .jb-cc,
+.fr-card.provider .rf-card,
+.fr-card.provider .rf-row {
+  border-color: var(--pv-line);
+}
+
+/* Light-blue tints become deeper cream. */
+.fr-card.provider .pg-note,
+.fr-card.provider .pg-chip,
+.fr-card.provider .pg-morestrip,
+.fr-card.provider .jb-bubble,
+.fr-card.provider .rf-how {
+  background: var(--pv-cream2);
+}
+.fr-card.provider .rf-claim {
+  background: #fff;
+  border-color: var(--pv-line);
+}
+.fr-card.provider .jb-stage:not(:last-child)::after,
+.fr-card.provider .jb-cc-prog {
+  background: var(--pv-line);
+}
+
+/* Sub-tabs (used by Parts J–L): active dark navy, count badge yellow; an
+   inactive tab's badge goes yellow too when something needs action. */
+.fr-card.provider .jb-subtab {
+  color: var(--pv-navy);
+}
+.fr-card.provider .jb-subtab:hover {
+  background: var(--pv-cream2);
+}
+.fr-card.provider .jb-subtab.on,
+.fr-card.provider .jb-subtab.on:hover {
+  background: var(--pv-navy);
+  color: #fff;
+}
+.fr-card.provider .jb-badge {
+  background: var(--pv-line);
+  color: var(--pv-navy);
+}
+.fr-card.provider .jb-subtab.on .jb-badge,
+.fr-card.provider .jb-badge.is-attention {
+  background: var(--pv-yellow);
+  color: var(--pv-navy);
+  font-weight: 800;
+}
+/* Keep the yellow "needs your action" / accepted borders above the cream default. */
+.fr-card.provider .jb-cc:hover {
+  border-color: var(--pv-navy);
+}
+.fr-card.provider .jb-cc.is-attention,
+.fr-card.provider .jb-quote.is-accepted {
+  border-color: var(--pv-yellow);
+}
