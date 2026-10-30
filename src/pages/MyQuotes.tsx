@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
-import { ListControls } from '../components/ListControls'
+import { ArrowIcon, EmptyState, GridIcon, InitialsAvatar, ListIcon, PageHead, PinIcon, SearchIcon } from '../components/PageParts'
+import { RefPill, SubTabs } from '../components/JobParts'
+import { RequestCompactCard } from '../components/RequestCards'
+import { DocTickIcon, FigureTrio, PaymentChip, QuoteCompactCard, ReasonLine, ReviewForm, StageTimeline } from '../components/QuoteCards'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   CATEGORY_LABELS, OUTCOME_LABELS,
   formatDate, formatMoney, settlementLabel,
-  type ProviderQuote, type ProviderRequestRow, type SettlementResult, type SettlementStatus,
+  type ProviderQuote, type ProviderQuoteStage, type ProviderRequestRow, type SettlementResult, type SettlementStatus,
 } from '../types'
 
 interface ReviewTarget { quoteId: string; stageId: string | null; label: string }
@@ -206,168 +209,284 @@ export default function MyQuotes() {
   function unitAction(quoteId: string, stageId: string | null, st: SettlementStatus | null, label: string, key: string) {
     if (!st) return null
     if (st === 'PENDING_COMPLETION') {
-      return <button className="btn btn-green btn-xs" disabled={busyId === key} onClick={() => complete(quoteId, stageId)}>
+      return <button type="button" className="pg-btn pg-btn-navy pk-sm" disabled={busyId === key} onClick={() => complete(quoteId, stageId)}>
         {busyId === key ? 'Working…' : 'Mark complete'}</button>
     }
     if (st === 'PENDING_REVIEW') {
-      return <button className="btn btn-amber btn-xs" onClick={() => openReview(quoteId, stageId, label)}>Review &amp; get paid</button>
+      return <button type="button" className="pg-btn pg-btn-yellow pk-sm" onClick={() => openReview(quoteId, stageId, label)}>Review &amp; get paid</button>
     }
-    return <span className="stage-settle">{settlementLabel(st)}</span>
+    return <span className="pk-settle">{settlementLabel(st)}</span>
   }
 
-  return (
-    <>
-      <div className="page-head">
-        <h2>Your quotes</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/home/requests')}>See requests</button>
-      </div>
-      <p className="page-intro">Quotes you've sent, what you'll be paid, and where they stand. Open a quote to see the full breakdown.</p>
+  /* ---------- display helpers (read already-loaded data only) ---------- */
 
-      {error && <div className="msg err">{error}</div>}
-      {quotes === null && !error && <div className="loading">Loading…</div>}
+  // List or Grid, remembered like the other tabs (display option only).
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.quotes.layout', 'list')
+  // Grid only: which request rows (Action needed / Declined) are opened up.
+  const [openRows, setOpenRows] = useState<string[]>([])
+  const toggleRow = (id: string) =>
+    setOpenRows((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const customerOf = (jobId: string) => (pipeline ?? []).find((r) => r.jobId === jobId)?.customerName ?? null
+
+  /** What the provider has to do next on this quote, in words, from its settlement state. */
+  function nextStep(q: ProviderQuote): { kind: 'complete' | 'review'; text: string; stage: ProviderQuoteStage | null } | null {
+    if (!needsAction(q)) return null
+    if (q.paymentType === 'STAGED') {
+      const st = (q.stages ?? []).find((s) => s.settlementStatus === 'PENDING_COMPLETION' || s.settlementStatus === 'PENDING_REVIEW')
+      if (!st) return null
+      return st.settlementStatus === 'PENDING_REVIEW'
+        ? { kind: 'review', text: `Submit your review to release ${formatMoney(st.providerPayable)}`, stage: st }
+        : { kind: 'complete', text: `Mark ${st.name} complete`, stage: st }
+    }
+    return q.settlementStatus === 'PENDING_REVIEW'
+      ? { kind: 'review', text: `Submit your review to release ${formatMoney(q.providerPayable)}`, stage: null }
+      : { kind: 'complete', text: 'Mark the job complete', stage: null }
+  }
+
+  const anyAcceptedAction = acceptedQuotes.some(needsAction)
+
+  // The review form sits inside its quote's card when that card is on screen,
+  // otherwise at the top of the page (where it always used to be).
+  const reviewQuote = review ? list.visible.find((q) => q.id === review.quoteId) : undefined
+  const reviewInCard = review !== null && tab === 'ACCEPTED' && reviewQuote !== undefined
+    && (layout === 'list' || list.isExpanded(reviewQuote.id ?? reviewQuote.jobId))
+
+  const reviewForm = review && (
+    <ReviewForm
+      label={review.label}
+      isStage={review.stageId !== null}
+      difficulty={difficulty}
+      cooperation={cooperation}
+      hazards={hazards}
+      notes={notes}
+      onDifficulty={setDifficulty}
+      onCooperation={setCooperation}
+      onHazards={setHazards}
+      onNotes={setNotes}
+      submitDisabled={busyId !== null}
+      onSubmit={submitReview}
+      onCancel={() => setReview(null)}
+    />
+  )
+
+  const requestRows = tab === 'ACTION' ? actionRows : tab === 'DECLINED' ? declinedRows : []
+
+  return (
+    <div className="pg pk">
+      <PageHead
+        icon={<DocTickIcon />}
+        title="Your quotes"
+        intro="Quotes you've sent, what you'll be paid, and where they stand. Open a quote to see the full breakdown."
+        action={<button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/home/requests')}>See requests</button>}
+      />
+
+      {error && <div className="pg-error" role="alert">{error}</div>}
+      {quotes === null && !error && <div className="pg-loading">Loading…</div>}
 
       {quotes !== null && (
-        <div className="pipe-tabs" role="tablist">
-          {QUOTE_TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`pipe-tab${tab === t.key ? ' active' : ''}${t.key === 'ACTION' && actionRows.length > 0 ? ' due' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-              <span className="pipe-count">{countOf(t.key)}</span>
-            </button>
-          ))}
-        </div>
+        <SubTabs
+          label="Your quotes by stage"
+          active={tab}
+          onChange={setTab}
+          tabs={QUOTE_TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            count: countOf(t.key),
+            attention: (t.key === 'ACTION' && actionRows.length > 0) || (t.key === 'ACCEPTED' && anyAcceptedAction),
+          }))}
+        />
       )}
 
-      {review && (
-        <div className="md-panel" style={{ marginBottom: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Post-job review — {review.label}</h3>
-          <p className="page-intro" style={{ marginTop: 0 }}>Submitting your review releases your payout for this {review.stageId ? 'stage' : 'job'}.</p>
-          <form onSubmit={submitReview}>
-            <div className="row2">
-              <div>
-                <label>Job difficulty (1 easy – 5 hard)</label>
-                <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
-              <div>
-                <label>Customer cooperation (1 poor – 5 great)</label>
-                <select value={cooperation} onChange={(e) => setCooperation(Number(e.target.value))}>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
-            </div>
-            <label style={{ marginTop: 10 }}>Hazards encountered (optional)</label>
-            <input value={hazards} onChange={(e) => setHazards(e.target.value)} />
-            <label style={{ marginTop: 10 }}>Notes (optional)</label>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} />
-            <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-              <button className="btn btn-amber btn-sm" type="submit" disabled={busyId !== null}>Submit review &amp; release payout</button>
-              <button className="btn btn-ghost-dark btn-sm" type="button" onClick={() => setReview(null)}>Cancel</button>
-            </div>
-          </form>
-        </div>
-      )}
+      {review && !reviewInCard && <div className="pk-review-top">{reviewForm}</div>}
 
+      {/* Filters: the same list state as before (Accepted only, as before). */}
       {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && (
-        <ListControls list={list} searchPlaceholder="Search your quotes" countLabel="quotes" />
+        <div className="pg-searchrow pk-filters">
+          <div className="pg-field pg-field-grow">
+            <label htmlFor="pk-search">Search your quotes</label>
+            <span className="pg-input-ico">
+              <SearchIcon />
+              <input
+                id="pk-search"
+                type="search"
+                value={list.view.search}
+                placeholder="Job title or message"
+                onChange={(e) => list.setSearch(e.target.value)}
+              />
+            </span>
+          </div>
+          {list.filters.map((f) => (
+            <div className="pg-field" key={f.key}>
+              <label htmlFor={`pk-${f.key}`}>
+                {f.key === 'status' ? 'Quote status' : f.key === 'payment' ? 'Payment' : 'Work state'}
+              </label>
+              <select id={`pk-${f.key}`} value={list.view.filters[f.key] ?? ''} onChange={(e) => list.setFilter(f.key, e.target.value)}>
+                <option value="">All {f.label.toLowerCase()}</option>
+                {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          ))}
+          <div className="pg-field">
+            <label htmlFor="pk-sort">Sort by</label>
+            <span className="jb-sortbox">
+              <select id="pk-sort" value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+                {list.sorts.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+              <button
+                type="button"
+                className="pg-dir"
+                aria-label={list.view.sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                title={list.view.sortDir === 'asc' ? 'Lowest first' : 'Highest first'}
+                onClick={list.toggleDir}
+              >
+                {list.view.sortDir === 'asc' ? '↑' : '↓'}
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {quotes !== null && (
+        <div className="pg-toolbar">
+          {tab === 'ACCEPTED' && acceptedQuotes.length > 0 ? (
+            <h3 className="pg-count">
+              {list.shown === list.total ? `${list.total} quote${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} quotes`}
+            </h3>
+          ) : tab !== 'ACCEPTED' && requestRows.length > 0 ? (
+            <h3 className="pg-count">{requestRows.length} request{requestRows.length === 1 ? '' : 's'}</h3>
+          ) : <span />}
+          <div className="pg-toolbar-end">
+            {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && list.dirty && (
+              <button type="button" className="pg-link" onClick={list.clear}>Clear filters</button>
+            )}
+            <div className="pg-seg" role="group" aria-label="View">
+              <button type="button" className={layout === 'list' ? 'on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>
+                <ListIcon /> List
+              </button>
+              <button type="button" className={layout === 'grid' ? 'on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+                <GridIcon /> Grid
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === 'ACCEPTED' && acceptedQuotes.length === 0 && quotes !== null && (
-        <div className="empty">
-          <p>No accepted quotes yet. Quotes the customer accepts appear here, with the actions that get you paid.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/home/requests')} style={{ marginTop: 12 }}>See requests to me</button>
-        </div>
+        <EmptyState
+          action={<button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/home/requests')}>See requests to me</button>}
+        >
+          No accepted quotes yet. Quotes the customer accepts appear here, with the actions that get you paid.
+        </EmptyState>
       )}
 
       {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && list.shown === 0 && (
-        <div className="empty">
-          <p>No quotes match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
-        </div>
+        <EmptyState action={<button type="button" className="pg-btn pg-btn-ghost" onClick={list.clear}>Clear filters</button>}>
+          No quotes match these filters.
+        </EmptyState>
       )}
 
       {tab === 'ACCEPTED' && list.shown > 0 && (
-        <div className="job-list">
+        <div className={layout === 'grid' ? 'jb-grid' : 'jb-list'}>
           {list.visible.map((q) => {
             const rowId = q.id ?? q.jobId
             const open = list.isExpanded(rowId)
-            const action = needsAction(q)
-            return (
-              <div className="job-card" key={rowId}>
-                {/* Summary row — title, status, amount. Collapsed by default (UAT §5.2). */}
-                <div className="sum-row">
-                  <span className="sum-main">
-                    <span className="sum-title">{q.jobTitle}</span>
-                    {q.status && <span className={`status status-${q.status.toLowerCase()}`}>{q.status}</span>}
-                    {action && <span className="sum-flag">Action needed</span>}
-                  </span>
-                  <span className="sum-right">
-                    <span className="sum-amt">{formatMoney(q.customerTotal)}</span>
-                    <button className="btn btn-ghost-dark btn-xs" onClick={() => list.toggleExpanded(rowId)}>
-                      {open ? 'Hide' : 'View'}
-                    </button>
-                  </span>
-                </div>
+            const step = nextStep(q)
+            const customer = customerOf(q.jobId)
+            const ref = q.jobId ? refByJob[q.jobId] ?? null : null
+            const staged = q.paymentType === 'STAGED'
 
-                {q.jobId && refByJob[q.jobId] && (
-                  <div className="ref-list">
-                    <span className="ref-item"><code className="req-ref">{refByJob[q.jobId]}</code></span>
-                  </div>
+            if (layout === 'grid' && !open) {
+              return (
+                <QuoteCompactCard
+                  key={rowId}
+                  title={q.jobTitle}
+                  customerName={customer}
+                  refValue={ref}
+                  staged={staged}
+                  customerPays={q.customerTotal}
+                  youGet={q.providerPayable}
+                  reason={step ? step.text : null}
+                  actionLabel={step?.kind === 'review' ? 'Review & get paid' : step?.kind === 'complete' ? 'Open to mark complete' : 'View details'}
+                  onAction={() => {
+                    list.setExpanded(rowId, true)
+                    if (step?.kind === 'review' && q.id) {
+                      openReview(q.id, step.stage?.id ?? null, step.stage ? `${q.jobTitle} — ${step.stage.name}` : q.jobTitle)
+                    }
+                  }}
+                  onOpen={() => list.setExpanded(rowId, true)}
+                />
+              )
+            }
+
+            return (
+              <article
+                key={rowId}
+                className={`jb-card pk-card${step ? ' is-attention' : ''}${layout === 'grid' ? ' jb-span' : ''}`}
+              >
+                {layout === 'grid' && (
+                  <button type="button" className="pg-link jb-less" aria-expanded="true" onClick={() => list.setExpanded(rowId, false)}>
+                    Show less
+                  </button>
                 )}
 
-                {open && (
-                  <>
+                <div className="pk-head">
+                  <div className="pk-head-main">
+                    <h3 className="pk-title">{q.jobTitle}</h3>
+                    <div className="pk-tags">
+                      {q.status && <span className="pk-status">{q.status.charAt(0) + q.status.slice(1).toLowerCase()}</span>}
+                      <PaymentChip staged={staged} />
+                      {ref && <RefPill value={ref} />}
+                    </div>
+                    <p className="pk-who">
+                      {customer && <><InitialsAvatar name={customer} size="sm" /><span>{customer}</span></>}
+                      {q.createdAt && <span className="pk-sent">{customer ? '· ' : ''}Sent {formatDate(q.createdAt)}</span>}
+                    </p>
+                  </div>
+                  {/* Full payment: the settlement action sits on the card. */}
+                  {q.status === 'ACCEPTED' && !staged && q.id && (
+                    <div className="pk-head-act">{unitAction(q.id, null, q.settlementStatus, q.jobTitle, q.id)}</div>
+                  )}
+                </div>
+
+                {step && <ReasonLine>{step.text}</ReasonLine>}
+
+                <FigureTrio customerPays={q.customerTotal} commission={q.commission} youGet={q.providerPayable} />
+
+                {staged && q.stages && q.stages.length > 0 && (
+                  <StageTimeline
+                    stages={q.stages}
+                    actionFor={(st) => (q.status === 'ACCEPTED' && st.id
+                      ? unitAction(q.id!, st.id, st.settlementStatus, `${q.jobTitle} — ${st.name}`, st.id)
+                      : null)}
+                  />
+                )}
+
+                {review && reviewInCard && reviewQuote?.id === q.id && reviewForm}
+
+                {layout === 'list' && (
+                  <button type="button" className="pg-link pk-toggle" aria-expanded={open} onClick={() => list.toggleExpanded(rowId)}>
+                    {open ? 'Hide details' : 'View details'}
+                  </button>
+                )}
+
+                {(open || layout === 'grid') && (
+                  <div className="pk-details">
                     {q.lineItems.length > 0 && (
-                      <div className="qmini">
+                      <div className="pk-lines">
                         {q.lineItems.map((li, i) => (
-                          <div className="qmini-row" key={i}><span>{li.description}</span><span>{formatMoney(li.amount)}</span></div>
+                          <div className="pk-line" key={i}><span>{li.description}</span><span>{formatMoney(li.amount)}</span></div>
                         ))}
                       </div>
                     )}
-                    {q.message && <p className="job-desc">{q.message}</p>}
-                    <div className="quote-breakdown">
-                      <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(q.customerTotal)}</span></div>
-                      <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(q.providerPayable)}</span></div>
-                      <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(q.pointsEarned)} in points</span></div>
-                      <div className="qb-row qb-rate">
-                        <span>Rates applied</span>
-                        <span>{q.commissionRate}% commission &middot; {q.pointsRate}% Mate Points</span>
-                      </div>
-                      {q.stages && q.stages.length > 0 && (
-                        <div className="stage-preview">
-                          <div className="stage-preview-head">Payment stages</div>
-                          {q.stages.map((st) => (
-                            <div className="stage-row" key={st.id ?? st.name}>
-                              <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
-                              <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                {formatMoney(st.customerTotal)} · you get {formatMoney(st.providerPayable)}
-                                {q.status === 'ACCEPTED' && st.id &&
-                                  unitAction(q.id!, st.id, st.settlementStatus, `${q.jobTitle} — ${st.name}`, st.id)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    {q.message && <p className="pk-message">{q.message}</p>}
+                    <div className="pk-more">
+                      <span>Customer earns <strong>{formatMoney(q.pointsEarned)}</strong> in points</span>
+                      <span>Rates applied: {q.commissionRate}% commission &middot; {q.pointsRate}% Mate Points</span>
                     </div>
-                    {/* Full-payment settlement action */}
-                    {q.status === 'ACCEPTED' && q.paymentType !== 'STAGED' && q.id && (
-                      <div className="quote-item-foot">
-                        {unitAction(q.id, null, q.settlementStatus, q.jobTitle, q.id)}
-                      </div>
-                    )}
-                    <div className="job-foot">
-                      <span className="job-date">{q.createdAt ? `Sent ${formatDate(q.createdAt)}` : ''}</span>
-                      <span className="job-by">{q.paymentType === 'STAGED' ? 'Staged payment' : 'Full payment'}</span>
-                    </div>
-                  </>
+                  </div>
                 )}
-              </div>
+              </article>
             )
           })}
         </div>
@@ -377,61 +496,88 @@ export default function MyQuotes() {
           records Requests to Me shows, so a provider can act without leaving
           this tab. Nothing here changes where those items also appear. */}
       {(tab === 'ACTION' || tab === 'DECLINED') && pipeline === null && !error && (
-        <div className="loading">Loading…</div>
+        <div className="pg-loading">Loading…</div>
       )}
 
       {tab === 'ACTION' && pipeline !== null && actionRows.length === 0 && (
-        <div className="empty"><p>Nothing waiting on a reply from you.</p></div>
+        <EmptyState>Nothing waiting on a reply from you.</EmptyState>
       )}
 
       {tab === 'DECLINED' && pipeline !== null && declinedRows.length === 0 && (
-        <div className="empty"><p>No declined or lost requests.</p></div>
+        <EmptyState>No declined or lost requests.</EmptyState>
       )}
 
-      {(tab === 'ACTION' || tab === 'DECLINED') && (
-        <div className="job-list">
-          {(tab === 'ACTION' ? actionRows : declinedRows).map((row) => (
-            <div className="job-card" key={row.jobId}>
-              <div className="sum-row">
-                <span className="sum-main">
-                  <span className="sum-title">{row.jobTitle}</span>
-                  <span className="tag-muted">{OUTCOME_LABELS[row.outcome]}</span>
-                </span>
-                <span className="sum-right">
-                  {row.quoteTotal !== null && <span className="sum-amt">{formatMoney(row.quoteTotal)}</span>}
-                  {tab === 'ACTION' && (
-                    <button className="btn btn-amber btn-xs" onClick={() => navigate('/home/requests')}>
-                      Send a quote
-                    </button>
-                  )}
-                </span>
-              </div>
-
-              <div className="job-meta">
-                <span className="chip">{CATEGORY_LABELS[row.category]}</span>
-                <span>{row.suburb}</span>
-                {row.timeFrame && <span>· {row.timeFrame}</span>}
-                <span className="job-date">· {formatDate(row.requestedAt)}</span>
-              </div>
-
-              <p className="job-assigned">Customer: <strong>{row.customerName}</strong></p>
-
-              {row.requestRef && (
-                <div className="ref-list">
-                  <span className="ref-item"><code className="req-ref">{row.requestRef}</code></span>
+      {(tab === 'ACTION' || tab === 'DECLINED') && requestRows.length > 0 && (
+        <div className={layout === 'grid' ? 'jb-grid' : 'jb-list'}>
+          {requestRows.map((row) => {
+            const isAction = tab === 'ACTION'
+            if (layout === 'grid' && !openRows.includes(row.jobId)) {
+              return (
+                <RequestCompactCard
+                  key={row.jobId}
+                  title={row.jobTitle}
+                  customerName={row.customerName}
+                  industry={CATEGORY_LABELS[row.category]}
+                  suburb={row.suburb}
+                  date={formatDate(row.requestedAt)}
+                  refValue={row.requestRef}
+                  expiresAt={null}
+                  outcomeLabel={OUTCOME_LABELS[row.outcome]}
+                  attention={isAction}
+                  actionLabel={isAction ? 'Send a quote' : undefined}
+                  onAction={isAction ? () => navigate('/home/requests') : undefined}
+                  onOpen={() => toggleRow(row.jobId)}
+                />
+              )
+            }
+            return (
+              <article
+                key={row.jobId}
+                className={`jb-card pr-card${isAction ? ' is-attention' : ''}${layout === 'grid' ? ' jb-span' : ''}`}
+              >
+                {layout === 'grid' && (
+                  <button type="button" className="pg-link jb-less" aria-expanded="true" onClick={() => toggleRow(row.jobId)}>
+                    Show less
+                  </button>
+                )}
+                <div className="pr-row">
+                  <InitialsAvatar name={row.customerName} />
+                  <div className="pr-main">
+                    <h3 className="pr-title">{row.jobTitle}</h3>
+                    <div className="pr-meta">
+                      <span className="pg-chip">{CATEGORY_LABELS[row.category]}</span>
+                      <span className="pr-meta-item"><PinIcon />{row.suburb}</span>
+                      {row.requestRef && <RefPill value={row.requestRef} />}
+                    </div>
+                    <p className="pr-sub">
+                      Customer: <strong>{row.customerName}</strong> · {formatDate(row.requestedAt)}
+                      {row.timeFrame && <> · {row.timeFrame}</>}
+                    </p>
+                  </div>
+                  <div className="pr-side">
+                    {row.quoteTotal !== null && (
+                      <div className="pr-amount"><span>Customer pays <strong>{formatMoney(row.quoteTotal)}</strong></span></div>
+                    )}
+                    {isAction ? (
+                      <button type="button" className="pg-btn pg-btn-yellow" onClick={() => navigate('/home/requests')}>
+                        Send a quote <ArrowIcon />
+                      </button>
+                    ) : (
+                      <span className="pr-tag">{OUTCOME_LABELS[row.outcome]}</span>
+                    )}
+                  </div>
                 </div>
-              )}
-
-              {row.outcome === 'DECLINED' && row.declineMessage && (
-                <div className="decline-note">
-                  <span className="decline-note-head">You declined this request</span>
-                  <p>{row.declineMessage}</p>
-                </div>
-              )}
-            </div>
-          ))}
+                {row.outcome === 'DECLINED' && row.declineMessage && (
+                  <div className="pr-declined">
+                    <span className="pr-declined-head">You declined this request</span>
+                    <p>{row.declineMessage}</p>
+                  </div>
+                )}
+              </article>
+            )
+          })}
         </div>
       )}
-    </>
+    </div>
   )
 }

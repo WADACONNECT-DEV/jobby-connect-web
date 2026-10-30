@@ -9239,3 +9239,414 @@ main.wrap:has(> .fr) {
     white-space: normal;
   }
 }
+
+/* ==========================================================================
+   Your Quotes (design/HANDOFF-provider.md, Part K): `pk-` quote cards,
+   figures, stage timeline, review form. Request rows reuse Part J's `pr-`.
+   ========================================================================== */
+.pg-searchrow.pk-filters {
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)) auto;
+}
+.pk-card {
+  gap: 12px;
+}
+.pk-card.is-attention {
+  border-color: #f7c21b;
+  box-shadow: 0 0 0 1px #f7c21b inset;
+}
+.pk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.pk-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+.pk-title {
+  margin: 0;
+  font-family: "Inter Tight", Inter, sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  color: #0b2038;
+  overflow-wrap: anywhere;
+}
+.pk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.pk-tags .jb-ref {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.pk-status {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #e5f5ea;
+  color: #1d5c37;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.pk-pay {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #3e5571;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pk-pay.is-staged {
+  background: #fff1c7;
+  color: #6b4e00;
+}
+.pk-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b2038;
+}
+.pk-sent {
+  font-weight: 400;
+  color: #5a6e86;
+}
+.pk-head-act {
+  display: flex;
+  align-items: center;
+}
+.pg .pk-sm {
+  min-height: 38px;
+  padding: 7px 14px;
+  font-size: 14px;
+}
+.pk-settle {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #3e5571;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Reason line on cards that need the provider */
+.pk-reason {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff1c7;
+  color: #0b2038;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pk-reason-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f7c21b;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* Customer pays · Commission · You get paid */
+.pk-figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.pk-figs > div {
+  padding: 10px 12px;
+  border: 1px solid #e9dfc0;
+  border-radius: 10px;
+  background: #fff;
+}
+.pk-figs dt {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a6e86;
+}
+.pk-figs dd {
+  margin: 2px 0 0;
+  font-family: "Inter Tight", Inter, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0b2038;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.pk-figs .pk-fig-you {
+  border-color: #f7c21b;
+  background: #fff8e4;
+}
+
+/* Stage timeline */
+.pk-stages {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pk-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 0;
+}
+.pk-stage:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 26px;
+  bottom: -8px;
+  width: 2px;
+  background: #e9dfc0;
+}
+.pk-dot {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd6e2;
+  border-radius: 50%;
+  background: #fff;
+}
+.pk-stage.is-wait .pk-dot {
+  border-color: #0b2038;
+  background: #fff8e4;
+}
+.pk-stage.is-act .pk-dot {
+  border-color: #f7c21b;
+  background: #f7c21b;
+}
+.pk-stage.is-done .pk-dot {
+  border-color: #0b2038;
+  background: #0b2038;
+}
+.pk-stage-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  font-size: 14px;
+  color: #0b2038;
+}
+.pk-stage-name span {
+  color: #5a6e86;
+}
+.pk-stage-amt {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0b2038;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pk-stage-amt span {
+  font-weight: 400;
+  color: #5a6e86;
+}
+.pk-stage-act {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Details */
+.pk-toggle {
+  align-self: flex-start;
+  font-size: 14px;
+}
+.pk-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0e8cf;
+}
+.pk-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+.pk-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #24405f;
+}
+.pk-line span:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pk-message {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid #e9dfc0;
+  font-size: 14px;
+  color: #3e5571;
+}
+.pk-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 13px;
+  color: #5a6e86;
+}
+
+/* Grid card */
+.pk-cc-figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: #3e5571;
+}
+.pk-cc-figs strong {
+  color: #0b2038;
+}
+.pk-cc .pk-reason {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* Post-job review */
+.pk-review-top {
+  display: flex;
+  flex-direction: column;
+}
+.pk-review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1.5px solid #f7c21b;
+  border-radius: 12px;
+  background: #fffdf6;
+}
+.pk-review h4 {
+  margin: 0;
+  font-family: "Inter Tight", Inter, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0b2038;
+}
+.pk-review-lead {
+  margin: -6px 0 0;
+  font-size: 14px;
+  color: #3e5571;
+}
+.pk-review-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.pk-scale {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.pk-scale legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #24405f;
+}
+.pk-scale-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.pk-scale-row button {
+  min-height: 44px;
+  border: 1.5px solid #cbd6e2;
+  border-radius: 10px;
+  background: #fff;
+  color: #0b2038;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pk-scale-row button.on {
+  border-color: #0b2038;
+  background: #0b2038;
+  color: #fff;
+}
+.pk-scale-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #5a6e86;
+}
+.pk-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .pg-searchrow.pk-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .pg-searchrow.pk-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pk-figs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .pk-figs > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .pk-stage {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .pk-stage-amt,
+  .pk-stage-act {
+    grid-column: 2;
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .pk-head-act,
+  .pk-head-act .pg-btn {
+    width: 100%;
+  }
+  .pk-review-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pk-review-actions .pg-btn {
+    width: 100%;
+    white-space: normal;
+  }
+}

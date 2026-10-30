@@ -578,3 +578,49 @@ chip, grid card, decline dialog; display only); `src/index.css` (new `pr-` / `pq
 
 `npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
 local API still returns 500 on login.
+
+## 2026-10-31 — Your Quotes (design/HANDOFF-provider.md, Part K)
+
+**What changed visually**
+- Header: document-tick icon, "Your quotes", same intro. "See requests" is now the header's yellow button.
+- Sub-tabs Accepted · Action needed · Declined use the shared `SubTabs` bar (same keys, counts and remembered tab
+  `provider.quotes.tab`). Action needed's badge is yellow when it has rows, as the old `due` style was. Accepted's badge
+  is now yellow too when an accepted quote needs action (`needsAction`).
+- Accepted: filter row like the customer side (search, Quote status, Payment, Work state, Sort + direction). It is the
+  same `useListView('provider.quotes')` state as before; `ListControls` is no longer used here. Count line and
+  Clear filters.
+- **List / Grid** toggle on every sub-tab, remembered under the new key `provider.quotes.layout` (default List).
+- **Quote card** (Accepted):
+  - Header: job title, status chip ("Accepted"), Full / Staged payment chip, Quote Request ID, and customer initials +
+    name. The name comes from the pipeline rows the page already loads, matched by `jobId`; no new call.
+  - "Sent {date}". For full payment, the settlement button sits on the card.
+  - Cards that need action get the yellow border and a reason line, worked out from the settlement state already on the
+    quote: "Mark {stage} complete" / "Mark the job complete" / "Submit your review to release {stage or quote
+    providerPayable}".
+  - Three figures: Customer pays (`customerTotal`), Commission (`commission`, ex-GST, as the quote holds it), You get paid
+    (`providerPayable`). Formatting only.
+  - Staged quotes: a stage timeline (dot per stage: grey to do / navy-outline awaiting payment / yellow review / navy
+    paid), name and %, customer total and "you get", and the existing per-stage action or settlement label.
+  - "View details" / "Hide details" uses the same expanded state as the old View/Hide. It shows line items, message, and
+    the points-earned / rates line.
+- **Grid**: compact cards (customer pays / you get, reason line). The main button reads "Review & get paid" (opens the
+  card and the review form, same `openReview`), "Open to mark complete" (opens the card), or "View details". Mark
+  complete itself is only on the full card.
+- **Post-job review**: same four fields and submit/cancel. Difficulty and cooperation are 1–5 button rows that set the
+  same numbers as the old dropdowns (default 3). The form shows inside its quote's card when that card is on screen,
+  otherwise at the top of the page as before (e.g. arriving from Your Work's link while filters hide the card).
+- Action needed / Declined rows use the Part J request-card style. "Send a quote" still goes to `/home/requests`, and
+  the decline note is unchanged. In Grid they show as compact cards that open in place. The open/closed state for those
+  rows is local, display only.
+- Empty states: same text in the new style.
+
+**Behaviour:** unchanged. `needsAction`, the filters/sorts, `load`, the pipeline call, the `?review=` effect,
+`complete`, `openReview`, `submitReview` and `unitAction`'s conditions are as before. Inside `unitAction`, only the three
+elements' class names changed (Mark complete navy, Review & get paid yellow, status label as a grey pill).
+
+**Files touched:** `src/pages/MyQuotes.tsx`; new `src/components/QuoteCards.tsx` (icon, figures, payment chip, stage
+timeline, reason line, grid card, review form; display only); `src/components/RequestCards.tsx` (grid card's main button
+is now optional, for Declined rows); `src/index.css` (new `pk-` block).
+
+`npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
+local API still returns 500 on login.
