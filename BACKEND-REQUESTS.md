@@ -150,3 +150,13 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
 - **API needed:** `GET /provider/pipeline` rows to include `draftSavedAt` (null when there's no draft).
 - **Why:** the list doesn't say whether a draft exists. Checking would mean a `GET /jobs/{id}/quotes/draft` per row. Until
   then, every card says "Send a quote"; opening the form still restores the draft and shows "Draft saved {date}".
+
+## 2026-10-31 — Your Work: customer's request photos on the job card (developer OK needed)
+
+- **Screen:** provider dashboard → Your Work (`src/pages/MyWork.tsx`), job card.
+- **User need:** see the photos the customer attached to the request while doing the job (HANDOFF-provider Part L).
+- **What it needs:** no new endpoint. The existing read-only gallery (`<ImageUploader kind="REQUEST" canUpload={false}>`)
+  would do it, but that adds a `GET /jobs/{id}/images?kind=REQUEST` call per job card, plus thumbnails, which the page
+  doesn't make today.
+- **Why logged, not built:** screen-only work may not add API calls. If OK, it's a one-line addition per card. Ideally
+  `GET /jobs/assigned` would return a request-photo count, so the gallery loads only when there are photos.

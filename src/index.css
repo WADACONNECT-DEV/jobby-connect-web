@@ -9650,3 +9650,272 @@ main.wrap:has(> .fr) {
     white-space: normal;
   }
 }
+
+/* ==========================================================================
+   Your Work (design/HANDOFF-provider.md, Part L): `pw-` job cards, progress,
+   photos and completion. Reuses Part J's `pr-meta` and Part K's `pk-` pills.
+   ========================================================================== */
+.pw-card {
+  gap: 12px;
+}
+.pw-card.is-attention {
+  border-color: #f7c21b;
+  box-shadow: 0 0 0 1px #f7c21b inset;
+}
+.pw-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.pw-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+.pw-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.pw-title {
+  margin: 0;
+  font-family: "Inter Tight", Inter, sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  color: #0b2038;
+  overflow-wrap: anywhere;
+}
+.pw-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-size: 14px;
+  color: #0b2038;
+}
+.pw-muted {
+  color: #5a6e86;
+  font-weight: 400;
+}
+.pw-address {
+  margin: 0;
+  font-size: 14px;
+  color: #0b2038;
+  overflow-wrap: anywhere;
+}
+.pw-head-act {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Where the job stands */
+.pw-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f6f7f9;
+  color: #3e5571;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pw-state-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b9c6d4;
+}
+.pw-state.is-attention {
+  background: #fff1c7;
+  color: #0b2038;
+}
+.pw-state.is-attention .pw-state-dot {
+  background: #f7c21b;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* Sections inside the card */
+.pw-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #f0e8cf;
+}
+.pw-section h4,
+.pw-progress-form h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5a6e86;
+}
+.pw-history-toggle {
+  align-self: flex-start;
+  font-size: 14px;
+}
+.pw-history {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e9dfc0;
+  border-radius: 10px;
+  list-style: none;
+  overflow: hidden;
+}
+.pw-history li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-top: 1px solid #f0e8cf;
+  font-size: 14px;
+}
+.pw-history li:first-child {
+  border-top: 0;
+}
+.pw-history-pct {
+  font-weight: 800;
+  color: #0b2038;
+}
+.pw-history-note {
+  color: #24405f;
+  overflow-wrap: anywhere;
+}
+.pw-history-date {
+  font-size: 12.5px;
+  color: #5a6e86;
+  white-space: nowrap;
+}
+
+/* Update progress panel */
+.pw-progress-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1.5px solid #f7c21b;
+  border-radius: 12px;
+  background: #fffdf6;
+}
+.pw-pair {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 14px;
+}
+.pg .pw-progress-form .pq-pct input {
+  padding-right: 28px;
+  text-align: right;
+}
+.pw-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #5a6e86;
+}
+.pw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Photos */
+.pw-photos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Completion */
+.pw-complete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pw-complete-head {
+  font-size: 14px;
+  font-weight: 600;
+  color: #24405f;
+}
+.pw-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border: 1px solid #e9dfc0;
+  border-radius: 10px;
+  background: #fff;
+}
+.pw-stage-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b2038;
+}
+.pw-complete > .pg-btn {
+  align-self: flex-start;
+}
+.pw-next {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+/* Customer rating */
+.pw-rating {
+  padding-top: 10px;
+  border-top: 1px solid #f0e8cf;
+  font-size: 14px;
+}
+.pw-rating-comment {
+  margin: 4px 0 0;
+  color: #3e5571;
+  font-style: italic;
+}
+
+/* Progress bar in provider colours (provider pane only). */
+.fr-card.provider .prog-bar {
+  background: #fff1c7;
+}
+.fr-card.provider .prog-fill {
+  background: #0b2038;
+}
+.fr-card.provider .prog-fill.full {
+  background: #f7c21b;
+}
+.fr-card.provider .jb-cc-prog span {
+  background: #0b2038;
+}
+
+@media (max-width: 640px) {
+  .pw-head-act,
+  .pw-head-act .pg-btn {
+    width: 100%;
+  }
+  .pw-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pw-history li {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+  .pw-history-date {
+    grid-column: 2;
+  }
+  .pw-actions .pg-btn,
+  .pw-complete > .pg-btn {
+    width: 100%;
+  }
+}

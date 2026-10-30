@@ -624,3 +624,47 @@ is now optional, for Declined rows); `src/index.css` (new `pk-` block).
 
 `npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
 local API still returns 500 on login.
+
+## 2026-10-31 — Your Work (design/HANDOFF-provider.md, Part L)
+
+**What changed visually**
+- Header: toolbox icon, "Your work", same intro. "See requests" is the header's yellow button. Errors are in the red bar.
+- Sub-tabs Open · In Progress · Completed use the shared `SubTabs` bar (same `classified` grouping, counts and
+  remembered tab `work.tab`). A badge is yellow when a job in that sub-tab needs the provider. That means: ready to start,
+  progress at 100% but not marked complete, or paid and awaiting the review. Same conditions as the old status line.
+- **New display option:** a search / Industry / Sort row and a List / Grid toggle, over the jobs already loaded for the
+  open sub-tab. It uses `useListView('provider.work.{tab}')`, and `provider.work.layout` defaults to List. The default
+  sort is "Date requested", newest first; before, the order was whatever `/jobs/assigned` returned.
+- **Job card**:
+  - Header: title, status chip, industry chip, suburb, time frame, this provider's Quote Request ID, customer initials +
+    name, requested date, and the job address (`job.jobAddress`, already on the job).
+  - "Start work" / "Update progress" / "Post progress" are now at the top right, with the same conditions and handlers.
+  - The old footer status text is a state line under the header, same wording, yellow when it needs the provider.
+  - Description cut to two lines with "Show more".
+  - **Progress** section: the same `ProgressBar` (provider colours: navy fill on cream, yellow at 100%), then "Progress
+    history (n)" as a small table.
+  - **Update progress** panel: same fields (percentage, note), validation and Post update / Cancel. Adds the help line
+    "Add photos to an update after posting it — they attach to your latest update below." This is how it already works:
+    PROGRESS photos need the posted entry's id.
+  - Photos: the same two `ImageUploader`s (latest update, completion) with the same conditions.
+  - **Completion** section: the same Mark complete / Mark job complete / settlement-label logic and the "Review & get
+    paid" link (`reviewLink`).
+  - Customer rating: same, restyled.
+- **Grid**: the customer side's `JobCompactCard` (customer name in place of the provider, progress bar). The main button
+  is "Review & get paid" (same `reviewLink` navigation), "Open to start", "Open to mark complete", "Update / Post
+  progress" (opens the card and the same `openProgress`), or "View details". Start work and Mark complete themselves
+  are only on the full card.
+
+**Behaviour:** unchanged. Lines 1–219 (loading, `markComplete`, `action('start')`, `openProgress`, `postProgress`,
+`classified`, `emptyCopy`) are as before apart from imports. In the markup, every condition and handler call is the same
+expression. The two known errors are on the same, untouched `markComplete(myQuote.id, …)` calls, now at lines 596 and
+610. `statusLabel` was dropped from the imports because the status chip replaced it.
+
+**Not built:** the customer's request photos on the job card (see BACKEND-REQUESTS.md). Showing them would add a
+`GET /jobs/{id}/images?kind=REQUEST` call per job, which this page doesn't make today.
+
+**Files touched:** `src/pages/MyWork.tsx`; new `src/components/WorkParts.tsx` (icon, state line, section; display only);
+`src/index.css` (new `pw-` block + provider progress-bar colours).
+
+`npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
+local API still returns 500 on login.
