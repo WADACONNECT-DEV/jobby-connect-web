@@ -39,3 +39,40 @@ These are in quote/GST code, so I left them alone. The landing-page files type-c
 
 **Open question for the owner:** the slideshow and card 02 say "up to 3" providers/quotes (HANDOFF says keep 3;
 spec says 4). I couldn't find a 3-provider limit in the web code, so it may only be enforced by the backend.
+
+## 2026-10-30 — Providers landing page (design V3)
+
+**Screen:** new `/for-providers` for logged-out visitors. Reference: `design/providers-v3/Providers.dc.html`.
+
+**What changed visually**
+- Provider theme: dark nav with a yellow top line and PROVIDERS badge, navy hero, cream page, yellow CTA band.
+- Same 9-slide slideshow component as the Customers page (overview, 4 steps, 4 photos), in provider colours.
+- "How to join" (3 steps), "Grow your business, on fair terms" (4 cards), "Bring your own customers" / "One login, both roles", CTA.
+- Wording change (per HANDOFF): "About, Services and Careers pages" became "Home, About Us, Services and Contact Us pages",
+  matching the mini-site tabs in `ProviderView.tsx`. The slide picture's tabs were changed to match.
+- Links: Start as a provider → `/register`; Provider log in → `/login`; For customers / I'm a customer / logo → `/`.
+  (The mockup pointed "Start as a provider" at the How to join section; HANDOFF says `/register`.)
+- The slide pictures are illustrations only (a staged 30% / 70% quote, tab counts, a 5★ "Great Job Mate").
+  Nothing is calculated.
+
+**Files touched**
+- `src/pages/Providers.tsx`, `src/components/ProviderSteps.tsx` (new, display only)
+- `src/components/LandingNav.tsx`: provider wording + badge when `active="providers"`
+- `src/components/LandingSteps.tsx`: exported existing helpers for reuse (no visual change)
+- `src/index.css`: the colours that differ between the two themes are now variables on `.lp`, set to the
+  same customer values as before, plus a new `.lp--providers` block at the end
+- `src/components/HeroSlideshow.tsx`: unchanged
+
+**Exceptions (approved in HANDOFF):**
+1. `src/App.tsx`: added `/for-providers` next to `/`, outside `UserLayout`. Logged-in users are redirected to `/home`, as with `/`.
+2. `public/landing/`: 4 provider photos added as `provider-quoting.jpg`, `provider-electrical.jpg`,
+   `provider-garden.jpg`, `provider-cleaning.jpg`.
+
+`npm run build` still stops on the same 3 TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx` noted above.
+
+## 2026-10-30 — Providers landing page: slide 3 labels
+
+**Screen:** `/for-providers`, slideshow slide 4 ("Step 3 · Do the job") picture.
+**What changed:** the picture's tab labels now match the app's provider tabs exactly:
+"Received quotes" → "Received", "Job done" → "Job Done". Text only.
+**Files touched:** `src/components/ProviderSteps.tsx`

@@ -3,6 +3,7 @@ import { useAuth, RequireAuth } from './auth'
 import { NotificationBell } from './components/NotificationBell'
 import { RequireAdmin } from './adminAuth'
 import Landing from './pages/Landing'
+import Providers from './pages/Providers'
 import Register from './pages/Register'
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -84,6 +85,7 @@ export default function App() {
       {/* ---- Public landing page: has its own nav and footer band, so it
           sits outside UserLayout (no standard site header/footer). ---- */}
       <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
+      <Route path="/for-providers" element={user ? <Navigate to="/home" replace /> : <Providers />} />
 
       {/* ---- Customer / Provider app ---- */}
       <Route element={<UserLayout />}>

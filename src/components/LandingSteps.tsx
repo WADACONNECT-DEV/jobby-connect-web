@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
    and quote cards drawn here are illustrations, not working controls. */
 
 /** 'slide' = inside the hero slideshow, 'card' = in the cards grid. */
-type Size = 'slide' | 'card'
+export type Size = 'slide' | 'card'
 
 const NAVY = '#0F2A4A'
 const GOLD = '#D9A400'
@@ -17,7 +17,7 @@ const HEART = 'M12 21l-8.4-8.1a5.3 5.3 0 0 1 7.5-7.5L12 6.3l.9-.9a5.3 5.3 0 0 1 
 
 type IconProps = { size?: number; children: ReactNode; join?: boolean }
 
-function Line({ size = 18, children, join = true }: IconProps) {
+export function Line({ size = 18, children, join = true }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -113,7 +113,7 @@ function Coin({ className, star }: { className: string; star: number }) {
 
 /* ---------- building blocks ---------- */
 
-function Head({ n, title, size }: { n: string; title: string; size: Size }) {
+export function Head({ n, title, size }: { n: string; title: string; size: Size }) {
   const H = size === 'slide' ? 'h2' : 'h3'
   return (
     <div className="lp-step-head">
@@ -123,7 +123,7 @@ function Head({ n, title, size }: { n: string; title: string; size: Size }) {
   )
 }
 
-function Point({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+export function Point({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
     <div className="lp-point">
       <span className="lp-point-ico">{icon}</span>
@@ -229,7 +229,7 @@ export function RewardsStep({ size }: { size: Size }) {
 
 /* ---------- slideshow-only slides ---------- */
 
-function SumBox({ n, icon, title, desc }: { n: string; icon: ReactNode; title: string; desc: string }) {
+export function SumBox({ n, icon, title, desc }: { n: string; icon: ReactNode; title: string; desc: string }) {
   return (
     <div className="lp-sum-box">
       <span className="lp-sum-n">{n}</span>

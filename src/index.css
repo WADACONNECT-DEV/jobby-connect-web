@@ -3022,6 +3022,14 @@ textarea.input { font-family: inherit; }
   --lp-line: #d6e0ea;
   --lp-rule: #e4eaf1;
   --lp-focus: #1f6fd1;
+  /* Colours that differ between the two landing themes (customer values;
+     `.lp--providers` overrides them). */
+  --lp-num-bg: var(--lp-yellow);
+  --lp-num-fg: var(--lp-navy);
+  --lp-seg-todo: #d6e0ea;
+  --lp-ctrl-line: #d6e0ea;
+  --lp-show-shadow: 0 14px 40px rgba(15, 42, 74, 0.1);
+  --lp-photo-bg: #d7e8f6;
   --lp-head: 'Inter Tight', 'Inter', system-ui, sans-serif;
   font-family: Inter, system-ui, sans-serif;
   color: var(--lp-navy);
@@ -3274,7 +3282,8 @@ textarea.input { font-family: inherit; }
   background: #fff;
   border-radius: 20px;
   padding: 22px 24px 24px;
-  box-shadow: 0 14px 40px rgba(15, 42, 74, 0.1);
+  box-shadow: var(--lp-show-shadow);
+  color: var(--lp-navy);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -3295,7 +3304,7 @@ textarea.input { font-family: inherit; }
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  border: 1px solid var(--lp-line);
+  border: 1px solid var(--lp-ctrl-line);
   background: #fff;
   color: var(--lp-navy);
   cursor: pointer;
@@ -3323,7 +3332,7 @@ textarea.input { font-family: inherit; }
   width: 100%;
   height: 5px;
   border-radius: 999px;
-  background: var(--lp-line);
+  background: var(--lp-seg-todo);
 }
 .lp-seg.is-done span {
   background: var(--lp-navy);
@@ -3395,7 +3404,8 @@ textarea.input { font-family: inherit; }
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: var(--lp-yellow);
+  background: var(--lp-num-bg);
+  color: var(--lp-num-fg);
   font-weight: 800;
   font-size: 13px;
   display: flex;
@@ -3453,7 +3463,7 @@ textarea.input { font-family: inherit; }
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  background: #d7e8f6;
+  background: var(--lp-photo-bg);
 }
 .lp-photo img {
   width: 100%;
@@ -3512,7 +3522,8 @@ textarea.input { font-family: inherit; }
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: var(--lp-yellow);
+  background: var(--lp-num-bg);
+  color: var(--lp-num-fg);
   font-weight: 800;
   font-size: 15px;
   display: flex;
@@ -3979,5 +3990,381 @@ textarea.input { font-family: inherit; }
   .lp-extras,
   .lp-teaser {
     padding: 20px;
+  }
+}
+
+/* ==========================================================================
+   Providers landing page — design V3 (design/providers-v3, 30 Oct 2026)
+   Dark nav, navy hero, cream sections, yellow CTA band. Re-uses every `lp-`
+   rule above; this block only swaps colours and adds provider-only parts.
+   ========================================================================== */
+.lp--providers {
+  --lp-card: #fff8e4;
+  --lp-num-bg: var(--lp-navy);
+  --lp-num-fg: var(--lp-yellow);
+  --lp-seg-todo: #ebddb3;
+  --lp-ctrl-line: #e6d9ae;
+  --lp-show-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  --lp-photo-bg: #fff1c9;
+  --lp-deep: #0b2038;
+  --lp-cream-bg: #fff8e4;
+  background: var(--lp-cream-bg);
+}
+/* Yellow focus ring where the background is dark. */
+.lp--providers .lp-nav,
+.lp--providers .lp-hero-copy {
+  --lp-focus: #f7c21b;
+}
+
+/* ---- Nav (dark) ---- */
+.lp--providers .lp-nav {
+  background: var(--lp-deep);
+  border-top: 4px solid var(--lp-yellow);
+  border-bottom: 0;
+}
+.lp--providers .lp-nav-in {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  gap: 24px;
+}
+.lp--providers .lp-logo,
+.lp--providers .lp-logo:hover {
+  color: #fff;
+}
+.lp--providers .lp-logo-j {
+  -webkit-text-stroke: 0;
+}
+.lp-logo-badge {
+  background: var(--lp-yellow);
+  color: var(--lp-deep, #0b2038);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  padding: 4px 9px;
+}
+.lp--providers .lp-nav-link {
+  color: #d3deea;
+}
+.lp--providers .lp-pill {
+  background: #17304f;
+}
+.lp--providers .lp-pill a {
+  color: #d3deea;
+}
+.lp--providers .lp-pill a[aria-current='page'] {
+  background: var(--lp-yellow);
+  color: var(--lp-deep);
+  font-weight: 800;
+}
+.lp--providers .lp-nav-login {
+  color: #fff;
+}
+.lp--providers .lp-btn-nav,
+.lp--providers .lp-btn-nav:hover {
+  background: var(--lp-yellow);
+  color: var(--lp-deep);
+  font-weight: 800;
+}
+
+/* ---- Hero (navy) ---- */
+.lp--providers .lp-hero {
+  background: var(--lp-navy);
+  color: #fff;
+}
+.lp--providers .lp-hero-copy .lp-eyebrow {
+  color: var(--lp-yellow);
+}
+.lp-h1-accent {
+  color: var(--lp-yellow);
+}
+.lp--providers .lp-lead {
+  color: #c3d1e1;
+  max-width: 500px;
+}
+.lp--providers .lp-badge-ico {
+  background: #17304f;
+}
+.lp-btn-start,
+.lp-btn-start:hover {
+  background: var(--lp-yellow);
+  color: var(--lp-deep);
+  font-weight: 800;
+}
+
+/* Slideshow extras */
+.lp-sum-points--dark {
+  background: var(--lp-navy);
+  color: #fff;
+}
+.lp-sum-points--dark .lp-sum-points-d {
+  color: #c3d1e1;
+}
+.lp-coin--flat {
+  box-shadow: none;
+}
+.lp--providers .lp-photo figcaption {
+  background: var(--lp-navy);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+/* Picture: business profile + mini-site tabs */
+.lp-pic-setup {
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+}
+.lp-biz {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp-biz-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--lp-navy);
+  color: var(--lp-yellow);
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.lp-biz-txt {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  min-width: 0;
+}
+.lp-biz-ok {
+  font-size: 12px;
+  color: #2e7d4f;
+  font-weight: 700;
+}
+.lp-site-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lp-site-tabs > span {
+  border: 1px solid #e6d9ae;
+  border-radius: 999px;
+  padding: 5px 11px;
+}
+.lp-site-tabs > .is-on {
+  background: var(--lp-navy);
+  border-color: var(--lp-navy);
+  color: #fff;
+}
+.lp-sketch {
+  display: block;
+  height: 5px;
+  background: #ebddb3;
+  border-radius: 2px;
+}
+
+/* Picture: rows (staged quote, provider tabs) */
+.lp-pic-rows {
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+}
+.lp-pic-tabs {
+  gap: 7px;
+  padding: 14px 16px;
+}
+.lp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.lp-pic-tabs .lp-row {
+  padding: 6px 10px;
+}
+.lp-row strong {
+  font-weight: 700;
+}
+.lp-row-head {
+  font-weight: 700;
+  padding: 0;
+}
+.lp-row-muted {
+  color: var(--lp-muted);
+  font-weight: 600;
+}
+.lp-row-cream {
+  background: var(--lp-cream-bg);
+}
+.lp-row-win {
+  background: #fff;
+  border: 1.5px solid #2e9e5b;
+}
+.lp-row-green {
+  color: #2e7d4f;
+}
+.lp-count {
+  background: var(--lp-yellow);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-weight: 800;
+}
+.lp-pic-rows .lp-fake-btn {
+  padding: 8px;
+  font-size: 13px;
+}
+
+/* Picture: payout progress + 5-star review */
+.lp-pic-paid {
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+}
+.lp-dot-payout {
+  background: var(--lp-yellow);
+  box-shadow: 0 0 0 3px #ffe7a0;
+}
+.lp-stars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: var(--lp-cream-bg);
+  border-radius: 8px;
+  padding: 9px;
+}
+.lp-stars-label {
+  font-size: 13px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+/* ---- How to join ---- */
+.lp-join {
+  background: #fff;
+  border-bottom: 1px solid #f0e4be;
+}
+.lp-join-in {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.lp-join-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp-kicker--gold {
+  color: #8a6400;
+}
+.lp-join-h {
+  margin: 0;
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+.lp-join-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.lp-join-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--lp-cream-bg);
+  border-radius: 14px;
+  padding: 18px;
+}
+.lp-join-n {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--lp-navy);
+  color: var(--lp-yellow);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.lp-join-step .lp-point-txt {
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+/* ---- Everything you get (cream page, white cards) ---- */
+.lp--providers .lp-get {
+  padding-bottom: 48px;
+}
+.lp--providers .lp-step--card {
+  background: #fff;
+}
+.lp--providers .lp-step--card .lp-point-ico {
+  background: var(--lp-cream-bg);
+}
+.lp--providers .lp-extras {
+  background: #fff;
+}
+
+/* ---- Closing call to action (yellow) ---- */
+.lp--providers .lp-cta {
+  background: var(--lp-yellow);
+  color: var(--lp-deep);
+  border-top: 0;
+}
+.lp--providers .lp-cta-h {
+  font-weight: 900;
+}
+.lp--providers .lp-cta-note {
+  color: var(--lp-deep);
+  font-weight: 500;
+}
+.lp-btn-deep,
+.lp-btn-deep:hover {
+  background: var(--lp-deep);
+  color: #fff;
+  font-weight: 800;
+  padding: 14px 28px;
+}
+.lp-btn-outline-deep,
+.lp-btn-outline-deep:hover {
+  border: 1.5px solid var(--lp-deep);
+  color: var(--lp-deep);
+  padding: 13px 24px;
+}
+
+/* ---- Providers on phones ---- */
+@media (max-width: 600px) {
+  .lp--providers .lp-nav-in {
+    gap: 12px 16px;
+  }
+}
+@media (max-width: 480px) {
+  .lp-join-in {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* These pictures hold more rows than the customer ones, so let them take
+     the height they need instead of the shorter phone height. */
+  .lp--providers .lp-step--slide .lp-pic {
+    height: auto;
   }
 }
