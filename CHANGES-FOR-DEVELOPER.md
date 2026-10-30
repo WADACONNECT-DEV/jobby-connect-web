@@ -76,3 +76,159 @@ spec says 4). I couldn't find a 3-provider limit in the web code, so it may only
 **What changed:** the picture's tab labels now match the app's provider tabs exactly:
 "Received quotes" → "Received", "Job done" → "Job Done". Text only.
 **Files touched:** `src/components/ProviderSteps.tsx`
+
+## 2026-10-30 — Log in and Create account pages (design/HANDOFF-auth.md)
+
+**Screens:** `/login`, `/register`, plus new `/forgot-password`, `/reset-password`, `/terms`, `/privacy`.
+**Reference:** `design/auth-v1/login-mockup.png`, `register-mockup.png`, in the V3 landing style.
+
+**What changed visually**
+- Slim white top bar (landing logo → `/`, "← Back to home"), a light-blue page, one big rounded card:
+  a navy story panel on the left (headline, sub-text, icon steps, photo) and a white form on the right.
+  Footer "© Jobby-Connect 2026 | Privacy | Terms".
+- Log in: email (envelope icon), password (lock icon + show/hide), "Forgot password?" link, yellow "Log in →",
+  "New to Jobby-Connect? Create a free account", info box. The curved navy edge over the photo is drawn in SVG.
+- Create account: Full name, Email address, Mobile number (see below), Password (show/hide,
+  "At least 8 characters"), Terms/Privacy sentence, yellow "Create account →", "Already have an account? Log in", info box.
+- Phones / under 860px: the card is one column; the navy panel becomes a short band with just the headline.
+- Show/hide password only switches the field between hidden and visible text.
+
+**Not changed:** both `onSubmit` functions are byte-for-byte the same as before (same checks, error text,
+`login()` / `register()` calls and redirect to `/home`). The forms still use the browser's email check.
+Logged-in users still go from `/login` / `/register` to `/home`.
+
+**Files touched**
+- `src/pages/Login.tsx`, `src/pages/Register.tsx` (markup only)
+- New: `src/components/AuthParts.tsx` (display only), `src/pages/ForgotPassword.tsx`, `ResetPassword.tsx`, `Terms.tsx`, `Privacy.tsx`
+- `src/index.css` (new `au-` block at the end)
+- `BACKEND-REQUESTS.md` (new)
+
+**Exceptions approved by the owner (HANDOFF-auth):**
+1. `src/App.tsx`: `/login` and `/register` moved outside `UserLayout` (no standard header/footer), with the same elements.
+   Added public routes `/forgot-password`, `/reset-password`, `/terms`, `/privacy`, also outside `UserLayout`.
+   These four have no logged-in redirect, so signed-in users can still read Terms/Privacy. No other route changed.
+2. `public/landing/`: `auth-login.jpg` and `auth-register.jpg`, PROVISIONAL photos cut from the mockups.
+
+### Do not release until connected
+Each of these shows an amber "Preview — not connected yet" note and has a `// TODO(developer):` comment.
+
+| What | Where | Needs |
+|---|---|---|
+| Mobile number at sign-up: shown, NOT sent | `src/pages/Register.tsx` (state + field) | Optional `mobile` on `POST /auth/register`, then pass it to `register()` (`auth.tsx`) |
+| Forgot password: sends nothing, shows "Check your email" | `src/pages/ForgotPassword.tsx` | `POST /auth/forgot-password` |
+| Reset password: saves nothing, shows "Password updated" | `src/pages/ResetPassword.tsx` | `POST /auth/reset-password`, plus min-8 / match checks and an expired-link message |
+| Terms of Use: placeholder text | `src/pages/Terms.tsx` | Wording from the owner |
+| Privacy Policy: placeholder text | `src/pages/Privacy.tsx` | Wording from the owner |
+
+Details are in `BACKEND-REQUESTS.md`. The "Forgot password?" link on Log in and the Terms/Privacy links lead to these screens.
+
+`npm run build` still stops only on the 3 known TypeScript errors in `MyWork.tsx` / `ProviderRequests.tsx`.
+
+## 2026-10-30 — Logged-in frame (design/HANDOFF-mates.md, Part A)
+
+**Screens:** every logged-in page gets the new top bar + footer. The dashboard (`/home/*`, both roles) gets the
+welcome band, role switch and tab pills. Reference: `design/mates-v1/mates-mockup.png`.
+
+**What changed visually**
+- Top bar (white): landing "J" logo (→ `/home`, or `/` when logged out, as before), the existing `NotificationBell`
+  (component unchanged; only its colours are adjusted for a white bar via `.fr-top .nb-btn`), and an account button
+  (avatar initial + first name + ▾). The ▾ opens a menu with "Account settings" (→ `/account`) and "Log out", which runs
+  the same `logout(); navigate('/')` as before. The menu closes on outside click or Escape.
+- Navy welcome band: "Welcome back, {first name}." The line for non-providers changed (owner decision, 30 Oct) from
+  "Request quotes from providers you choose." to "Your trusted local providers, ready for your next job.".
+  Approved providers keep "Switch between requesting work and providing it.".
+  The Mate Points pill moved into the band, with the same condition (customer side, balance loaded) and the same wallet call.
+- White card: "As a customer | As a provider" underline tabs (approved providers only, same switching), tab bar
+  as rounded pills (active navy), "← Back" kept under it as a small text link (UAT Round 7 §3), pending/rejected
+  banners and the customer-profile gate restyled with the same conditions, text and targets.
+  The old heading row ("As a customer" / "As a provider" / "Your dashboard") is removed; the role tabs and band carry it.
+  The provider side keeps its tinted card (`--pane-provider`) so the two roles stay visually distinct.
+- Footer on every logged-in page: "© Jobby-Connect 2026 · Privacy · Terms".
+- The dashboard runs full width (`main.wrap:has(> .fr)`); other logged-in pages keep the 1000px column.
+- 375px: the tab pills scroll sideways in their own strip, the points pill stacks under the welcome text, and the
+  first name is hidden next to the avatar.
+
+**Not changed:** in `Home.tsx` everything above `return (` (wallet call, role/tab memory, effects, `switchRole`) is
+byte-for-byte the same as before. Tab names, order and routes are the same, and so are the `NavLink`s.
+
+**Files touched:** `src/App.tsx` (Header + footer only), `src/pages/Home.tsx` (markup only), `src/index.css`
+(new `fr-` block; old Home-only classes left in place, now unused; shared `banner` / `welcome` / `link-btn` rules not touched).
+
+**Exception approved by the owner:** `src/App.tsx`, the `Header` component (HANDOFF-mates) **and** the `UserLayout`
+footer line (owner decision, 30 Oct, so the new footer shows on every logged-in page). No routes changed.
+
+## 2026-10-30 — Your Jobby Mates tab (design/HANDOFF-mates.md, Part B)
+
+Built before HANDOFF-jobs-find Part C, at the owner's request (30 Oct), because that hand-off reuses these pieces.
+
+**Screen:** customer dashboard → Your Jobby Mates. Reference: `design/mates-v1/mates-mockup.png`.
+
+**What changed visually**
+- Header row (heart-people icon, title, intro, yellow "Invite a Jobby Mate" → `/home/referrals`).
+- Search row: SEARCH YOUR MATES, INDUSTRY, SUBURB (the same `useListView` search/filters) and a navy Search button.
+  Filtering is still instant; the button only moves keyboard focus to the results count.
+- Left "Refine your mates" panel: Rating radios and Reset (= `list.clear`), plus a "Your saved providers" note.
+  Under 860px it sits behind a "Filters" button.
+- Selection bar at the top while anything is ticked: "{n} of {cap} providers selected | Only selected providers
+  will receive your request.", "Clear", "Continue with {n} →" (same `requestFromSelected`).
+  `{cap}` = `useMaxProvidersPerRequest()`.
+- "{n} saved mates", Sort by (same sorts + ↑/↓), List / Grid toggle (same remembered `customer.mates.layout`).
+- New mate card: checkbox, initials avatar, name, "Saved" chip, industry chips, first 3 suburbs "+N suburbs"
+  (falls back to service area), "Last used {date}", rating or "No reviews yet", jobs completed,
+  "Add to request" / "✓ Selected", "View profile", "Remove mate". A selected card gets a yellow border and tint.
+- "Need someone new? Find more providers →" strip (→ `/home/find`). Loading, error and empty states keep their text.
+
+**Behaviour changes (owner decisions in HANDOFF-mates)**
+- The per-card "Request a quote" button is replaced by "Add to request" / "✓ Selected" (the same selection as the
+  checkbox, same cap and tooltip) + "Continue with n". The unused `requestQuote` function was removed.
+- New **Rating** filter (Any / 4.0+ / 4.5+): a third entry in the existing `filters` array (key `rating`), so it's
+  stored and restored by `useListView` like the others. Mates without reviews only show under "Any".
+
+**Not changed:** `load`, `remove`, `toggle`, `requestFromSelected` (byte-for-byte), the `GET /mates` / `DELETE /mates/{id}`
+calls, the `customer.mates` list key, search/industry/suburb filters, sorts, layout memory. No `listView.ts` change.
+
+**Files touched:** `src/pages/Mates.tsx`; new `src/components/PageParts.tsx` (PageHead, SelectionBar, EmptyState,
+InitialsAvatar, icons) and `src/components/ProviderCard.tsx`, both display only and meant to be reused by
+Requests & Jobs and Find; `src/index.css` (new `pg-` / `pc-` block; old `mate-*` rules left, now unused).
+
+**BACKEND-REQUESTS.md:** the six mockup items that need data, and the **provider cap mismatch** (website default 4,
+`POST /jobs` max 3).
+
+## 2026-10-30 — Your Jobby Mates: compact Grid cards
+
+**Screen:** Your Jobby Mates, Grid view only. List view is unchanged.
+**What changed visually:** Grid cards are now short, about the height of the old grid cards.
+- 4 per row on desktop, 2 under 1180px, 1 under 640px.
+- Checkbox + 40px initials avatar on one line, then the business name on one line (cut with "…", full name on hover).
+- "Saved" chip + first industry chip on one line ("+N" when there are more; full list on hover).
+- First 2 suburbs + "+N" on one line, cut with "…" (full list on hover).
+- "★ 4.5 (100) · 100 jobs" on one line, or "No reviews yet · n jobs".
+- "Last used" hidden in Grid (still shown in List).
+- "Add to request" / "✓ Selected" and "View profile" side by side, small; "Remove mate" as a small link under them.
+
+Same checkbox, buttons, cap and tooltip; nothing else changed.
+**Files touched:** `src/components/ProviderCard.tsx` (new `compact` variant), `src/pages/Mates.tsx` (passes `compact` in Grid view),
+`src/index.css` (grid columns + compact card rules; the old grid-card rules were replaced).
+
+## 2026-10-30 — Your Jobby Mates: Grid card fixes
+
+**Screen:** Your Jobby Mates, Grid view only (List unchanged).
+- Long business names stay on one line and are cut with "…" inside the card (full name on hover). The compact card and
+  each of its rows now have `min-width: 0` / `overflow: hidden`, so nothing can push past the card edge.
+- When "Saved" + industry don't fit, the industry chip shrinks and is cut with "…" ("Saved" keeps its size).
+- "Add to request" / "✓ Selected" is a full-width button on its own line. "View profile" and "Remove mate" are two small
+  text links side by side underneath. Same actions as before; in List view "View profile" is still a button.
+
+**Files touched:** `src/index.css` (compact card rules), `src/pages/Mates.tsx` (View profile class depends on layout).
+
+## 2026-10-30 — Your Jobby Mates: Grid cards show the full business name
+
+**Screen:** Your Jobby Mates, Grid view only (List unchanged).
+- 3 cards per row on desktop (2 under 1180px, 1 under 640px).
+- The business name moved up beside the initials avatar, in the checkbox row. It is always shown in full and wraps to a
+  second line instead of being cut with "…". The separate name line below is gone, so the card height is unchanged.
+- The industry chip is shown in full (no "…"); a very long one wraps rather than being cut.
+- "Add to request" / "✓ Selected" spans the full card width.
+- Everything else as before (suburbs line still cut with "…", stats line, the two small links).
+
+**Files touched:** `src/components/ProviderCard.tsx` (compact card markup), `src/index.css` (compact card rules, grid columns).

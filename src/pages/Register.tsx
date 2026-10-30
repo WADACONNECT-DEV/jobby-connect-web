@@ -1,6 +1,19 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import {
+  AuthLayout,
+  BriefcaseIcon,
+  DocIcon,
+  IconInput,
+  InfoBox,
+  NumberedSteps,
+  PasswordInput,
+  PreviewNotice,
+  RocketIcon,
+  SubmitButton,
+  UserIcon,
+} from '../components/AuthParts'
 
 export default function Register() {
   const { register } = useAuth()
@@ -10,6 +23,10 @@ export default function Register() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // TODO(developer): the mobile number is shown but NOT sent yet — register()
+  // below still takes (fullName, email, password). Connect once POST
+  // /auth/register accepts an optional `mobile` (see BACKEND-REQUESTS.md).
+  const [mobile, setMobile] = useState('')
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -30,28 +47,77 @@ export default function Register() {
   }
 
   return (
-    <div className="center">
-      <form className="card" onSubmit={onSubmit}>
-        <h2>Create your account</h2>
-        <div className="card-sub">Join Jobby-Connect in a few seconds.</div>
-        {error && <div className="msg err">{error}</div>}
+    <AuthLayout
+      headline={<>One account.<br /><span className="au-accent">More possibilities.</span></>}
+      sub="Find local help today. Build your service business when you're ready."
+      steps={
+        <NumberedSteps
+          steps={[
+            { icon: <UserIcon />, label: 'Create account' },
+            { icon: <DocIcon />, label: 'Complete profile' },
+            { icon: <RocketIcon />, label: 'Get started' },
+          ]}
+        />
+      }
+      photo={{ src: '/landing/auth-register.jpg', alt: 'A smiling woman talks with a Jobby-Connect provider over a laptop at her kitchen table' }}
+    >
+      <form className="au-form" onSubmit={onSubmit}>
+        <span className="au-eyebrow">JOIN JOBBY-CONNECT</span>
+        <h1 className="au-title">Create your free account</h1>
+        <p className="au-lead">A few details and you're ready to begin.</p>
+        {error && <div className="au-error" role="alert">{error}</div>}
 
-        <label>Full name</label>
-        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Smith" autoComplete="name" />
+        <IconInput
+          id="reg-name"
+          label="Full name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          placeholder="Your full name"
+          autoComplete="name"
+        />
+        <IconInput
+          id="reg-email"
+          label="Email address"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
+        {/* TODO(developer): display only until the API takes `mobile`. */}
+        <IconInput
+          id="reg-mobile"
+          label="Mobile number"
+          type="tel"
+          inputMode="tel"
+          value={mobile}
+          onChange={(e) => setMobile(e.target.value)}
+          placeholder="04xx xxx xxx"
+          autoComplete="tel"
+          hint="Australian mobile: 10 digits starting 04"
+          after={<PreviewNotice>This number isn't saved yet. You'll add it in Complete profile.</PreviewNotice>}
+        />
+        <PasswordInput
+          id="reg-password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Create a password"
+          autoComplete="new-password"
+          hint="At least 8 characters"
+        />
 
-        <label>Email</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+        <p className="au-terms">
+          By creating an account, you agree to our <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.
+        </p>
 
-        <label>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
+        <SubmitButton busy={busy}>{busy ? 'Creating…' : 'Create account'}</SubmitButton>
 
-        <button className="btn btn-amber btn-block" type="submit" disabled={busy} style={{ marginTop: 20 }}>
-          {busy ? 'Creating…' : 'Create account'}
-        </button>
-        <div className="swap">
+        <p className="au-swap">
           Already have an account? <Link to="/login">Log in</Link>
-        </div>
+        </p>
+        <InfoBox icon={<BriefcaseIcon />}>Offering services? Set up your provider profile after joining.</InfoBox>
       </form>
-    </div>
+    </AuthLayout>
   )
 }

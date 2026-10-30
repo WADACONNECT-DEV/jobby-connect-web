@@ -121,95 +121,101 @@ export default function Home() {
   const tabs = tabsFor(activeRole)
 
   return (
-    <>
-      <section className="welcome">
-        <h2>Welcome, {firstName}!</h2>
-        <p>
-          {isApprovedProvider
-            ? 'Switch between requesting work and providing it.'
-            : 'Request quotes from providers you choose.'}
-        </p>
-      </section>
-
-      {isApprovedProvider && (
-        <div className="role-tabs" role="tablist">
-          <button
-            role="tab"
-            aria-selected={activeRole === 'customer'}
-            className={`role-tab customer${activeRole === 'customer' ? ' on' : ''}`}
-            onClick={() => switchRole('customer')}
-          >
-            As a customer
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeRole === 'provider'}
-            className={`role-tab provider${activeRole === 'provider' ? ' on' : ''}`}
-            onClick={() => switchRole('provider')}
-          >
-            As a provider
-          </button>
-        </div>
-      )}
-
-      <div className={`role-pane ${activeRole}`}>
-        <div className="area-head">
-          <h3>
-            {activeRole === 'provider'
-              ? 'As a provider'
-              : isApprovedProvider ? 'As a customer' : 'Your dashboard'}
-          </h3>
+    <div className="fr">
+      <section className="fr-band">
+        <div className="fr-band-in">
+          <div className="fr-band-copy">
+            <h1>Welcome back, {firstName}.</h1>
+            <p>
+              {isApprovedProvider
+                ? 'Switch between requesting work and providing it.'
+                : 'Your trusted local providers, ready for your next job.'}
+            </p>
+          </div>
           {activeRole === 'customer' && points !== null && (
-            <span className="points-chip">Mate Points: {formatMoney(points)}</span>
+            <span className="fr-points">
+              <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24">
+                <ellipse cx="12" cy="17" rx="8" ry="3.2" fill="#D9A400" />
+                <ellipse cx="12" cy="13.5" rx="8" ry="3.2" fill="#F7C21B" stroke="#D9A400" strokeWidth="1" />
+                <ellipse cx="12" cy="10" rx="8" ry="3.2" fill="#FFD95A" stroke="#D9A400" strokeWidth="1" />
+              </svg>
+              Mate Points <strong>{formatMoney(points)}</strong>
+            </span>
           )}
         </div>
+      </section>
 
-        {/* A pending or rejected application is surfaced here, because this is
-            the only role the applicant can see until they're approved. */}
-        {activeRole === 'customer' && hasProvider && approval === 'PENDING' && (
-          <div className="banner banner-pending">
-            <strong>Your provider application is pending approval.</strong> Once an admin approves
-            it, your Provider tab will appear here.{' '}
-            <button className="link-btn" onClick={() => navigate('/account')}>View in Account</button>
-          </div>
-        )}
-        {activeRole === 'customer' && hasProvider && approval === 'REJECTED' && (
-          <div className="banner banner-rejected">
-            <strong>Your provider application wasn't approved.</strong>{' '}
-            <button className="link-btn" onClick={() => navigate('/account')}>Review in Account</button>
-          </div>
-        )}
-
-        {activeRole === 'customer' && !customerReady ? (
-          <div className="gate-card">
-            <p>Complete a quick customer profile (name + mobile) to start requesting quotes.</p>
-            <button className="btn btn-amber btn-sm" onClick={() => navigate('/customer-profile')}>Complete customer profile</button>
-          </div>
-        ) : (
-          <>
-            <nav className="dash-tabs" role="tablist" aria-label={`${activeRole} dashboard`}>
-              {tabs.map((tab) => (
-                <NavLink
-                  key={tab.to}
-                  to={tab.to}
-                  role="tab"
-                  className={({ isActive }) => `dash-tab${isActive ? ' on' : ''}`}
-                >
-                  {tab.label}
-                </NavLink>
-              ))}
-            </nav>
-
-            {/* Beneath the tab bar, above the content — the placement UAT
-                Round 7 §3 asks for, and now identical in both roles. */}
-            <button className="btn btn-ghost-dark btn-sm dash-back" onClick={() => navigate(-1)}>← Back</button>
-
-            <div className="dash-pane">
-              <Outlet />
+      <div className="fr-body">
+        <div className={`fr-card ${activeRole}`}>
+          {isApprovedProvider && (
+            <div className="fr-roles" role="tablist">
+              <button
+                role="tab"
+                aria-selected={activeRole === 'customer'}
+                className={`fr-role${activeRole === 'customer' ? ' on' : ''}`}
+                onClick={() => switchRole('customer')}
+              >
+                As a customer
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeRole === 'provider'}
+                className={`fr-role${activeRole === 'provider' ? ' on' : ''}`}
+                onClick={() => switchRole('provider')}
+              >
+                As a provider
+              </button>
             </div>
-          </>
-        )}
+          )}
+
+          {/* A pending or rejected application is surfaced here, because this is
+              the only role the applicant can see until they're approved. */}
+          {activeRole === 'customer' && hasProvider && approval === 'PENDING' && (
+            <div className="fr-banner fr-banner-pending">
+              <strong>Your provider application is pending approval.</strong> Once an admin approves
+              it, your Provider tab will appear here.{' '}
+              <button className="fr-textbtn" onClick={() => navigate('/account')}>View in Account</button>
+            </div>
+          )}
+          {activeRole === 'customer' && hasProvider && approval === 'REJECTED' && (
+            <div className="fr-banner fr-banner-rejected">
+              <strong>Your provider application wasn't approved.</strong>{' '}
+              <button className="fr-textbtn" onClick={() => navigate('/account')}>Review in Account</button>
+            </div>
+          )}
+
+          {activeRole === 'customer' && !customerReady ? (
+            <div className="fr-gate">
+              <p>Complete a quick customer profile (name + mobile) to start requesting quotes.</p>
+              <button className="fr-gate-btn" onClick={() => navigate('/customer-profile')}>Complete customer profile</button>
+            </div>
+          ) : (
+            <>
+              {/* The pills scroll sideways inside this strip on small screens. */}
+              <nav className="fr-tabs" role="tablist" aria-label={`${activeRole} dashboard`}>
+                {tabs.map((tab) => (
+                  <NavLink
+                    key={tab.to}
+                    to={tab.to}
+                    role="tab"
+                    className={({ isActive }) => `fr-tab${isActive ? ' on' : ''}`}
+                  >
+                    {tab.label}
+                  </NavLink>
+                ))}
+              </nav>
+
+              {/* Beneath the tab bar, above the content — the placement UAT
+                  Round 7 §3 asks for, and now identical in both roles. */}
+              <button className="fr-textbtn fr-back" onClick={() => navigate(-1)}>← Back</button>
+
+              <div className="fr-pane">
+                <Outlet />
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </>
+    </div>
   )
 }

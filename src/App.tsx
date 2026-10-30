@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, Route, Routes, useNavigate, Link } from 'react-router-dom'
 import { useAuth, RequireAuth } from './auth'
 import { NotificationBell } from './components/NotificationBell'
@@ -6,6 +7,10 @@ import Landing from './pages/Landing'
 import Providers from './pages/Providers'
 import Register from './pages/Register'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 import Home from './pages/Home'
 import Search from './pages/Search'
 import NewRequest from './pages/NewRequest'
@@ -32,23 +37,78 @@ import Account from './pages/Account'
 import WalletPage from './pages/Wallet'
 import Notifications from './pages/Notifications'
 
+/* Logged-in top bar (HANDOFF-mates Part A). Same links and the same log-out
+   action as before; the name now opens a small menu instead of being a link. */
 function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuWrap = useRef<HTMLDivElement | null>(null)
+  const menuButton = useRef<HTMLButtonElement | null>(null)
+
+  // Close the account menu on an outside click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDown(e: MouseEvent) {
+      if (menuWrap.current && !menuWrap.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        menuButton.current?.focus()
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  const firstName = user?.fullName.split(' ')[0] ?? ''
+  const initial = (firstName.charAt(0) || '?').toUpperCase()
+
   return (
-    <header className="site-header">
-      <Link to={user ? '/home' : '/'} className="brand">
-        <span className="brand-mark">J</span>
-        <span className="brand-name">JOBBY-CONNECT</span>
-      </Link>
-      <div className="spacer" />
-      {user && (
-        <>
-          <NotificationBell />
-          <Link to="/account" className="whoami whoami-link" title="Account settings">{user.fullName}</Link>
-          <button className="btn btn-nav" onClick={() => { logout(); navigate('/') }}>Log out</button>
-        </>
-      )}
+    <header className="fr-top">
+      <div className="fr-top-in">
+        <Link to={user ? '/home' : '/'} className="fr-logo">
+          <span className="fr-logo-j" aria-hidden="true">J</span>
+          <span className="fr-logo-name">JOBBY-CONNECT</span>
+        </Link>
+        {user && (
+          <div className="fr-top-end">
+            <NotificationBell />
+            <div className="fr-account" ref={menuWrap}>
+              <button
+                ref={menuButton}
+                type="button"
+                className="fr-account-btn"
+                aria-expanded={menuOpen}
+                aria-controls="account-menu"
+                aria-label={`Account menu for ${user.fullName}`}
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <span className="fr-avatar" aria-hidden="true">{initial}</span>
+                <span className="fr-account-name">{firstName}</span>
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+              {menuOpen && (
+                <div id="account-menu" className="fr-menu">
+                  <Link to="/account" className="fr-menu-item" onClick={() => setMenuOpen(false)}>Account settings</Link>
+                  <button
+                    type="button"
+                    className="fr-menu-item"
+                    onClick={() => { setMenuOpen(false); logout(); navigate('/') }}
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </header>
   )
 }
@@ -60,7 +120,9 @@ function UserLayout() {
       <main className="wrap">
         <Outlet />
       </main>
-      <footer className="site-foot">Jobby-Connect · React + TypeScript</footer>
+      <footer className="fr-foot">
+        © Jobby-Connect 2026 · <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link>
+      </footer>
     </>
   )
 }
@@ -86,12 +148,17 @@ export default function App() {
           sits outside UserLayout (no standard site header/footer). ---- */}
       <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
       <Route path="/for-providers" element={user ? <Navigate to="/home" replace /> : <Providers />} />
+      {/* Log in / sign up have their own top bar and footer too (HANDOFF-auth). */}
+      <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
+      {/* Public screens built ahead of the backend: not connected yet. */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {/* ---- Customer / Provider app ---- */}
       <Route element={<UserLayout />}>
-        <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
-        <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
-
         {/* The dashboard. Both roles now work the same way (UAT Round 7 §3):
             every tab is a real child route, so the back button, deep links and
             the persisted filter/sort/view state all behave. Home renders the

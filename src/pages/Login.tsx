@@ -1,6 +1,20 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
+import {
+  AuthLayout,
+  ClipboardIcon,
+  IconInput,
+  IconSteps,
+  InfoBox,
+  LockIcon,
+  MailIcon,
+  PasswordInput,
+  PeopleIcon,
+  StarOutlineIcon,
+  SubmitButton,
+  UserIcon,
+} from '../components/AuthParts'
 
 export default function Login() {
   const { login } = useAuth()
@@ -29,25 +43,60 @@ export default function Login() {
   }
 
   return (
-    <div className="center">
-      <form className="card" onSubmit={onSubmit}>
-        <h2>Welcome back</h2>
-        <div className="card-sub">Log in to your Jobby-Connect account.</div>
-        {error && <div className="msg err">{error}</div>}
+    <AuthLayout
+      rule
+      curve
+      headline={<>Good to see you <span className="au-accent">again.</span></>}
+      sub="Your jobs, your trusted mates and your rewards — all in one place."
+      steps={
+        <IconSteps
+          steps={[
+            { icon: <ClipboardIcon />, label: 'Manage jobs' },
+            { icon: <PeopleIcon />, label: 'Stay connected' },
+            { icon: <StarOutlineIcon />, label: 'Mate Points' },
+          ]}
+        />
+      }
+      photo={{ src: '/landing/auth-login.jpg', alt: 'An older woman and a Jobby-Connect provider smile at a phone together in her garden' }}
+    >
+      <form className="au-form" onSubmit={onSubmit}>
+        <span className="au-eyebrow">YOUR JOBBY-CONNECT ACCOUNT</span>
+        <h1 className="au-title">Welcome back</h1>
+        <p className="au-lead">Log in to continue.</p>
+        {error && <div className="au-error" role="alert">{error}</div>}
 
-        <label>Email</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+        <IconInput
+          id="login-email"
+          label="Email address"
+          icon={<MailIcon />}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
+        <PasswordInput
+          id="login-password"
+          label="Password"
+          icon={<LockIcon />}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Your password"
+          autoComplete="current-password"
+          after={
+            <Link to="/forgot-password" className="au-forgot">Forgot password?</Link>
+          }
+        />
 
-        <label>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" autoComplete="current-password" />
+        <SubmitButton busy={busy}>{busy ? 'Logging in…' : 'Log in'}</SubmitButton>
 
-        <button className="btn btn-amber btn-block" type="submit" disabled={busy} style={{ marginTop: 20 }}>
-          {busy ? 'Logging in…' : 'Log in'}
-        </button>
-        <div className="swap">
-          New here? <Link to="/register">Create an account</Link>
-        </div>
+        <p className="au-divider">
+          <span>
+            New to Jobby-Connect? <Link to="/register">Create a free account</Link>
+          </span>
+        </p>
+        <InfoBox icon={<UserIcon size={26} stroke="currentColor" />}>One login for customers and service providers.</InfoBox>
       </form>
-    </div>
+    </AuthLayout>
   )
 }
