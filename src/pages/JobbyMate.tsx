@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { optionsFrom, useListView } from '../listView'
 import {
   referralStatusLabel,
   type MateConnection,
   type InviteResult,
   type ReferralActionResult,
+  type ReferralPointsStatus,
 } from '../types'
+import { ArrowIcon, EmptyState, PageHead, SearchIcon } from '../components/PageParts'
+import { ConnectionRow, HowItWorks, PeoplePlusIcon } from '../components/ReferralParts'
 
 export default function JobbyMate() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const isProvider = user?.hasProviderProfile ?? false
 
@@ -93,132 +95,189 @@ export default function JobbyMate() {
     (m) => m.direction === 'REFERRED_ME' && m.pointsStatus === 'OFFERED',
   )
 
-  // ---- connection list + filter ----
-  const [filter, setFilter] = useState('')
-  const filtered = useMemo(() => {
-    const f = filter.trim().toLowerCase()
-    if (!f) return mates
-    return mates.filter((m) =>
-      (m.otherPartyName ?? '').toLowerCase().includes(f) ||
-      (m.industry ?? '').toLowerCase().includes(f) ||
-      (m.suburb ?? '').toLowerCase().includes(f),
-    )
-  }, [mates, filter])
+  // ---- connection list: search + status filter ----
+  // Same name / industry / suburb search as before, now held by useListView so
+  // it is remembered after Back (HANDOFF-referrals). The fields are joined by
+  // line breaks, so a search can't match across two of them. Status filter is
+  // new and only offers the statuses present. No sort: the API order stays.
+  const list = useListView<MateConnection>('referrals.connections', mates, {
+    search: (m) => [m.otherPartyName ?? '', m.industry ?? '', m.suburb ?? ''].join('\n'),
+    filters: [
+      {
+        key: 'status',
+        label: 'statuses',
+        options: optionsFrom<MateConnection>((m) => m.pointsStatus, (v) => referralStatusLabel(v as ReferralPointsStatus)),
+        match: (m, value) => m.pointsStatus === value,
+      },
+    ],
+  })
+  const statusFilter = list.filters.find((f) => f.key === 'status')
 
   return (
-    <>
-      <div className="page-head">
-        <h2>Jobby Mate</h2>
-        <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate('/home')}>← Home</button>
+    <div className="pg rf">
+      {/* The page's own "← Home" button is gone: the dashboard frame already
+          has ← Back under the tab bar. */}
+      <PageHead
+        icon={<PeoplePlusIcon />}
+        title="Jobby Mate Referrals"
+        intro="Bring a provider you trust onto Jobby-Connect — and stay connected as Jobby Mates."
+      />
+
+      <HowItWorks />
+
+      {error && <div className="pg-error" role="alert">{error}</div>}
+      {notice && <div className="pg-selbar rf-notice" role="status">{notice}</div>}
+
+      <div className="rf-cards">
+        {/* Flow A: invite a provider (any member can) */}
+        <section className="rf-card rf-invite" aria-labelledby="rf-invite-title">
+          <div className="rf-card-head">
+            <h3 id="rf-invite-title">Invite a provider</h3>
+            <span className="rf-badge">EARN POINTS</span>
+          </div>
+          <p className="rf-card-intro">
+            Know a great tradie or local business? Send them an invite. When they join and accept, you earn Mate Points.
+          </p>
+          <div className="pg-field">
+            <label htmlFor="rf-mobile">Provider mobile number</label>
+            <input id="rf-mobile" type="tel" inputMode="tel" placeholder="04xx xxx xxx" value={provMobile}
+                   onChange={(e) => setProvMobile(e.target.value)} />
+          </div>
+          <div className="rf-pair">
+            <div className="pg-field">
+              <label htmlFor="rf-name">Their name (optional)</label>
+              <input id="rf-name" placeholder="e.g. Sam's Plumbing" value={provName}
+                     onChange={(e) => setProvName(e.target.value)} />
+            </div>
+            <div className="pg-field">
+              <label htmlFor="rf-industry">Industry (optional)</label>
+              <input id="rf-industry" placeholder="e.g. Plumbing" value={provIndustry}
+                     onChange={(e) => setProvIndustry(e.target.value)} />
+            </div>
+          </div>
+          <button type="button" className="pg-btn pg-btn-yellow rf-wide" disabled={!provMobile.trim()} onClick={inviteProvider}>
+            Send invite <ArrowIcon />
+          </button>
+        </section>
+
+        {/* claim a code */}
+        <section className="rf-card rf-claim" aria-labelledby="rf-claim-title">
+          <h3 id="rf-claim-title">Have a referral code?</h3>
+          <p className="rf-card-intro">Someone invited you? Enter the code from your message to connect with them.</p>
+          <div className="pg-field">
+            <label htmlFor="rf-code">Referral code</label>
+            <div className="rf-inline">
+              <input id="rf-code" placeholder="Referral code" value={claimCode}
+                     onChange={(e) => setClaimCode(e.target.value)} />
+              <button type="button" className="pg-btn pg-btn-navy" disabled={!claimCode.trim()} onClick={claim}>Claim</button>
+            </div>
+          </div>
+          <p className="rf-tip">Codes are in the text message your Jobby Mate sent you.</p>
+        </section>
       </div>
-      <p className="muted">
-        Invite people you know onto Jobby-Connect and earn Mate Points for successful referrals.
-        Connections stay in your Jobby Mate list regardless of points.
-      </p>
 
-      {error && <div className="msg err">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
-
-      {/* claim a code */}
-      <div className="jm-card">
-        <h3>Have a referral code?</h3>
-        <p className="muted">If someone invited you, enter the code from your message to connect.</p>
-        <div className="jm-row">
-          <input className="input" placeholder="Referral code" value={claimCode}
-                 onChange={(e) => setClaimCode(e.target.value)} />
-          <button className="btn btn-dark btn-sm" disabled={!claimCode.trim()} onClick={claim}>Claim</button>
-        </div>
-      </div>
-
-      {/* Flow A: invite a provider (any member can) */}
-      <div className="jm-card">
-        <h3>Invite a provider</h3>
-        <p className="muted">Know a great tradie or business? Invite them — when they join and accept, you earn Mate Points.</p>
-        <div className="jm-form">
-          <input className="input" placeholder="Provider mobile number" value={provMobile}
-                 onChange={(e) => setProvMobile(e.target.value)} />
-          <input className="input" placeholder="Their name (optional)" value={provName}
-                 onChange={(e) => setProvName(e.target.value)} />
-          <input className="input" placeholder="Industry (optional)" value={provIndustry}
-                 onChange={(e) => setProvIndustry(e.target.value)} />
-          <button className="btn btn-amber btn-sm" disabled={!provMobile.trim()} onClick={inviteProvider}>Send invite</button>
-        </div>
-      </div>
-
-      {/* Flow B: provider invites customers */}
+      {/* Flow B: provider invites customers — provider-only, same behaviour. */}
       {isProvider && (
-        <div className="jm-card">
-          <h3>Invite your customers</h3>
-          <p className="muted">Bring your existing clients on board. Optionally gift them Mate Points as a welcome — you fund those points when they join.</p>
-          <textarea className="input jm-textarea" placeholder="Mobile numbers — one per line" value={custMobiles}
-                    onChange={(e) => setCustMobiles(e.target.value)} />
-          <label className="jm-check">
+        <section className="rf-card" aria-labelledby="rf-bulk-title">
+          <h3 id="rf-bulk-title">Invite your customers</h3>
+          <p className="rf-card-intro">Bring your existing clients on board. Optionally gift them Mate Points as a welcome — you fund those points when they join.</p>
+          <div className="pg-field">
+            <label htmlFor="rf-bulk">Mobile numbers</label>
+            <textarea id="rf-bulk" className="rf-textarea" placeholder="Mobile numbers — one per line" value={custMobiles}
+                      onChange={(e) => setCustMobiles(e.target.value)} />
+          </div>
+          <label className="rf-check">
             <input type="checkbox" checked={offerPoints} onChange={(e) => setOfferPoints(e.target.checked)} />
             Offer Mate Points as a joining bonus
           </label>
           {offerPoints && (
-            <input className="input" type="number" min={0} placeholder="Points per customer" value={pointsAmount}
-                   onChange={(e) => setPointsAmount(e.target.value)} />
+            <div className="pg-field rf-points-field">
+              <label htmlFor="rf-bulk-points">Points per customer</label>
+              <input id="rf-bulk-points" type="number" min={0} placeholder="Points per customer" value={pointsAmount}
+                     onChange={(e) => setPointsAmount(e.target.value)} />
+            </div>
           )}
-          <button className="btn btn-amber btn-sm" onClick={inviteCustomers}>Send invites</button>
-        </div>
+          <button type="button" className="pg-btn pg-btn-yellow rf-fit" onClick={inviteCustomers}>Send invites</button>
+        </section>
       )}
 
       {/* pending Flow A offers for a provider to accept/decline */}
       {pendingOffers.length > 0 && (
-        <div className="jm-card jm-offers">
-          <h3>Referral offers awaiting you</h3>
-          <p className="muted">A customer referred you. Accept to grant them the Mate Points shown (you fund these), or decline — either way you stay connected.</p>
-          {pendingOffers.map((o) => (
-            <div className="jm-offer-row" key={o.referralRecordId}>
-              <div>
-                <strong>{o.otherPartyName ?? 'A customer'}</strong>
-                <span className="pay-meta"> · would earn {o.pointsAmount} points</span>
-              </div>
-              <div className="jm-offer-actions">
-                <button className="btn btn-dark btn-sm" onClick={() => decide(o.referralRecordId, 'accept')}>Accept</button>
-                <button className="btn btn-ghost-dark btn-sm" onClick={() => decide(o.referralRecordId, 'decline')}>Decline</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* connections list */}
-      <div className="page-head" style={{ marginTop: 22 }}>
-        <h3>Your Jobby Mates</h3>
-        <input className="input jm-filter" placeholder={isProvider ? 'Filter by suburb / name' : 'Filter by industry / name'}
-               value={filter} onChange={(e) => setFilter(e.target.value)} />
-      </div>
-
-      {loading ? (
-        <div className="loading">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="empty"><p>No Jobby Mate connections yet. Send an invite above to get started.</p></div>
-      ) : (
-        <div className="md-panel">
-          {filtered.map((m) => (
-            <div className="jm-conn" key={m.referralRecordId}>
-              <div className="jm-conn-main">
-                <strong>{m.otherPartyName ?? (m.otherPartyType === 'PROVIDER' ? 'Provider' : 'Customer')}</strong>
-                <span className="pay-meta">
-                  {m.otherPartyType === 'PROVIDER'
-                    ? [m.industry, m.suburb].filter(Boolean).join(' · ')
-                    : (m.direction === 'REFERRED_BY_ME' ? 'You referred them' : 'They referred you')}
+        <section className="rf-card rf-offers" aria-labelledby="rf-offers-title">
+          <h3 id="rf-offers-title">Referral offers awaiting you</h3>
+          <p className="rf-card-intro">A customer referred you. Accept to grant them the Mate Points shown (you fund these), or decline — either way you stay connected.</p>
+          <ul className="rf-offer-list">
+            {pendingOffers.map((o) => (
+              <li className="rf-offer" key={o.referralRecordId}>
+                <span>
+                  <strong>{o.otherPartyName ?? 'A customer'}</strong>
+                  <span className="rf-muted"> · would earn {o.pointsAmount} points</span>
                 </span>
-              </div>
-              <div className="jm-conn-side">
-                <span className={`jm-badge jm-${m.pointsStatus.toLowerCase()}`}>{referralStatusLabel(m.pointsStatus)}</span>
-                {m.pointsAmount > 0 && <span className="pay-meta"> {m.pointsAmount} pts</span>}
-                {m.pointsStatus === 'PAYMENT_OVERDUE' && m.direction === 'REFERRED_ME' && (
-                  <button className="btn btn-ghost-dark btn-sm" onClick={() => complain(m.referralRecordId)}>Report unpaid</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                <span className="rf-offer-actions">
+                  <button type="button" className="pg-btn pg-btn-navy rf-btn-sm" onClick={() => decide(o.referralRecordId, 'accept')}>Accept</button>
+                  <button type="button" className="pg-btn pg-btn-ghost rf-btn-sm" onClick={() => decide(o.referralRecordId, 'decline')}>Decline</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
-    </>
+
+      {/* connections list — renamed from "Your Jobby Mates", which clashed with tab 1 */}
+      <section className="rf-conns" aria-labelledby="rf-conns-title">
+        <div className="rf-conns-head">
+          <h3 id="rf-conns-title">
+            Your connections <span className="rf-count">· {list.shown === list.total ? list.total : `${list.shown} of ${list.total}`}</span>
+          </h3>
+          {mates.length > 0 && (
+            <div className="rf-conns-tools">
+              {statusFilter && (
+                <select
+                  aria-label="Status"
+                  value={list.view.filters.status ?? ''}
+                  onChange={(e) => list.setFilter('status', e.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  {statusFilter.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              )}
+              <span className="pg-input-ico">
+                <SearchIcon />
+                <input
+                  type="search"
+                  aria-label="Search connections"
+                  placeholder="Name, industry or suburb"
+                  value={list.view.search}
+                  onChange={(e) => list.setSearch(e.target.value)}
+                />
+              </span>
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="pg-loading">Loading…</div>
+        ) : mates.length === 0 ? (
+          <EmptyState>No connections yet. Send your first invite above.</EmptyState>
+        ) : list.shown === 0 ? (
+          <EmptyState action={<button type="button" className="pg-btn pg-btn-ghost" onClick={list.clear}>Clear filters</button>}>
+            No connections match these filters.
+          </EmptyState>
+        ) : (
+          <ul className="rf-list">
+            {list.visible.map((m) => (
+              <ConnectionRow
+                key={m.referralRecordId}
+                c={m}
+                action={m.pointsStatus === 'PAYMENT_OVERDUE' && m.direction === 'REFERRED_ME' && (
+                  <button type="button" className="pg-link" onClick={() => complain(m.referralRecordId)}>Report unpaid</button>
+                )}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   )
 }
 

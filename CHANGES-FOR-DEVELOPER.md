@@ -346,3 +346,90 @@ Mates doesn't pass it); `src/index.css` (small `fd-` block, `.pg-link:disabled`)
 **For you (existing gap, not changed):** the chosen industry, suburb, sort and results on this page are held in component state,
 so they are not restored after Back or reload, which CLAUDE.md / UAT Round 1 §5.3 asks of list screens. Fixing it means
 changing how that state is stored, so it's left for you.
+
+## 2026-10-30 — Mate Points ledger (design/HANDOFF-points.md, Part E)
+
+**Screen:** customer dashboard → Mate Points, redesigned as a general ledger in the Mates / Requests & Jobs style.
+
+**What changed visually**
+- Header (coin icon, "Mate Points", intro). The page's own "← Home" button is removed; the frame has ← Back.
+- Navy balance card: "Available balance" (the API's `balance`, not recalculated), "Redeemable against future jobs at checkout."
+- Filter row:
+  - PERIOD: This month, Last month, Last 3 months (this month + the two before, to today), This / Last financial year
+    (1 Jul – 30 Jun), All time (default), Custom with From / To.
+  - TYPE: All + the five types.
+  - SEARCH: in the description.
+  - Remembered with `useListView('customer.points')`. A custom range is stored in the one `period` value
+    (`custom:FROM:TO`), so no new storage.
+- Period summary: Opening, Earned (+), Redeemed (−), Closing. Formulas as in HANDOFF, summed in whole cents.
+- Ledger table: Date · Type (coloured chip) · Description · Earned · Redeemed · Balance.
+  - New label `REFERRAL` → "Referral points".
+  - Running balance over the whole history, oldest → newest (the API returns it complete, newest first, `createdAt desc`).
+  - Opening / Closing rows in bold. Per **owner decision A**, Closing sits next to the newest entry and Opening next to the
+    oldest, so they swap ends when the Date header flips the sort (newest first by default).
+  - 25 rows a page with page numbers, and a sticky header under the top bar.
+  - A note appears when Type / Search narrow the table: "Opening and closing balances include all activity in the period."
+- Download CSV (built in the browser: every row in the current view across all pages plus opening/closing rows; UTF-8 BOM,
+  ISO dates, plain numbers for Excel) and Print (prints the whole view without the frame, filters or buttons).
+- Empty states: "No points activity yet…" (today's text); "No points activity in this period." + "Show all time";
+  "No entries match these filters." + "Clear filters".
+- 375px: rows stack (date + type chip on top, description with the amount on the right, balance small).
+
+**Not changed:** the single `GET /points/wallet` call (byte-for-byte), the balance shown, all amounts.
+
+**Checked:** a throwaway test of the ledger maths (not added to the project) against sample data. The last running balance
+equals the available balance; opening + earned + redeemed = closing for this / last FY, last month, custom and all time,
+and it matches the table; financial-year boundaries are right in July and in January.
+
+**Files touched:** `src/pages/Wallet.tsx`; new `src/components/Ledger.tsx` (period ranges, date reading, running balance,
+summary, type chip, pager, CSV; display only); `src/index.css` (new `lg-` block incl. print rules scoped with
+`body:has(.lg)`).
+
+**BACKEND-REQUESTS.md:** job details on wallet entries (Reference / Company / Industry columns) and the UTC date issue.
+
+## 2026-10-30 — Mate Points ledger: planned ID column (waiting on the API)
+
+**Not built yet; recorded so it's not lost.** When `GET /points/wallet` returns `ref` on each history entry (HIGH-priority
+request in BACKEND-REQUESTS.md: `MPT` + zero-padded sequence, e.g. `MPT000123`, shown exactly as issued):
+- The ledger table gains an **ID** column first, before Date, as a monospace pill (same style as the Quote Request ID pill, `jb-ref`).
+- The **CSV** gains an ID column first, and **Print** shows it.
+- The **search box** matches the ID as well as the description.
+- On phones the ID sits on the top line of each stacked row, beside the date.
+
+Where to change it: `WalletEntry` in `src/types.ts` (developer), `buildLedger` / `ledgerCsvLine` in `src/components/Ledger.tsx`,
+and the table and `search` option in `src/pages/Wallet.tsx`.
+
+## 2026-10-30 — Jobby Mate Referrals, customer view (design/HANDOFF-referrals.md, Part F)
+
+**Screen:** Jobby Mate Referrals (`src/pages/JobbyMate.tsx`, serves both roles). Reference: `design/referrals-v1/referrals-mockup.png`.
+
+**What changed visually**
+- Header (people-plus icon, "Jobby Mate Referrals", new intro). The page's own "← Home" button is removed (frame has ← Back).
+- "How it works" strip: 1 Invite a provider by mobile → 2 They join → 3 They accept your referral → 4 You earn Mate Points,
+  plus "If they decline, you still stay connected — no points are earned."
+- Two cards side by side (stacked under 860px, Invite first):
+  - **Invite a provider**: "EARN POINTS" badge, labelled fields (mobile, name, industry), full-width yellow "Send invite →".
+  - **Have a referral code?**: light blue, field + navy "Claim", and the tip box. The placeholder stays "Referral code"; the
+    mockup's example code format wasn't shown.
+- Provider-only "Invite your customers" and "Referral offers awaiting you": same content and behaviour, new card style.
+- "Your connections · n" (renamed from "Your Jobby Mates", which clashed with tab 1).
+  - Status filter + name / industry / suburb search.
+  - Rows: initials avatar, name, industry · suburb · direction, status chip (existing `referralStatusLabel` labels; colour and
+    lightness differ), "{n} pts" or "—", date, "Report unpaid".
+- Notices: success in the yellow bar, errors in the red bar (same text). Empty states in the Mates style.
+- Phones: rows stack (name + chip on top, details, points on the right).
+
+**Behaviour**
+- Unchanged, byte-for-byte: `load`, `claim`, `inviteProvider`, `inviteCustomers`, `decide`, `complain`, `pendingOffers`,
+  `summarise`. The Send invite / Claim disabled rules are unchanged, and no `<form>` was added (Enter doesn't submit).
+- Changed (asked for by HANDOFF): the connections search moved from `useState` / `useMemo` to
+  `useListView('referrals.connections')`, so it is remembered after Back. It searches the same fields, joined by line breaks so
+  a search can't span two fields. A new Status filter offers only the statuses present. No sort; the API order is kept.
+
+**Mockup differences not followed (per HANDOFF):** amounts stay in points ("{n} pts"), not dollars. "Report unpaid" stays
+where it is today (Points overdue **and** "They referred you"), not on a "You referred them" row as drawn.
+
+**Files touched:** `src/pages/JobbyMate.tsx`; new `src/components/ReferralParts.tsx` (how-it-works strip, status chip,
+connection row; display only); `src/index.css` (new `rf-` block; old `jm-` rules left, unused).
+
+**BACKEND-REQUESTS.md:** invites sent but not joined yet; points unit (owner decision).

@@ -6862,3 +6862,743 @@ main.wrap:has(> .fr) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ==========================================================================
+   Mate Points ledger (HANDOFF-points Part E). Uses the Mates `pg-` pieces;
+   `lg-` adds the balance card, period summary, ledger table and print view.
+   ========================================================================== */
+.lg-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 26px;
+  border-radius: 16px;
+  background: #0f2a4a;
+  color: #fff;
+}
+.lg-balance-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d3deea;
+}
+.lg-balance-value {
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.1;
+  color: #f7c21b;
+}
+.lg-balance-note {
+  font-size: 14px;
+  color: #c3d1e1;
+}
+.pg-searchrow.lg-filters {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+/* Period summary */
+.lg-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.lg-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 12px;
+  background: #fff;
+}
+.lg-sum-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a6e86;
+}
+.lg-sum-value {
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: #0f2a4a;
+  font-variant-numeric: tabular-nums;
+}
+.lg-sum.is-earned .lg-sum-value {
+  color: #2e7d4f;
+}
+.lg-sum.is-closing {
+  border-color: #0f2a4a;
+  background: #f5f8fc;
+}
+.lg-btn {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.lg-note {
+  margin-top: -6px;
+  font-size: 13px;
+  color: #5a6e86;
+}
+
+/* Type chips */
+.lg-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lg-chip-standard {
+  background: #e5f4ea;
+  color: #2e7d4f;
+}
+.lg-chip-bonus {
+  background: #fff1bf;
+  color: #6b4e00;
+}
+.lg-chip-redeemed {
+  background: #fff;
+  border-color: #0f2a4a;
+  color: #0f2a4a;
+}
+.lg-chip-referral {
+  background: #dcebfb;
+  color: #124a8c;
+}
+.lg-chip-adjusted {
+  background: #eef1f5;
+  color: #5a6e86;
+}
+
+/* Ledger table */
+.lg-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e4eaf1;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 14px;
+  color: #24405f;
+}
+/* The header stays visible while scrolling, just under the sticky top bar. */
+.lg-table thead th {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  padding: 10px 12px;
+  border-bottom: 1px solid #d6e0ea;
+  background: #f5f8fc;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: #5a6e86;
+}
+.lg-table thead th:first-child {
+  border-top-left-radius: 12px;
+}
+.lg-table thead th:last-child {
+  border-top-right-radius: 12px;
+}
+.lg-sortbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.lg-sortbtn:hover {
+  color: #0f2a4a;
+}
+.lg-table td {
+  padding: 10px 12px;
+  border-top: 1px solid #eef1f5;
+  vertical-align: middle;
+}
+.lg-table tbody tr:first-child td {
+  border-top: 0;
+}
+.lg-table .lg-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lg-date {
+  white-space: nowrap;
+}
+.lg-bal {
+  font-weight: 700;
+  color: #0f2a4a;
+}
+.lg-bal-label {
+  display: none;
+}
+.lg-balrow td {
+  background: #f5f8fc;
+  font-weight: 800;
+  color: #0f2a4a;
+}
+
+/* Pages */
+.lg-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+.lg-page {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f2a4a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lg-page.on {
+  background: #0f2a4a;
+  border-color: #0f2a4a;
+  color: #fff;
+}
+.lg-page:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lg-gap {
+  color: #5a6e86;
+}
+
+@media (max-width: 860px) {
+  .lg-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phones: each row becomes a stacked card — date and type on top, then the
+   description with the amount on the right, and the balance small. */
+@media (max-width: 640px) {
+  .lg-balance-value {
+    font-size: 32px;
+  }
+  .lg-table,
+  .lg-table tbody,
+  .lg-table td {
+    display: block;
+  }
+  .lg-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .lg-table caption {
+    display: none;
+  }
+  .lg-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'date type'
+      'desc amt'
+      'desc bal';
+    gap: 4px 12px;
+    padding: 12px 14px;
+    border-top: 1px solid #eef1f5;
+  }
+  .lg-table tbody tr:first-child {
+    border-top: 0;
+  }
+  .lg-table td {
+    padding: 0;
+    border: 0;
+  }
+  .lg-table .lg-date {
+    grid-area: date;
+    font-size: 13px;
+    color: #5a6e86;
+  }
+  .lg-table .lg-type {
+    grid-area: type;
+    justify-self: end;
+  }
+  .lg-table .lg-desc {
+    grid-area: desc;
+    min-width: 0;
+  }
+  .lg-table .lg-amt {
+    grid-area: amt;
+    font-weight: 800;
+    color: #0f2a4a;
+  }
+  .lg-table .lg-amt:empty {
+    display: none;
+  }
+  .lg-table .lg-amt:not(.lg-out)::before {
+    content: '+';
+  }
+  .lg-table .lg-out::before {
+    content: '−';
+  }
+  .lg-table .lg-bal {
+    grid-area: bal;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #5a6e86;
+  }
+  .lg-bal-label {
+    display: inline;
+  }
+  .lg-table tbody tr.lg-balrow {
+    grid-template-areas:
+      'desc bal'
+      'date bal';
+    background: #f5f8fc;
+  }
+  .lg-balrow td {
+    background: transparent;
+  }
+  .lg-table .lg-balrow .lg-bal {
+    align-self: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f2a4a;
+  }
+}
+
+/* Print: just the title, balance, summary and the full table. */
+@media print {
+  body:has(.lg) .fr-top,
+  body:has(.lg) .fr-band,
+  body:has(.lg) .fr-roles,
+  body:has(.lg) .fr-tabs,
+  body:has(.lg) .fr-back,
+  body:has(.lg) .fr-foot,
+  .lg .lg-noprint {
+    display: none !important;
+  }
+  body:has(.lg) {
+    background: #fff;
+  }
+  body:has(.lg) .fr-body {
+    padding: 0;
+  }
+  body:has(.lg) .fr-card {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .lg .lg-table thead th {
+    position: static;
+  }
+  .lg .lg-table tr {
+    break-inside: avoid;
+  }
+  .lg .lg-balance {
+    border: 1px solid #0f2a4a;
+    background: #fff;
+    color: #0f2a4a;
+  }
+  .lg .lg-balance-value,
+  .lg .lg-balance-label,
+  .lg .lg-balance-note {
+    color: #0f2a4a;
+  }
+}
+
+/* ==========================================================================
+   Jobby Mate Referrals (HANDOFF-referrals Part F). Uses the Mates `pg-`
+   pieces; `rf-` adds the how-it-works strip, invite / claim cards and the
+   connections list. The old `jm-` rules are left in place, now unused.
+   ========================================================================== */
+.rf-how {
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #eaf4fc;
+}
+.rf-how ol {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.rf-how li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0f2a4a;
+}
+.rf-how li:not(:last-child)::after {
+  content: '→';
+  margin-left: 4px;
+  color: #5a6e86;
+}
+.rf-how-n {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #f7c21b;
+  color: #0f2a4a;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.rf-how-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #5a6e86;
+}
+.rf-notice {
+  font-size: 14px;
+}
+
+/* Invite + claim cards */
+.rf-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+}
+.rf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 14px;
+  background: #fff;
+}
+.rf-card h3 {
+  margin: 0;
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: #0f2a4a;
+}
+.rf-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.rf-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fff1bf;
+  color: #6b4e00;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.rf-card-intro {
+  margin-top: -6px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #3e5571;
+}
+.rf-claim {
+  background: #f1f7fc;
+  border-color: #d6e7f6;
+}
+.rf-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.rf-inline {
+  display: flex;
+  gap: 8px;
+}
+.rf-inline input {
+  flex: 1;
+  min-width: 0;
+}
+.rf-inline .pg-btn {
+  min-height: 48px;
+}
+.rf-wide {
+  width: 100%;
+  min-height: 48px;
+}
+.rf-fit {
+  align-self: flex-start;
+}
+.rf-tip {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13.5px;
+  color: #3e5571;
+}
+.pg .rf-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 14px;
+  border: 1px solid #cbd6e2;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  resize: vertical;
+}
+.pg label.rf-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: #24405f;
+  cursor: pointer;
+}
+.rf-points-field {
+  max-width: 260px;
+}
+.rf-offers {
+  border-color: #f2d27a;
+  background: #fffbea;
+}
+.rf-offer-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.rf-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid #f0e4be;
+  font-size: 14.5px;
+}
+.rf-offer:first-child {
+  border-top: 0;
+}
+.rf-offer-actions {
+  display: flex;
+  gap: 8px;
+}
+.rf-btn-sm {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.rf-muted {
+  color: #5a6e86;
+}
+
+/* Connections */
+.rf-conns {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rf-conns-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.rf-conns-head h3 {
+  margin: 0;
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: #0f2a4a;
+}
+.rf-count {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5a6e86;
+}
+.rf-conns-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pg .rf-conns-tools select,
+.pg .rf-conns-tools input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd6e2;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f2a4a;
+  font-family: inherit;
+  font-size: 14.5px;
+}
+.pg .rf-conns-tools .pg-input-ico input {
+  width: 230px;
+  padding-left: 40px;
+}
+.rf-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rf-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 150px 80px 96px minmax(0, auto);
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 18px;
+  border: 1.5px solid #e4eaf1;
+  border-radius: 14px;
+  background: #fff;
+}
+.rf-row .pg-avatar-md {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+.rf-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rf-row-name {
+  font-family: 'Inter Tight', Inter, sans-serif;
+  font-weight: 800;
+  font-size: 16.5px;
+  color: #0f2a4a;
+  overflow-wrap: anywhere;
+}
+.rf-row-details {
+  font-size: 13.5px;
+  color: #5a6e86;
+}
+.rf-row-status {
+  justify-self: start;
+}
+.rf-row-pts {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #0f2a4a;
+  white-space: nowrap;
+}
+.rf-row-date {
+  font-size: 13px;
+  color: #5a6e86;
+  white-space: nowrap;
+}
+.rf-row-action .pg-link {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.rf-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Colour AND lightness differ, so the statuses still read without colour. */
+.rf-chip-granted {
+  background: #2e7d4f;
+  color: #fff;
+}
+.rf-chip-pending {
+  background: #fff1bf;
+  color: #6b4e00;
+}
+.rf-chip-connected {
+  background: #eef1f5;
+  color: #5a6e86;
+}
+.rf-chip-declined {
+  background: #fff;
+  border-color: #b9c6d4;
+  color: #5a6e86;
+}
+.rf-chip-overdue {
+  background: #b3261e;
+  color: #fff;
+}
+
+@media (max-width: 860px) {
+  .rf-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rf-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'avatar main status'
+      'avatar main pts'
+      'avatar date action';
+  }
+  .rf-row .pg-avatar {
+    grid-area: avatar;
+    align-self: start;
+  }
+  .rf-row-main {
+    grid-area: main;
+  }
+  .rf-row-status {
+    grid-area: status;
+    justify-self: end;
+  }
+  .rf-row-pts {
+    grid-area: pts;
+  }
+  .rf-row-date {
+    grid-area: date;
+  }
+  .rf-row-action {
+    grid-area: action;
+    justify-self: end;
+  }
+}
+
+/* Phones: name + chip on top, details, the points on the right. */
+@media (max-width: 640px) {
+  .rf-how ol {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rf-how li:not(:last-child)::after {
+    content: none;
+  }
+  .rf-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rf-conns-tools,
+  .rf-conns-tools > * {
+    width: 100%;
+  }
+  .pg .rf-conns-tools .pg-input-ico input {
+    width: 100%;
+  }
+  .rf-row {
+    padding: 12px 14px;
+  }
+}

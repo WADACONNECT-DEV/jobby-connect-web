@@ -65,3 +65,52 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
   and suburbs list, like `GET /mates` does.
 - **Why:** results only carry `categories` (the six old categories), which are empty for the 120 new industries, so the
   cards no longer show category chips. The service-area line is shown instead until this exists.
+
+## 2026-10-30 — Mate Points ledger: job details and dates on wallet entries
+
+- **Screen:** customer dashboard → Mate Points (`src/pages/Wallet.tsx`), ledger table.
+- **User need:** the owner wants Reference, Company and Industry columns, and the job title in the description, so each
+  points entry can be traced to its job.
+- **API needed (owner's wording, HANDOFF-points):**
+
+  > `GET /points/wallet` — for each history entry also return: `jobId`,
+  > `jobTitle`, the **Quote Request ID** (`requestRef`), the provider's
+  > **business name**, the job's **industry**, and the full timestamp in ISO
+  > format. (The `points_transaction` row already holds `job_id` and
+  > `quote_id`, so these can be joined.) Also: `date` is formatted in UTC, so
+  > an entry made in the morning in Australia can show the previous day —
+  > format in Australia/Melbourne or return ISO and let the screen format it.
+
+- **Why:** the wallet entries don't say which job they belong to. When these fields exist, the table gains **Reference**,
+  **Company** and **Industry** columns after Date, and the job title joins the description. The screen already reads ISO
+  dates, so switching `date` to ISO needs no screen change.
+
+## 2026-10-30 — HIGH PRIORITY — Mate Points transaction ID (`ref`)
+
+- **Screen:** customer dashboard → Mate Points ledger (`src/pages/Wallet.tsx`); also the admin portal.
+- **User need:** each Mate Points entry needs a permanent, unique reference that customers and support can quote.
+- **API / database needed:**
+  - Format: **`MPT` + zero-padded sequence**, minimum 6 digits, never truncated (same rule as CAS / PAS), e.g. `MPT000123`.
+  - Issued from a **database sequence** when the entry is created; **never reused**.
+  - **Backfill** existing entries in date order.
+  - Return it as **`ref`** on each `GET /points/wallet` history entry, together with the job's **Quote Request ID**
+    (`requestRef`) where the entry belongs to a job (see the entry above).
+  - It must also be **searchable in the admin portal**.
+  - Admin portal: searching an MPT number opens the entry with its customer (CAS), job and Quote Request ID, provider (PAS), payment and the related ledger lines.
+- **Screen, once `ref` is returned:** the ledger shows an **ID** column first (monospace pill, like the Quote Request ID). It's
+  included in the CSV and Print, and the search box also matches it.
+- **Why:** entries currently have no identifier, so a customer or support can't point to one specific entry.
+
+## 2026-10-30 — Jobby Mate Referrals: invites sent but not joined yet
+
+- **Screen:** customer dashboard → Jobby Mate Referrals (`src/pages/JobbyMate.tsx`), "Your connections".
+- **User need:** see invites they've sent that haven't been taken up yet ("Invited — waiting to join").
+- **API needed:** return the customer's open invites (`ReferralInvite` with status `SENT` / `EXPIRED`) with the connections from
+  `GET /me/jobby-mates` (or a sibling endpoint), with mobile (masked is fine), name / industry hint, sent date and status.
+- **Why:** a connection only appears once the invited person registers, so a customer can't see or follow up an invite they sent.
+
+## 2026-10-30 — Jobby Mate Referrals: points unit (owner to decide)
+
+- **Screens:** Jobby Mate Referrals (shows referral rewards as "{n} pts") vs Mate Points (shows dollars, e.g. "$20.00").
+- **Decision needed (owner):** one unit for referral rewards. With the spec's $-per-point rate the screen could show both,
+  e.g. "20 pts · $2.00". That needs the rate (or the dollar value) returned with each connection.
