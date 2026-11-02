@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { THEME_LABELS, type SiteTheme } from '../types'
@@ -10,8 +11,100 @@ import {
   type MasterSuburb,
   type ProviderProfile as Profile,
 } from '../types'
+import { SearchIcon } from '../components/PageParts'
+import { ToolboxIcon } from '../components/AccountParts'
+import {
+  CharCount, ChipX, PremiumLocked, ProfileChecklist, ProfilePreview, SectionCard, SectionMenu, SuburbAdd, ThemeSwatch,
+  type SectionItem,
+} from '../components/ProfileParts'
 
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT']
+
+// Validation messages from onSubmit. Used only to show the right section when one appears.
+const MSG_NAME_AREA = 'Please fill in your business name and service area.'
+const MSG_INDUSTRY = 'Pick at least one industry you work in.'
+
+// Placeholder: the owner will supply the real address for new-service requests.
+const ADMIN_EMAIL = '[ADMIN EMAIL]'
+
+const SECTION_NAMES: Record<number, string> = {
+  1: 'Business details',
+  2: 'Services',
+  3: 'Service area',
+  4: 'Public page',
+  5: 'Photos & highlights',
+}
+
+const THEME_NOTES: Record<SiteTheme, string> = {
+  CLASSIC: 'Navy & amber',
+  COASTAL: 'Teal',
+  SLATE: 'Muted grey',
+}
+
+/** Every form value, in one plain object, so the form can be compared and reset. */
+interface Fields {
+  businessName: string
+  abn: string
+  bio: string
+  serviceArea: string
+  gstRegistered: boolean
+  promoPoints: string
+  planId: string
+  selIndustries: string[]
+  selSubcats: string[]
+  selSuburbs: [string, string][]
+  siteTheme: SiteTheme
+  aboutText: string
+  contactEmail: string
+  contactPhone: string
+  contactHours: string
+}
+
+/** The loaded profile as form values. Same mapping the page has always used on load. */
+function fieldsFrom(p: Profile | null): Fields {
+  if (!p) {
+    return {
+      businessName: '', abn: '', bio: '', serviceArea: '', gstRegistered: false, promoPoints: '', planId: '',
+      selIndustries: [], selSubcats: [], selSuburbs: [], siteTheme: 'CLASSIC',
+      aboutText: '', contactEmail: '', contactPhone: '', contactHours: '',
+    }
+  }
+  return {
+    businessName: p.businessName,
+    abn: p.abn ?? '',
+    bio: p.bio ?? '',
+    serviceArea: p.serviceArea,
+    gstRegistered: p.gstRegistered,
+    promoPoints: p.promoPoints ? String(p.promoPoints) : '',
+    planId: p.subscriptionPlanId ?? '',
+    selIndustries: p.industries.map((i) => i.id),
+    selSubcats: p.subcategories.map((s) => s.id),
+    selSuburbs: p.suburbs.map((s) => [s.id, s.name] as [string, string]),
+    siteTheme: p.siteTheme ?? 'CLASSIC',
+    aboutText: p.aboutText ?? '',
+    contactEmail: p.contactEmail ?? '',
+    contactPhone: p.contactPhone ?? '',
+    contactHours: p.contactHours ?? '',
+  }
+}
+
+/** Which section each field lives in, for "Unsaved changes in …". */
+const FIELD_SECTION: Record<keyof Fields, number> = {
+  businessName: 1, abn: 1, planId: 1, gstRegistered: 1, promoPoints: 1,
+  selIndustries: 2, selSubcats: 2,
+  selSuburbs: 3, serviceArea: 3,
+  siteTheme: 4, bio: 4, aboutText: 4, contactPhone: 4, contactEmail: 4, contactHours: 4,
+}
+
+function sameValue(a: Fields[keyof Fields], b: Fields[keyof Fields]): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const key = (v: unknown) => (Array.isArray(v) ? String(v[0]) : String(v))
+    const sa = a.map(key).sort()
+    const sb = b.map(key).sort()
+    return sa.length === sb.length && sa.every((v, i) => v === sb[i])
+  }
+  return a === b
+}
 
 export default function ProviderProfile() {
   const navigate = useNavigate()
@@ -52,6 +145,32 @@ export default function ProviderProfile() {
   const [ok, setOk] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // Display only: which section is on screen, the industry search text, and the
+  // values the form was last loaded or saved with (for "Unsaved changes" / Discard).
+  const [section, setSection] = useState(1)
+  const [industryQuery, setIndustryQuery] = useState('')
+  const [askOpen, setAskOpen] = useState(false)
+  const [baseline, setBaseline] = useState<Fields>(() => fieldsFrom(null))
+  const topRef = useRef<HTMLDivElement>(null)
+
+  function fillFrom(f: Fields) {
+    setBusinessName(f.businessName)
+    setAbn(f.abn)
+    setBio(f.bio)
+    setServiceArea(f.serviceArea)
+    setGstRegistered(f.gstRegistered)
+    setPromoPoints(f.promoPoints)
+    setPlanId(f.planId)
+    setSelIndustries(new Set(f.selIndustries))
+    setSelSubcats(new Set(f.selSubcats))
+    setSelSuburbs(new Map(f.selSuburbs))
+    setSiteTheme(f.siteTheme)
+    setAboutText(f.aboutText)
+    setContactEmail(f.contactEmail)
+    setContactPhone(f.contactPhone)
+    setContactHours(f.contactHours)
+  }
+
   // Load master lists + existing profile once.
   useEffect(() => {
     Promise.all([
@@ -65,21 +184,9 @@ export default function ProviderProfile() {
     api<Profile>('/provider/profile', 'GET')
       .then((p) => {
         setProfile(p)
-        setBusinessName(p.businessName)
-        setAbn(p.abn ?? '')
-        setBio(p.bio ?? '')
-        setServiceArea(p.serviceArea)
-        setGstRegistered(p.gstRegistered)
-        setPromoPoints(p.promoPoints ? String(p.promoPoints) : '')
-        setPlanId(p.subscriptionPlanId ?? '')
-        setSelIndustries(new Set(p.industries.map((i) => i.id)))
-        setSelSubcats(new Set(p.subcategories.map((s) => s.id)))
-        setSelSuburbs(new Map(p.suburbs.map((s) => [s.id, s.name])))
-        setSiteTheme(p.siteTheme ?? 'CLASSIC')
-        setAboutText(p.aboutText ?? '')
-        setContactEmail(p.contactEmail ?? '')
-        setContactPhone(p.contactPhone ?? '')
-        setContactHours(p.contactHours ?? '')
+        const f = fieldsFrom(p)
+        fillFrom(f)
+        setBaseline(f)
       })
       .catch(() => setProfile(null))
   }, [])
@@ -140,6 +247,14 @@ export default function ProviderProfile() {
     })
   }
 
+  // ---- display values computed from the form ----
+  const current: Fields = {
+    businessName, abn, bio, serviceArea, gstRegistered, promoPoints, planId,
+    selIndustries: Array.from(selIndustries),
+    selSubcats: Array.from(selSubcats),
+    selSuburbs: Array.from(selSuburbs.entries()),
+    siteTheme, aboutText, contactEmail, contactPhone, contactHours,
+  }
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(''); setOk('')
@@ -169,6 +284,7 @@ export default function ProviderProfile() {
         ? await api<Profile>('/provider/profile', 'POST', body)
         : await api<Profile>('/provider/profile', 'PUT', body)
       setProfile(saved)
+      setBaseline(current) // display only: the form now matches what was saved
       setOk(isNew ? "You're now a provider — you can quote on jobs." : 'Profile updated.')
       if (isNew) await refresh()
     } catch (err) {
@@ -178,180 +294,376 @@ export default function ProviderProfile() {
     }
   }
 
+  // A required-field message shows the section that field is in.
+  useEffect(() => {
+    if (error === MSG_NAME_AREA) setSection(!businessName ? 1 : 3)
+    else if (error === MSG_INDUSTRY) setSection(2)
+    if (error || ok) topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error, ok])
+
+  const changedSections = Array.from(new Set(
+    (Object.keys(FIELD_SECTION) as (keyof Fields)[])
+      .filter((k) => !sameValue(current[k], baseline[k]))
+      .map((k) => FIELD_SECTION[k]),
+  )).sort()
+  const dirty = changedSections.length > 0
+
+  // The browser's own checks (email format, Mate Points not below 0) can flag a
+  // field in a hidden section. Show that section so the browser can point at it.
+  function showInvalidField(e: React.FormEvent<HTMLFormElement>) {
+    const box = (e.target as HTMLElement).closest('[data-section]')
+    const n = Number(box?.getAttribute('data-section'))
+    if (n && n !== section) flushSync(() => setSection(n))
+  }
+
+  function discard() {
+    fillFrom(baseline)
+    setError(''); setOk('')
+  }
+
   if (profile === undefined) return <div className="loading">Loading…</div>
   const isNew = profile === null
 
+  const industryName = (id: string) => industries.find((x) => x.id === id)?.name ?? 'Industry'
+  const selIndustryIds = Array.from(selIndustries)
+  // Saved suburbs come back labelled "Name, STATE"; ones picked here carry just the
+  // name, so add the state on screen to match. Display only; the saved ids are unchanged.
+  const suburbLabel = (id: string, name: string) => {
+    if (name.includes(',')) return name
+    const opt = suburbOptions.find((s) => s.id === id)
+    return opt ? `${name}, ${opt.state}` : name
+  }
+  const suburbNames = Array.from(selSuburbs.entries()).map(([id, name]) => suburbLabel(id, name))
+  const q = industryQuery.trim().toLowerCase()
+  const industryList = [...industries]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter((i) => !q || i.name.toLowerCase().includes(q))
+
+  const menu: SectionItem[] = [
+    { key: 1, label: 'Business details', status: businessName.trim() ? 'check' : undefined },
+    { key: 2, label: 'Services', status: selIndustries.size > 0 ? `${selSubcats.size} · ${selIndustries.size}` : undefined },
+    { key: 3, label: 'Service area', status: selSuburbs.size > 0 ? String(selSuburbs.size) : undefined },
+    { key: 4, label: 'Public page', status: aboutText.trim() ? 'check' : undefined },
+    { key: 5, label: 'Photos & highlights', status: 'premium' },
+  ]
+
+  // Selected industries that have services to tick but none ticked yet. A reminder
+  // only: saving is not blocked. Industries with no subcategories are skipped.
+  const untickedIndustries = selIndustryIds.filter((id) => {
+    const subs = subcatsByIndustry[id] ?? []
+    return subs.length > 0 && !subs.some((s) => selSubcats.has(s.id))
+  })
+
+  const checklist = [
+    { label: 'Business name, ABN', done: Boolean(businessName.trim() && abn.trim()) },
+    { label: 'Industries & services', done: selIndustries.size > 0 && selSubcats.size > 0 },
+    { label: 'Services ticked for every industry', done: selIndustries.size > 0 && untickedIndustries.length === 0 },
+    { label: 'Service area', done: selSuburbs.size > 0 && Boolean(serviceArea.trim()) },
+    { label: 'About Us text', done: Boolean(aboutText.trim()) },
+    { label: 'Opening hours', done: Boolean(contactHours.trim()) },
+  ]
+
+  const summary = (
+    <p className="pf-summary">
+      {selSubcats.size} subcategor{selSubcats.size === 1 ? 'y' : 'ies'} across{' '}
+      {selIndustries.size} industr{selIndustries.size === 1 ? 'y' : 'ies'}
+      {selSuburbs.size > 0 && ` · ${selSuburbs.size} suburb${selSuburbs.size === 1 ? '' : 's'}`}
+    </p>
+  )
+
   return (
-    <div className="center">
-      <form className="card card-wide" onSubmit={onSubmit}>
-        <h2>{isNew ? 'Become a provider' : 'Your provider profile'}</h2>
-        <div className="card-sub">
-          {isNew ? 'Set up your provider profile to start quoting on jobs.' : 'Update your details, industries and service area.'}
-        </div>
-        {error && <div className="msg err">{error}</div>}
-        {ok && <div className="msg ok">{ok}</div>}
-
-        {!isNew && selIndustries.size > 0 && (
-          <div className="svc-summary">
-            <div className="svc-summary-head">Services you cover</div>
-            {Array.from(selIndustries).map((indId) => {
-              const ind = industries.find((x) => x.id === indId)
-              const subs = (subcatsByIndustry[indId] ?? []).filter((sc) => selSubcats.has(sc.id))
-              return (
-                <div className="svc-line" key={indId}>
-                  <span className="svc-ind">{ind?.name ?? 'Industry'}</span>
-                  <span className="svc-subs">
-                    {subs.length > 0
-                      ? subs.map((sc) => sc.name).join(', ')
-                      : 'No subcategories selected'}
-                  </span>
-                </div>
-              )
-            })}
-            <div className="svc-summary-foot">
-              {selSubcats.size} subcategor{selSubcats.size === 1 ? 'y' : 'ies'} across{' '}
-              {selIndustries.size} industr{selIndustries.size === 1 ? 'y' : 'ies'}
-              {selSuburbs.size > 0 && ` · ${selSuburbs.size} suburb${selSuburbs.size === 1 ? '' : 's'}`}
+    <form className="pg pf" onSubmit={onSubmit} onInvalidCapture={showInvalidField}>
+      <div ref={topRef} className="pf-top">
+        <div className="pg-head">
+          <span className="pg-head-ico"><ToolboxIcon /></span>
+          <div className="pg-head-txt">
+            <h2>{isNew ? 'Become a provider' : 'Your provider profile'}</h2>
+            <p>{isNew ? 'Set up your provider profile to start quoting on jobs.' : 'What customers see, and where and what you work on.'}</p>
+          </div>
+          {profile && (
+            <div className="pg-head-action">
+              <button type="button" className="pg-btn pg-btn-ghost" onClick={() => navigate(`/providers/${profile.userId}`)}>
+                <EyeIcon /> Preview public page
+              </button>
             </div>
-          </div>
-        )}
-
-        <label>Business name</label>
-        <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Rivertown Plumbing" />
-
-        <div className="row2">
-          <div>
-            <label>ABN</label>
-            <input value={abn} onChange={(e) => setAbn(e.target.value)} placeholder="Australian Business Number" />
-          </div>
-          <div>
-            <label>Subscription plan</label>
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-              <option value="">Default</option>
-              {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
+          )}
         </div>
+      </div>
 
-        <label className="check-line">
-          <input type="checkbox" checked={gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />
-          <span>My business is registered for GST</span>
-        </label>
+      {error && <div className="pg-error" role="alert">{error}</div>}
+      {ok && <div className="pf-ok" role="status">{ok}</div>}
 
-        <label htmlFor="promo-points">Promotional Mate Points offered (optional)</label>
-        <input
-          id="promo-points"
-          type="number"
-          min="0"
-          step="0.01"
-          value={promoPoints}
-          onChange={(e) => setPromoPoints(e.target.value)}
-          placeholder="e.g. 20"
-        />
-        <p className="field-hint">
-          Mate Points you advertise on your quotes. Customers can sort search results by this, so a
-          higher offer lifts you up that list. Leave blank if you don't offer any.
-        </p>
+      <div className="pf-grid">
+        <SectionMenu items={menu} active={section} onPick={setSection} />
 
-        <label>Industries you work in</label>
-        <div className="cat-check">
-          {industries.map((i) => (
-            <button key={i.id} type="button" className={`cat-chip${selIndustries.has(i.id) ? ' on' : ''}`} onClick={() => toggleIndustry(i.id)}>
-              {i.name}
-            </button>
-          ))}
-        </div>
+        <div className="pf-main">
+          <div data-section={1} hidden={section !== 1}>
+            <SectionCard title="Business details" intro="Your business as customers and Jobby-Connect see it.">
+              <div className="pf-field">
+                <label htmlFor="pf-name">Business name</label>
+                <input id="pf-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Rivertown Plumbing" />
+              </div>
+              <div className="pf-row2">
+                <div className="pf-field">
+                  <label htmlFor="pf-abn">ABN</label>
+                  <input id="pf-abn" value={abn} onChange={(e) => setAbn(e.target.value)} placeholder="Australian Business Number" />
+                </div>
+                <div className="pf-field">
+                  <label htmlFor="pf-plan">Subscription plan</label>
+                  <select id="pf-plan" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                    <option value="">Default</option>
+                    {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <label className="pf-check">
+                <input type="checkbox" checked={gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />
+                <span>My business is registered for GST</span>
+              </label>
+              <div className="pf-field">
+                <label htmlFor="promo-points">Promotional Mate Points offered (optional)</label>
+                <input
+                  id="promo-points"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={promoPoints}
+                  onChange={(e) => setPromoPoints(e.target.value)}
+                  placeholder="e.g. 20"
+                />
+                <p className="pf-hint">
+                  Mate Points you advertise on your quotes. Customers can sort search results by this, so a
+                  higher offer lifts you up that list. Leave blank if you don't offer any.
+                </p>
+              </div>
+            </SectionCard>
+          </div>
 
-        {selIndustries.size > 0 && (
-          <>
-            <label>Subcategories</label>
-            {Array.from(selIndustries).map((indId) => {
-              const ind = industries.find((x) => x.id === indId)
-              const subs = subcatsByIndustry[indId] ?? []
-              if (subs.length === 0) return null
-              return (
-                <div key={indId} className="subcat-group">
-                  <div className="subcat-head">{ind?.name}</div>
-                  <div className="cat-check">
-                    {subs.map((s) => (
-                      <button key={s.id} type="button" className={`cat-chip sm${selSubcats.has(s.id) ? ' on' : ''}`} onClick={() => toggleSubcat(s.id)}>
-                        {s.name}
-                      </button>
+          <div data-section={2} hidden={section !== 2}>
+            <SectionCard title="Services" intro="The industries you work in and the jobs you do in each. Customers find you by these.">
+              {selIndustryIds.length > 0 && (
+                <div className="pf-block">
+                  <div className="pf-subhead">Your industries · {selIndustryIds.length}</div>
+                  <div className="pf-chips">
+                    {selIndustryIds.map((id) => (
+                      <ChipX key={id} label={industryName(id)} onRemove={() => toggleIndustry(id)} />
                     ))}
                   </div>
                 </div>
-              )
-            })}
-          </>
-        )}
+              )}
 
-        <label>Service area (description)</label>
-        <input value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} placeholder="e.g. Inner Melbourne" />
+              <div className="pf-field">
+                <label htmlFor="pf-ind-q">Find an industry</label>
+                <span className="pg-input-ico pf-search">
+                  <SearchIcon />
+                  <input id="pf-ind-q" type="search" value={industryQuery} onChange={(e) => setIndustryQuery(e.target.value)}
+                         placeholder="e.g. Plumbing, Tax, Cleaning" />
+                </span>
+                <button type="button" className="pg-link pf-ask-link" aria-expanded={askOpen} aria-controls="pf-ask"
+                        onClick={() => setAskOpen((o) => !o)}>
+                  Can't find your service? Ask us to add it
+                </button>
+              </div>
+              {askOpen && (
+                <div id="pf-ask" className="pf-ask" role="region" aria-label="Ask us to add a service">
+                  <div className="pf-ask-head">
+                    <strong>Ask us to add a service</strong>
+                    <button type="button" className="pf-chip-x" onClick={() => setAskOpen(false)} aria-label="Close">×</button>
+                  </div>
+                  <p>
+                    Our team adds new services to the list. For now, email us at <strong>{ADMIN_EMAIL}</strong> with
+                    your industry and the service name.
+                  </p>
+                </div>
+              )}
+              <div className="pf-ind-list">
+                {industryList.length === 0 && <p className="pf-hint">No industry matches "{industryQuery}".</p>}
+                <div className="cat-check">
+                  {industryList.map((i) => (
+                    <button key={i.id} type="button" aria-pressed={selIndustries.has(i.id)}
+                            className={`cat-chip sm${selIndustries.has(i.id) ? ' on' : ''}`} onClick={() => toggleIndustry(i.id)}>
+                      {selIndustries.has(i.id) ? '✓ ' : '+ '}{i.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        <label>Serviceable suburbs</label>
-        <div className="suburb-picker">
-          <select value={suburbState} onChange={(e) => setSuburbState(e.target.value)}>
-            {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <div className="cat-check" style={{ marginTop: 8 }}>
-            {suburbOptions.length === 0 && <span className="muted-note">No suburbs listed for {suburbState} yet.</span>}
-            {suburbOptions.map((s) => (
-              <button key={s.id} type="button" className={`cat-chip sm${selSuburbs.has(s.id) ? ' on' : ''}`} onClick={() => toggleSuburb(s)}>
-                {s.name}
-              </button>
-            ))}
+              {selIndustryIds.map((indId) => {
+                const subs = subcatsByIndustry[indId] ?? []
+                if (subs.length === 0) return null
+                const picked = subs.filter((s) => selSubcats.has(s.id)).length
+                return (
+                  <details key={indId} className="pf-subcats" open>
+                    <summary>
+                      <span className="pf-subcats-name">{industryName(indId)}</span>
+                      <span className="pf-subcats-count">{picked} of {subs.length}</span>
+                    </summary>
+                    {picked === 0 && (
+                      <p className="pf-warn">Tick at least one service so customers know what you do.</p>
+                    )}
+                    <div className="pf-subcats-tools">
+                      <button type="button" className="pg-link"
+                              onClick={() => subs.forEach((s) => { if (!selSubcats.has(s.id)) toggleSubcat(s.id) })}>
+                        Select all
+                      </button>
+                      <span aria-hidden="true">/</span>
+                      <button type="button" className="pg-link"
+                              onClick={() => subs.forEach((s) => { if (selSubcats.has(s.id)) toggleSubcat(s.id) })}>
+                        none
+                      </button>
+                    </div>
+                    <div className="cat-check">
+                      {subs.map((s) => (
+                        <button key={s.id} type="button" aria-pressed={selSubcats.has(s.id)}
+                                className={`cat-chip sm${selSubcats.has(s.id) ? ' on' : ''}`} onClick={() => toggleSubcat(s.id)}>
+                          {selSubcats.has(s.id) && '✓ '}{s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                )
+              })}
+
+              {selIndustries.size > 0 && summary}
+            </SectionCard>
           </div>
-          {selSuburbs.size > 0 && (
-            <div className="selected-suburbs">Selected: {Array.from(selSuburbs.values()).join(', ')}</div>
-          )}
+
+          <div data-section={3} hidden={section !== 3}>
+            <SectionCard
+              title="Service area"
+              intro="You'll only get requests from customers in the suburbs you pick. Kept private — customers just see the suburb names."
+            >
+              <div className="pf-subhead">Add suburbs</div>
+              <div className="pf-addrow">
+                <div className="pf-field pf-state">
+                  <label htmlFor="pf-state">State</label>
+                  <select id="pf-state" value={suburbState} onChange={(e) => setSuburbState(e.target.value)}>
+                    {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div className="pf-field pf-grow">
+                  <label htmlFor="pf-suburb">Suburb or postcode</label>
+                  {suburbOptions.length === 0
+                    ? <p className="pf-hint">No suburbs listed for {suburbState} yet.</p>
+                    : <SuburbAdd id="pf-suburb" options={suburbOptions} chosen={selSuburbs} onPick={toggleSuburb} />}
+                </div>
+              </div>
+
+              <div className="pf-block">
+                <div className="pf-subhead-row">
+                  <span className="pf-subhead">Your suburbs · {selSuburbs.size}</span>
+                  {selSuburbs.size > 0 && (
+                    <button type="button" className="pg-link" onClick={() => setSelSuburbs(new Map())}>Clear all</button>
+                  )}
+                </div>
+                {selSuburbs.size === 0
+                  ? <p className="pf-hint">No suburbs yet. Type above to add the ones you cover.</p>
+                  : (
+                    <div className="pf-chips">
+                      {Array.from(selSuburbs.entries()).map(([id, name]) => (
+                        <ChipX key={id} label={suburbLabel(id, name)}
+                               onRemove={() => setSelSuburbs((prev) => { const next = new Map(prev); next.delete(id); return next })} />
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              <div className="pf-field">
+                <label htmlFor="pf-area">Area description (shown on your page)</label>
+                <input id="pf-area" value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} placeholder="e.g. Inner Melbourne" />
+              </div>
+            </SectionCard>
+          </div>
+
+          <div data-section={4} hidden={section !== 4}>
+            <SectionCard
+              title="Public page"
+              intro="Customers see this as a small site with Home, About Us, Services and Contact Us pages. Your Services page is built from the industries and subcategories you picked."
+            >
+              <div className="pf-subhead">Theme</div>
+              <div className="pf-swatches" role="group" aria-label="Theme">
+                {(Object.keys(THEME_LABELS) as SiteTheme[]).map((t) => (
+                  <ThemeSwatch key={t} theme={t} on={siteTheme === t} onPick={() => setSiteTheme(t)} note={THEME_NOTES[t]} />
+                ))}
+              </div>
+
+              <div className="pf-field">
+                <div className="pf-label-row">
+                  <label htmlFor="pf-bio">Short description (optional)</label>
+                  <CharCount value={bio} max={1000} />
+                </div>
+                <textarea id="pf-bio" rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="One line customers see in search results…" />
+              </div>
+
+              <div className="pf-field">
+                <div className="pf-label-row">
+                  <label htmlFor="pf-about">About Us (optional)</label>
+                  <CharCount value={aboutText} max={4000} />
+                </div>
+                <textarea id="pf-about" rows={5} value={aboutText} onChange={(e) => setAboutText(e.target.value)}
+                          placeholder="Your story, experience, what you specialise in. Blank lines start a new paragraph." />
+              </div>
+
+              <div className="pf-row2">
+                <div className="pf-field">
+                  <label htmlFor="pf-phone">Contact phone (optional)</label>
+                  <input id="pf-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="e.g. 03 9000 0000" />
+                </div>
+                <div className="pf-field">
+                  <label htmlFor="pf-email">Contact email (optional)</label>
+                  <input id="pf-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="e.g. hello@yourbusiness.com.au" />
+                </div>
+              </div>
+
+              <div className="pf-field">
+                <label htmlFor="pf-hours">Opening hours (optional)</label>
+                <input id="pf-hours" value={contactHours} onChange={(e) => setContactHours(e.target.value)} placeholder="e.g. Mon–Fri 7am–5pm, Sat by appointment" />
+              </div>
+            </SectionCard>
+          </div>
+
+          <div data-section={5} hidden={section !== 5}>
+            <SectionCard title="Photos & highlights">
+              <PremiumLocked />
+            </SectionCard>
+          </div>
         </div>
 
-        <label>Short description (optional)</label>
-        <textarea rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="One line customers see in search results…" />
-
-        {/* ---- Public page (UAT Round 1 5.4) ---- */}
-        <h3 className="acct-head">Your public page</h3>
-        <p className="md-note" style={{ marginTop: 0 }}>
-          Customers see this as a small site with Home, About Us, Services and Contact Us pages.
-          Your Services page is built from the industries and subcategories you picked above.
-        </p>
-
-        <label>Theme</label>
-        <select value={siteTheme} onChange={(e) => setSiteTheme(e.target.value as SiteTheme)}>
-          {(Object.keys(THEME_LABELS) as SiteTheme[]).map((t) => (
-            <option key={t} value={t}>{THEME_LABELS[t]}</option>
-          ))}
-        </select>
-
-        <label style={{ marginTop: 12 }}>About Us (optional)</label>
-        <textarea rows={4} value={aboutText} onChange={(e) => setAboutText(e.target.value)}
-                  placeholder="Your story, experience, what you specialise in. Blank lines start a new paragraph." />
-
-        <div className="row2" style={{ marginTop: 12 }}>
-          <div>
-            <label>Contact phone (optional)</label>
-            <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="e.g. 03 9000 0000" />
+        <aside className="pf-side" aria-label="Preview and checklist">
+          <div className="pf-side-card">
+            <ProfilePreview
+              theme={siteTheme}
+              name={businessName}
+              industry={selIndustryIds.length > 0 ? industryName(selIndustryIds[0]) : null}
+              suburbs={suburbNames}
+            />
+            <ProfileChecklist items={checklist} />
           </div>
-          <div>
-            <label>Contact email (optional)</label>
-            <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="e.g. hello@yourbusiness.com.au" />
-          </div>
-        </div>
+        </aside>
+      </div>
 
-        <label style={{ marginTop: 12 }}>Opening hours (optional)</label>
-        <input value={contactHours} onChange={(e) => setContactHours(e.target.value)} placeholder="e.g. Mon–Fri 7am–5pm, Sat by appointment" />
-
-        {profile && (
-          <button type="button" className="btn btn-ghost-dark btn-sm" style={{ marginTop: 14 }}
-                  onClick={() => navigate(`/providers/${profile.userId}`)}>
-            Preview my public page
+      <div className="pf-savebar">
+        <span className="pf-savebar-msg" aria-live="polite">
+          {dirty
+            ? `Unsaved changes in ${changedSections.map((s) => SECTION_NAMES[s]).join(', ')}`
+            : isNew ? 'Fill in each section, then create your profile.' : 'All changes saved.'}
+        </span>
+        <span className="pf-savebar-actions">
+          {!isNew || dirty ? (
+            <button type="button" className="pg-btn pg-btn-ghost" onClick={discard} disabled={!dirty || busy}>Discard</button>
+          ) : null}
+          <button className="pg-btn pg-btn-yellow" type="submit" disabled={busy}>
+            {busy ? 'Saving…' : isNew ? 'Create provider profile' : 'Save changes'}
           </button>
-        )}
-
-        <button className="btn btn-amber btn-block" type="submit" disabled={busy} style={{ marginTop: 18 }}>
-          {busy ? 'Saving…' : isNew ? 'Create provider profile' : 'Save changes'}
-        </button>
-      </form>
-    </div>
+        </span>
+      </div>
+    </form>
   )
 }
+
+const EyeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" /><circle cx="12" cy="12" r="3" />
+  </svg>
+)

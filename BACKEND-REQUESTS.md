@@ -160,3 +160,39 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
   doesn't make today.
 - **Why logged, not built:** screen-only work may not add API calls. If OK, it's a one-line addition per card. Ideally
   `GET /jobs/assigned` would return a request-photo count, so the gallery loads only when there are photos.
+
+## 2026-11-03 — Provider Profile editor: industry groups and suburb quick-adds
+
+- **Screen:** Provider Profile editor (`src/pages/ProviderProfile.tsx`), Services and Service area sections
+  (HANDOFF-profile Part M).
+- **User need:**
+  - Services: browse the ~120 industries in their 13 groups (collapsed, with a "picked" count per group).
+  - Service area: one-tap quick-adds, "+ All of {council} council (n)" and "+ Suburbs within n km of {suburb}" (mockup).
+- **API needed:**
+  - `GET /master/industries` to return `group` (name, and ideally a group sort order) on each industry.
+  - `GET /master/suburbs` to return `lga` on each suburb (already in the database, V33), for the council quick-add.
+  - Suburb coordinates (lat/lng) for "within n km". Same need as the distance filter on Find.
+- **Why:** none of this comes back today. Built for now: a flat A–Z industry list with a "Find an industry" search
+  box, and suburbs added by typing (state dropdown + type-ahead over the state's list the page already loads). No
+  quick-add buttons yet.
+
+## 2026-11-03 — Request a new industry / subcategory (Functional Spec open item 7.4)
+
+- **Screen:** Provider Profile editor → Services (`src/pages/ProviderProfile.tsx`). Today it has a "Can't find your
+  service? Ask us to add it" link that only shows an email address (placeholder `[ADMIN EMAIL]`, owner to supply).
+- **User need:** a provider whose service isn't on the master list can ask for it from the editor and hear back,
+  instead of emailing.
+- **Workflow:**
+  1. The provider submits an industry (existing, or a new name) + the service name (+ optional note).
+  2. It goes into an admin queue (pending / approved / rejected) with the provider's PAS ref and the date.
+  3. **Approve** adds the industry/subcategory to the master list (admin can edit the name or merge it into an existing
+     entry) **and ticks it on that provider's profile**, then notifies the provider.
+  4. **Reject** requires a reason, which is sent to the provider (notification + email).
+- **API needed:**
+  - `POST /provider/service-requests { industryId | industryName, serviceName, note }`
+  - `GET /provider/service-requests` (the provider's own requests and their status, so the editor can show
+    "Requested — pending")
+  - Admin: `GET /admin/service-requests?status=`, `POST /admin/service-requests/{id}/approve { name?, mergeIntoId? }`,
+    `POST /admin/service-requests/{id}/reject { reason }`
+  - New table + notification types. An admin screen for the queue.
+- **Why:** there's no way to request a service today. Until this exists, the editor shows the email-us panel.

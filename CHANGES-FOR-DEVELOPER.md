@@ -668,3 +668,72 @@ expression. The two known errors are on the same, untouched `markComplete(myQuot
 
 `npm run build` still stops only on the 3 known TypeScript errors. `vite build` succeeds. Not checked in the browser: the
 local API still returns 500 on login.
+
+## 2026-11-03 — Provider Profile editor (HANDOFF-profile Part M)
+
+**Screen:** Provider Profile (`/home/provider-profile`, and `/provider` for "Become a provider").
+
+**What changed visually:** the single ~22-screen form is now **one form in five sections**, with a section menu on the
+left (a sideways strip of pills on phones):
+1. **Business details**: name, ABN, subscription plan, GST tick, Promotional Mate Points + the same help text.
+2. **Services**: "Your industries" removable chips; "Find an industry" search over a flat A–Z list (scrolls inside a
+   box); one collapsible block per selected industry with subcategory tick-chips, "n of m" and **Select all / none**;
+   the same "n subcategories across n industries · n suburbs" line.
+3. **Service area**: State dropdown + suburb type-ahead (suburb, state, postcode) instead of ~3,000 chips; "Your
+   suburbs · n" removable chips with **Clear all**; "Area description (shown on your page)".
+4. **Public page**: theme as 3 swatch cards with a mini header preview; Short description "n / 1000"; About Us
+   "n / 4000"; phone, email, hours; the same explainer text.
+5. **Photos & highlights**: PREMIUM badge, "Coming soon", 5 locked tiles. No inputs; nothing saves.
+
+Menu badges: ✓ / count / PREMIUM. Right column (desktop ≥1100px): a live header preview in the chosen theme colour
+(name, first industry, first suburb +n, suburb chips) and a **Profile checklist**. Both are computed from the form.
+Header: "Your provider profile" / "What customers see, and where and what you work on." + **Preview public page**.
+Sticky save bar at the bottom: "Unsaved changes in {sections}" / "All changes saved.", **Discard** and yellow **Save
+changes** (or "Create provider profile" when new).
+
+**Behaviour: unchanged.** Same loads (`/master/industries`, `/master/plans`, `GET /provider/profile`, subcategories per
+selected industry, `/master/suburbs?state=X` when the state changes), same `onSubmit` checks, messages, body and
+POST/PUT, the same toggle functions, and the same preview navigation. Display-only additions:
+- The load's field mapping moved into `fieldsFrom(p)` + `fillFrom(f)` so **Discard** can reset the form with no call.
+  `setBaseline(current)` after a successful save marks the form as saved (one display line inside `onSubmit`).
+- A required-field message switches the menu to its section (business name → Business details, service area →
+  Service area, industry → Services). Messages unchanged.
+- All five sections stay on the page (inactive ones `hidden`), so the browser's own checks (email format, Mate Points
+  ≥ 0) still run on Save. `onInvalidCapture` switches to the section holding the flagged field.
+- The "n / 1000" and "n / 4000" counters are display only. No `maxLength` was added.
+- Suburbs picked in the editor show "Name, STATE" on screen to match saved ones. Saved ids are unchanged.
+- The state dropdown and the per-state suburb load are kept on purpose. The handoff's `SuburbPicker` would swap in
+  its own all-states `/master/suburbs` call, which would change the page's server calls.
+
+**Not built (logged in BACKEND-REQUESTS.md):** industry groups (no `group` on industries); the "All of {council}"
+and "within n km" quick-adds (need `lga` / coordinates).
+
+**Files touched:** `src/pages/ProviderProfile.tsx`; new `src/components/ProfileParts.tsx` (section menu, chips,
+suburb type-ahead over a passed-in list, theme swatch, preview, checklist, premium tiles; display only, no API);
+`src/index.css` (new `pf-` block at the end).
+
+`npm run build` still stops only on the 3 known TypeScript errors (MyWork ×2, ProviderRequests). `vite build`
+succeeds. Checked in a headless browser as test-plumbing@example.com on `/provider` (this account is redirected away
+from `/home/provider-profile` because `/me` says `hasProviderProfile: false`, although `GET /provider/profile`
+returns its profile). Checked: section switching, industry search/add, adding suburbs by typing and removing one,
+theme + About change, Discard restores, empty name → same error + jump to Business details, bad email → jumps to Public
+page with no save call, 375px with no sideways scroll. **Save → reload was not run**, so test data wasn't changed.
+Owner to check.
+
+## 2026-11-03 — Provider Profile editor: services reminders + "Ask us to add it"
+
+**Screen:** Provider Profile → Services section.
+
+**What changed visually:**
+- Under any selected industry that has services but none ticked, an amber note: "Tick at least one service so
+  customers know what you do." It goes away once one is ticked. **Saving is not blocked.**
+- Profile checklist: new item "Services ticked for every industry" (✓ when every selected industry that has services
+  has at least one ticked).
+- Under the industry search: a "Can't find your service? Ask us to add it" link. It opens a small panel: "Our team
+  adds new services to the list. For now, email us at [ADMIN EMAIL] with your industry and the service name." The
+  address is a placeholder (`ADMIN_EMAIL` constant at the top of the file); **owner to supply it**.
+
+**Behaviour:** unchanged. No new calls, and validation is unchanged. All of it is computed from data the page already has.
+The full request-a-service workflow is logged in BACKEND-REQUESTS.md (open item 7.4).
+
+**Files touched:** `src/pages/ProviderProfile.tsx`, `src/index.css` (`pf-warn`, `pf-ask`).
