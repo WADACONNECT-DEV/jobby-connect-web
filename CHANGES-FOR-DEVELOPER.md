@@ -737,3 +737,40 @@ Owner to check.
 The full request-a-service workflow is logged in BACKEND-REQUESTS.md (open item 7.4).
 
 **Files touched:** `src/pages/ProviderProfile.tsx`, `src/index.css` (`pf-warn`, `pf-ask`).
+
+## 2026-11-03 — Provider public page, Basic (HANDOFF-profile Part N)
+
+**Screen:** provider public page (`/providers/{userId}`), opened from Find, Mates and the editor's Preview.
+
+**What changed visually** (layout as `design/profile-v1/profile-basic.png`):
+- **Header band** in the provider's theme colour (Classic navy / Coastal teal / Slate, from the existing `site-*`
+  colours) with a 4px yellow line. It has an initials circle, the business name, "{industries} · {first 3 suburbs} +n
+  suburbs" (falls back to the area description when there are no suburbs), and stars + "4.5 (100 reviews)" or "No
+  reviews yet".
+- **Tabs** Home · About Us · Services · Contact Us as pills, filled in the theme colour.
+- **Home:** bio as the lead paragraph; "WHAT WE DO" chips from the provider's ticked services; Recent reviews (latest 3, as
+  before) with the reviewer as first name + initial ("James O."), stars, "date · job title", comment. Right column: rating
+  box (average + **% rating** = average ÷ 5, rounded, display only; hidden with no reviews), "Where we work" (area
+  description + first 5 suburbs + "+n"), "Get in touch" (phone / email / hours, each only if filled; the box is
+  hidden if all are empty).
+- **About Us:** About text (falls back to bio, as before) + all suburbs as chips. **Services:** industry headings with
+  service chips. **Contact Us:** contact rows with icons + the same "surest way…" line.
+- **Bottom bar:** "Want this provider? Your request goes only to them." + Save as Mate / Request a quote →.
+- Display tidy-ups: suburbs, industries and services shown A–Z (the API returns them in no fixed order, so the
+  header changed between loads); the ", VIC" suffix is dropped when all suburbs are in one state.
+- **Removed:** the old-style category chips (`CATEGORY_LABELS`) on Home. The owner approved replacing them with the
+  "What we do" service chips.
+- 375px: one column (side boxes move under the reviews), tabs scroll inside their strip, full-width buttons.
+
+**Behaviour: unchanged.** Same `GET /providers/{userId}` load; same `saveMate` (`POST /mates/{id}`) and
+`requestQuote` navigation; same "♥ Saved as Mate" state; the tab is still remembered by `usePersistedValue`
+('provider.site.page'). Empty-tab messages kept.
+
+**Files touched:** `src/pages/ProviderView.tsx`; new `src/components/PublicProfileParts.tsx` (short name, side box,
+rating box, suburb chips, contact rows; display only); `src/index.css` (new `pv-` block; the old `site-hero`/`site-nav`
+etc. rules are now unused but left in place, and the `site-classic/coastal/slate` colour rules are still used).
+
+`npm run build`: only the 3 known TypeScript errors; `vite build` succeeds. Checked in a headless browser at 1280px
+and 375px: all four tabs, all three theme colours (the theme was swapped only in the browser's copy of the response),
+tab kept after reload, Save as Mate (the POST was answered locally, so no Mate was added), Request a quote opens
+`/new-request` with the provider. No sideways scroll at 375px.

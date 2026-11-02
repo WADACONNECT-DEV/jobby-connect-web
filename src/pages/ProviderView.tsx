@@ -3,7 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { Stars } from '../components/Stars'
 import { usePersistedValue } from '../listView'
-import { CATEGORY_LABELS, formatDate, type ProviderPublic } from '../types'
+import { formatDate, type ProviderPublic } from '../types'
+import { initialsOf } from '../components/PageParts'
+import { ContactRows, RatingBox, SideBox, SuburbChips, shortName } from '../components/PublicProfileParts'
 
 type Page = 'home' | 'about' | 'services' | 'contact'
 
@@ -51,34 +53,69 @@ export default function ProviderView() {
   const theme = (provider?.siteTheme ?? 'CLASSIC').toLowerCase()
   const hasContact = Boolean(provider?.contactEmail || provider?.contactPhone || provider?.contactHours)
 
-  return (
-    <>
-      <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>← Back</button>
+  // Display values built from what the page already received.
+  // Industries and services also arrive in no fixed order, so they're shown A-Z.
+  const byName = (a: string, b: string) => a.localeCompare(b)
+  const services = provider
+    ? [...provider.services].sort((a, b) => byName(a.industry, b.industry))
+        .map((s) => ({ ...s, subcategories: [...s.subcategories].sort(byName) }))
+    : []
+  const industries = services.map((s) => s.industry)
+  const whatWeDo = Array.from(new Set(services.flatMap((s) => s.subcategories))).sort(byName)
+  // Suburbs arrive as "Name, STATE" in no fixed order. Shown A–Z, and without the
+  // state when they're all in the same one (as in the design). Display only.
+  const rawSuburbs = [...(provider?.suburbs ?? [])].sort((a, b) => a.localeCompare(b))
+  const states = new Set(rawSuburbs.map((s) => (s.includes(',') ? s.split(',').pop()!.trim() : '')))
+  const suburbs = states.size === 1 && !states.has('')
+    ? rawSuburbs.map((s) => s.slice(0, s.lastIndexOf(',')).trim())
+    : rawSuburbs
+  const tagline = provider
+    ? [
+        industries.join(', '),
+        suburbs.length > 0
+          ? `${suburbs.slice(0, 3).join(', ')}${suburbs.length > 3 ? ` +${suburbs.length - 3} suburbs` : ''}`
+          : provider.serviceArea,
+      ].filter(Boolean).join(' · ')
+    : ''
+  const hasReviews = (provider?.reviewCount ?? 0) > 0
 
-      {error && <div className="msg err">{error}</div>}
+  return (
+    <div className="pv">
+      <button type="button" className="pv-back" onClick={() => navigate(-1)}>← Back</button>
+
+      {error && <div className="pg-error" role="alert">{error}</div>}
       {provider === null && !error && <div className="loading">Loading…</div>}
 
       {provider && (
-        <div className={`site site-${theme}`}>
-          <header className="site-hero">
-            <div className="site-hero-main">
-              <h2>{provider.businessName}</h2>
-              <p className="site-tagline">{provider.serviceArea}</p>
+        <div className={`pv-site site-${theme}`}>
+          <header className="pv-hero">
+            <span className="pv-initials" aria-hidden="true">{initialsOf(provider.businessName)}</span>
+            <div className="pv-hero-main">
+              <h1 className="pv-name">{provider.businessName}</h1>
+              {tagline && <p className="pv-tagline">{tagline}</p>}
             </div>
-            <span className="prov-rating">
-              {provider.reviewCount > 0 ? (
-                <><Stars value={provider.averageRating} /><span className="prov-rating-num">{provider.averageRating.toFixed(1)} ({provider.reviewCount})</span></>
-              ) : (<span className="prov-new">No reviews yet</span>)}
-            </span>
+            <div className="pv-hero-rating">
+              {hasReviews ? (
+                <>
+                  <Stars value={provider.averageRating} />
+                  <span>
+                    <strong>{provider.averageRating.toFixed(1)}</strong> ({provider.reviewCount} review{provider.reviewCount === 1 ? '' : 's'})
+                  </span>
+                </>
+              ) : (
+                <span className="pv-new">No reviews yet</span>
+              )}
+            </div>
           </header>
 
-          <nav className="site-nav" role="tablist">
+          <nav className="pv-tabs" role="tablist" aria-label={`${provider.businessName} pages`}>
             {PAGES.map((p) => (
               <button
                 key={p.key}
+                type="button"
                 role="tab"
                 aria-selected={page === p.key}
-                className={`site-navlink${page === p.key ? ' on' : ''}`}
+                className={`pv-tab${page === p.key ? ' on' : ''}`}
                 onClick={() => setPage(p.key)}
               >
                 {p.label}
@@ -86,107 +123,127 @@ export default function ProviderView() {
             ))}
           </nav>
 
-          <div className="site-body">
+          <div className="pv-body">
             {page === 'home' && (
-              <>
-                {provider.bio && <p className="site-lead">{provider.bio}</p>}
-                <div className="prov-cats">
-                  {provider.categories.map((c) => <span className="chip" key={c}>{CATEGORY_LABELS[c]}</span>)}
+              <div className="pv-cols">
+                <div className="pv-main">
+                  {provider.bio && <p className="pv-lead">{provider.bio}</p>}
+                  {whatWeDo.length > 0 && (
+                    <>
+                      <h3 className="pv-label">What we do</h3>
+                      <div className="pv-chips">
+                        {whatWeDo.map((s) => <span className="pv-chip" key={s}>{s}</span>)}
+                      </div>
+                    </>
+                  )}
+
+                  <h3 className="pv-h3">Recent reviews</h3>
+                  {provider.reviews.length === 0 && <p className="pv-muted">No reviews yet.</p>}
+                  {provider.reviews.length > 0 && (
+                    <ul className="pv-reviews">
+                      {provider.reviews.slice(0, 3).map((r) => (
+                        <li className="pv-review" key={r.id}>
+                          <div className="pv-review-top">
+                            <span className="pv-review-name">{shortName(r.reviewerName)}</span>
+                            <Stars value={r.rating} />
+                          </div>
+                          <span className="pv-review-meta">{formatDate(r.createdAt)} · {r.jobTitle}</span>
+                          {r.comment && <p className="pv-review-text">"{r.comment}"</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
-                <h3 className="site-h3">Recent reviews</h3>
-                {provider.reviews.length === 0 && <p className="site-muted">No reviews yet.</p>}
-                {provider.reviews.slice(0, 3).map((r) => (
-                  <div className="site-review" key={r.id}>
-                    <div className="job-top">
-                      <span className="quote-provider">{r.reviewerName}</span>
-                      <Stars value={r.rating} />
-                    </div>
-                    {r.comment && <p className="review-comment">"{r.comment}"</p>}
-                    <span className="job-date">{formatDate(r.createdAt)} · {r.jobTitle}</span>
-                  </div>
-                ))}
-              </>
+                <aside className="pv-side">
+                  {hasReviews && <RatingBox average={provider.averageRating} count={provider.reviewCount} />}
+                  {(suburbs.length > 0 || provider.serviceArea) && (
+                    <SideBox title="Where we work">
+                      {provider.serviceArea && <p className="pv-area">{provider.serviceArea}</p>}
+                      {suburbs.length > 0 && <SuburbChips suburbs={suburbs} limit={5} />}
+                    </SideBox>
+                  )}
+                  {hasContact && (
+                    <SideBox title="Get in touch">
+                      <ContactRows phone={provider.contactPhone} email={provider.contactEmail} hours={provider.contactHours} />
+                    </SideBox>
+                  )}
+                </aside>
+              </div>
             )}
 
             {page === 'about' && (
-              <>
-                <h3 className="site-h3">About {provider.businessName}</h3>
+              <div className="pv-narrow">
+                <h3 className="pv-h3 first">About {provider.businessName}</h3>
                 {provider.aboutText ? (
                   provider.aboutText.split('\n').filter(Boolean).map((para, i) => (
-                    <p className="site-para" key={i}>{para}</p>
+                    <p className="pv-para" key={i}>{para}</p>
                   ))
                 ) : provider.bio ? (
-                  <p className="site-para">{provider.bio}</p>
+                  <p className="pv-para">{provider.bio}</p>
                 ) : (
-                  <p className="site-muted">This provider hasn't written an About page yet.</p>
+                  <p className="pv-muted">This provider hasn't written an About page yet.</p>
                 )}
-                {provider.suburbs.length > 0 && (
+                {suburbs.length > 0 && (
                   <>
-                    <h3 className="site-h3">Where we work</h3>
-                    <div className="prov-cats">
-                      {provider.suburbs.map((s) => <span className="chip" key={s}>{s}</span>)}
-                    </div>
+                    <h3 className="pv-h3">Where we work</h3>
+                    {provider.serviceArea && <p className="pv-area">{provider.serviceArea}</p>}
+                    <SuburbChips suburbs={suburbs} />
                   </>
                 )}
-              </>
+              </div>
             )}
 
             {page === 'services' && (
-              <>
-                <h3 className="site-h3">What we do</h3>
-                {provider.services.length === 0 && <p className="site-muted">No services listed yet.</p>}
-                {provider.services.map((svc) => (
-                  <div className="site-service" key={svc.industry}>
-                    <div className="site-service-name">{svc.industry}</div>
+              <div className="pv-narrow">
+                <h3 className="pv-h3 first">What we do</h3>
+                {services.length === 0 && <p className="pv-muted">No services listed yet.</p>}
+                {services.map((svc) => (
+                  <section className="pv-service" key={svc.industry}>
+                    <h4 className="pv-service-name">{svc.industry}</h4>
                     {svc.subcategories.length > 0 ? (
-                      <div className="prov-cats">
-                        {svc.subcategories.map((sc) => <span className="chip" key={sc}>{sc}</span>)}
+                      <div className="pv-chips">
+                        {svc.subcategories.map((sc) => <span className="pv-chip" key={sc}>{sc}</span>)}
                       </div>
                     ) : (
-                      <p className="site-muted">General {svc.industry.toLowerCase()} work.</p>
+                      <p className="pv-muted">General {svc.industry.toLowerCase()} work.</p>
                     )}
-                  </div>
+                  </section>
                 ))}
-              </>
+              </div>
             )}
 
             {page === 'contact' && (
-              <>
-                <h3 className="site-h3">Get in touch</h3>
+              <div className="pv-narrow">
+                <h3 className="pv-h3 first">Get in touch</h3>
                 {hasContact ? (
-                  <div className="site-contact">
-                    {provider.contactPhone && (
-                      <div className="acct-row"><span className="acct-label">Phone</span><span className="acct-value">{provider.contactPhone}</span></div>
-                    )}
-                    {provider.contactEmail && (
-                      <div className="acct-row"><span className="acct-label">Email</span><span className="acct-value">{provider.contactEmail}</span></div>
-                    )}
-                    {provider.contactHours && (
-                      <div className="acct-row"><span className="acct-label">Hours</span><span className="acct-value">{provider.contactHours}</span></div>
-                    )}
+                  <div className="pv-box pv-contact-box">
+                    <ContactRows phone={provider.contactPhone} email={provider.contactEmail} hours={provider.contactHours} />
                   </div>
                 ) : (
-                  <p className="site-muted">
+                  <p className="pv-muted">
                     This provider hasn't published contact details. Request a quote and they'll come back to you.
                   </p>
                 )}
-                <p className="site-para" style={{ marginTop: 14 }}>
+                <p className="pv-para pv-surest">
                   The surest way to reach {provider.businessName} is to send a quote request — it goes
                   straight to them with your job details.
                 </p>
-              </>
+              </div>
             )}
           </div>
 
-          <footer className="site-foot-bar">
-            <button className="btn btn-ghost-dark btn-sm" onClick={saveMate} disabled={saved}>
-              {saved ? '♥ Saved as Mate' : '♡ Save as Mate'}
-            </button>
-            <button className="btn btn-amber btn-sm" onClick={requestQuote}>Request a quote</button>
+          <footer className="pv-foot">
+            <span className="pv-foot-msg">Want this provider? Your request goes only to them.</span>
+            <span className="pv-foot-actions">
+              <button type="button" className="pg-btn pg-btn-ghost" onClick={saveMate} disabled={saved}>
+                {saved ? '♥ Saved as Mate' : '♡ Save as Mate'}
+              </button>
+              <button type="button" className="pg-btn pg-btn-yellow" onClick={requestQuote}>Request a quote →</button>
+            </span>
           </footer>
         </div>
       )}
-    </>
+    </div>
   )
 }
