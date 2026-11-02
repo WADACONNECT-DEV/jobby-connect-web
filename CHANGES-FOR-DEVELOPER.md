@@ -774,3 +774,12 @@ etc. rules are now unused but left in place, and the `site-classic/coastal/slate
 and 375px: all four tabs, all three theme colours (the theme was swapped only in the browser's copy of the response),
 tab kept after reload, Save as Mate (the POST was answered locally, so no Mate was added), Request a quote opens
 `/new-request` with the provider. No sideways scroll at 375px.
+
+## 2026-11-03 — Premium provider profile (HANDOFF-profile Part O)
+
+**Screens:** none changed. Per the handoff, Premium is design-only until the data exists. Logged in BACKEND-REQUESTS.md:
+"Premium provider profile" (what it shows, plus the 7 items the developer needs to provide) and "Provider Careers page
+(owner to decide)", the last item from the handoff's "Also log" list. The other two "Also log" items (industry groups,
+suburb `lga` and coordinates) were logged with Part M.
+
+**Files touched:** `BACKEND-REQUESTS.md`, `CHANGES-FOR-DEVELOPER.md`.

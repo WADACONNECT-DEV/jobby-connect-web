@@ -196,3 +196,52 @@ No API needed. The owner supplies the wording for `/terms` and `/privacy`.
     `POST /admin/service-requests/{id}/reject { reason }`
   - New table + notification types. An admin screen for the queue.
 - **Why:** there's no way to request a service today. Until this exists, the editor shows the email-us panel.
+
+## 2026-11-03 — Premium provider profile (HANDOFF-profile Part O)
+
+- **Screens:** provider public page (`src/pages/ProviderView.tsx`) and the editor's "Photos & highlights" section
+  (`src/pages/ProviderProfile.tsx`, today a locked "Coming soon" preview). Design: `design/profile-v1/profile-premium.png`.
+- **User need:** providers on a Premium plan get a richer public page with their own photos and wording, on top of
+  everything Basic shows (Functional Spec §3.2). **No screen has been changed for Premium.** It's built once the data
+  below exists.
+- **What Premium shows, on top of Basic:**
+  - **Logo** (square) in place of the initials circle, and a **PREMIUM** badge by the business name.
+  - **Hero** on Home: headline + intro paragraph, up to 6 key services with icons, Request a quote / Save as Mate,
+    and a large **hero photo**.
+  - **Highlights strip:** up to 4 items (icon, title, sub-line), e.g. "11+ Years in business", "Trained team —
+    Police-checked staff".
+  - **Our services** as cards: photo (optional), name, short description. Tapping one starts a quote request for that
+    service (Spec §3.2: "Unlimited service listings, each with a short description and an optional image").
+  - **About Us:** up to 5 sub-sections (Spec §3.2: "Our History, Our Team, Our Area of Coverage…") + a photo gallery.
+  - **Contact Us:** website link, and the service area on a map.
+  - **Verified provider** badge. Needs the verification module, which isn't built.
+  - **"124 jobs completed"** under the rating in the header (the mockup).
+- **Developer needs to provide:**
+  1. **Plan entitlement:** a Premium subscription plan with a "premium profile" flag on `subscription_plan` (the table
+     exists; `GET /master/plans` already returns `minImages` / `maxImages` / `maxImageMb`). Open item 7.3: tiers and
+     price are the owner's decision.
+  2. **Profile media storage + upload endpoints** for logo, hero photo, gallery and service photos, with plan-based
+     limits (count and size from the plan). Plus delete / reorder.
+  3. **New profile fields:** `headline`, `intro`, `highlights[]` (icon, title, subtitle; max 4), `websiteUrl`,
+     `videoUrl` (optional), `aboutSections[]` (title, body; max 5), `serviceListings[]` (title, description, photo,
+     linked subcategory id, sort order).
+  4. **All of it returned on `GET /providers/{id}`**, with `premium: true/false`, `logoUrl`, `heroUrl`,
+     `galleryUrls[]`, `jobsCompleted` and `verified`, and saved via the existing profile save (`PUT
+     /provider/profile`), **only when the plan allows**. The server should ignore or reject Premium fields on
+     non-Premium plans.
+  5. **Map:** suburb coordinates (same need as the distance filter on Find and "within n km" in the editor).
+  6. **Quote from a service card:** the request form would need the chosen subcategory pre-filled. Today
+     `/new-request` only receives the provider.
+  7. **Editor:** the "Photos & highlights" section becomes live (uploads + the fields above), shown only on Premium.
+- **Why:** the app stores none of this today. `ProviderPublic` has no logo, photos, headline, highlights, website,
+  about sections, service listings, jobs-completed count or verified flag.
+
+## 2026-11-03 — Provider Careers page (owner to decide)
+
+- **Screen:** provider public page, a possible fifth tab "Careers" (`src/pages/ProviderView.tsx`).
+- **User need:** Functional Spec §3.2 lists a Careers page with a form: name, email, mobile, résumé upload. It still
+  isn't built.
+- **API needed (if wanted):** a provider "hiring" on/off setting + optional blurb; `POST /providers/{id}/applications`
+  (multipart: name, email, mobile, résumé file with type/size limits); a provider-side list of applications
+  and/or an email to the provider; retention/privacy rules for stored résumés.
+- **Why:** nothing exists for it. **Owner to decide** whether it's wanted before the developer builds anything.
