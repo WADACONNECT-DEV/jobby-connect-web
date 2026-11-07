@@ -2,10 +2,10 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ListControls } from '../components/ListControls'
+import { initialsOf } from '../components/mates/MateCard'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
-  CATEGORY_LABELS,
+  industryOf,
   OUTCOME_LABELS,
   formatDate,
   formatMoney,
@@ -18,7 +18,6 @@ import {
   type QuoteRate,
   type QuoteLineInput,
   type QuoteStageInput,
-  type ServiceCategory,
 } from '../types'
 
 const TABS: ProviderRequestOutcome[] = ['RECEIVED', 'REPLIED', 'WON', 'LOST', 'EXPIRED', 'DECLINED']
@@ -32,7 +31,7 @@ export default function ProviderRequests() {
   const [tab, setTab] = usePersistedValue<ProviderRequestOutcome>('provider.pipeline.tab', 'RECEIVED')
 
   const [openFor, setOpenFor] = useState<string | null>(null)
-  const [lines, setLines] = useState<QuoteLineInput[]>([{ description: '', amount: '' }])
+  const [lines, setLines] = useState<QuoteLineInput[]>([{ description: '', amount: '', gstApplicable: true }])
   const [bonus, setBonus] = useState('')
   const [paymentType, setPaymentType] = useState<PaymentType>('FULL')
   const [stages, setStages] = useState<QuoteStageInput[]>([{ name: '', percent: '' }])
@@ -63,6 +62,9 @@ export default function ProviderRequests() {
   // industry, suburb and plan, so a hardcoded figure would quietly go wrong.
   const [rate, setRate] = useState<QuoteRate | null>(null)
 
+  // List or Grid, remembered (redesign step 9). List is the default.
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.pipeline.layout', 'list')
+
   const inTab = rows === null ? null : rows.filter((r) => r.outcome === tab)
 
   // Each tab keeps its own filter, sort and expand state.
@@ -73,10 +75,10 @@ export default function ProviderRequests() {
         key: 'category',
         label: 'industries',
         options: optionsFrom<ProviderRequestRow>(
-          (row) => row.category,
-          (value) => CATEGORY_LABELS[value as ServiceCategory],
+          // By industry name (step J1); older jobs use their category's label.
+          (row) => industryOf(row),
         ),
-        match: (row, value) => row.category === value,
+        match: (row, value) => industryOf(row) === value,
       },
       {
         key: 'jobStatus',
@@ -173,6 +175,8 @@ export default function ProviderRequests() {
       })
       setDraftSavedAt(saved.updatedAt)
       setDirty(false)
+      // So the card shows "draft saved" / "Continue quote" straight away.
+      setRows((prev) => prev?.map((r) => (r.jobId === jobId ? { ...r, draftSavedAt: saved.updatedAt } : r)) ?? prev)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not save this draft.')
     } finally {
@@ -249,15 +253,21 @@ export default function ProviderRequests() {
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); edited() }
 
   /**
-   * What the customer will be shown for this line: the provider's amount plus
-   * the uplift. Returns null until the rate is known, so the column shows a dash
-   * rather than a figure that might be wrong.
+   * What the customer will be shown for this line (owner's ledger spec, Part 0):
+   *  - a +GST line of a GST-registered provider: amount x (1 + uplift), GST on top;
+   *  - a GST-free line, or any line of a provider not registered for GST:
+   *    amount x (1 + uplift x 1.1), no GST.
+   * Returns null until the rate is known, so the column shows a dash rather
+   * than a figure that might be wrong. The saved quote is priced by the server;
+   * this is the live figure while typing.
    */
-  function customerSees(amount: string): number | null {
+  function customerSees(amount: string, gstApplicable: boolean): number | null {
     if (rate === null) return null
     const value = Number(amount)
     if (!amount || Number.isNaN(value) || value < 0) return null
-    return Math.round(value * (1 + rate.upliftPercent / 100) * 100) / 100
+    const uplift = rate.upliftPercent / 100
+    const factor = rate.gstRegistered !== false && gstApplicable ? 1 + uplift : 1 + uplift * 1.1
+    return Math.round(value * factor * 100) / 100
   }
 
   function validLines() {
@@ -350,8 +360,14 @@ export default function ProviderRequests() {
     DECLINED: "You haven't declined any requests.",
   }
 
+  /** Which sub-tabs hold something waiting on the provider: a request still to answer. */
+  const needsAction = (key: ProviderRequestOutcome) =>
+    key === 'RECEIVED' && (rows ?? []).some((r) => r.outcome === 'RECEIVED' && r.quoteId === null)
+
+  const optionsFor = (key: string) => list.filters.find((f) => f.key === key)?.options ?? []
+
   return (
-    <>
+    <div className="mt pr">
       <ConfirmDialog
         open={confirmCancel}
         title="Discard your unsaved changes?"
@@ -367,104 +383,151 @@ export default function ProviderRequests() {
         </p>
       </ConfirmDialog>
 
-      <div className="page-head"><h2>Requests to me</h2></div>
-      <p className="page-intro">Customers who've asked you for a quote, and where each one ended up.</p>
+      <div className="mt-head">
+        <div className="mt-head-copy">
+          <BubbleIcon />
+          <div>
+            <h2 className="mt-title">Requests to me</h2>
+            <p className="mt-sub">Customers who've asked you for a quote, and where each one ended up.</p>
+          </div>
+        </div>
+      </div>
 
       {error && <div className="msg err">{error}</div>}
       {rows === null && !error && <div className="loading">Loading…</div>}
 
       {rows !== null && (
-        <div className="pipe-tabs" role="tablist">
+        <div className="mj-subtabs" role="tablist" aria-label="Requests to me">
           {TABS.map((key) => (
             <button
               key={key}
               role="tab"
               aria-selected={tab === key}
-              className={`pipe-tab${tab === key ? ' active' : ''}`}
+              className={`mj-subtab${tab === key ? ' is-on' : ''}`}
               onClick={() => setTab(key)}
             >
               {OUTCOME_LABELS[key]}
-              <span className="pipe-count">{countOf(key)}</span>
+              <span className={`mj-badge${needsAction(key) ? ' is-waiting' : ''}`}>{countOf(key)}</span>
             </button>
           ))}
         </div>
       )}
 
       {inTab && inTab.length > 0 && (
-        <ListControls list={list} searchPlaceholder="Search these requests" countLabel="requests" />
+        <div className="mt-search pr-filters">
+          <label className="mt-field is-wide">
+            <span>SEARCH REQUESTS</span>
+            <span className="mt-input">
+              <SearchIcon />
+              <input type="search" value={list.view.search} placeholder="Title, suburb or customer"
+                onChange={(e) => list.setSearch(e.target.value)} />
+            </span>
+          </label>
+          <label className="mt-field">
+            <span>INDUSTRY</span>
+            <select value={list.view.filters.category ?? ''} onChange={(e) => list.setFilter('category', e.target.value)}>
+              <option value="">All industries</option>
+              {optionsFor('category').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="mt-field">
+            <span>STATUS</span>
+            <select value={list.view.filters.jobStatus ?? ''} onChange={(e) => list.setFilter('jobStatus', e.target.value)}>
+              <option value="">All</option>
+              {optionsFor('jobStatus').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="mt-field">
+            <span>SORT BY</span>
+            <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+              {list.sorts.map((so) => <option key={so.key} value={so.key}>{so.label}</option>)}
+            </select>
+          </label>
+          <div className="mt-view pr-view" role="group" aria-label="View">
+            <button type="button" className={layout === 'list' ? 'is-on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>List</button>
+            <button type="button" className={layout === 'grid' ? 'is-on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>Grid</button>
+          </div>
+        </div>
+      )}
+
+      {inTab && inTab.length > 0 && (
+        <h3 className="mt-count">{list.shown === list.total ? `${list.total} request${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} requests`}</h3>
       )}
 
       {inTab && inTab.length === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>{emptyCopy[tab]}</p>
           {tab === 'RECEIVED' && (
-            <button className="btn btn-amber" style={{ marginTop: 12 }} onClick={() => navigate('/provider')}>My provider profile</button>
+            <button className="mt-continue" onClick={() => navigate('/provider')}>My provider profile</button>
           )}
         </div>
       )}
 
       {inTab && inTab.length > 0 && list.shown === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>No requests match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
+          <button className="mt-btn-ghost" onClick={list.clear}>Clear filters</button>
         </div>
       )}
 
       {list.shown > 0 && (
-        <div className="job-list">
+        <div className={layout === 'grid' ? 'pr-grid' : 'pr-list'}>
           {list.visible.map((row) => {
             const canQuote = row.outcome === 'RECEIVED' && row.quoteId === null
+            const panelOpen = openFor === row.jobId || declineFor === row.jobId
+            const closes = closesIn(row)
+            const others = row.targetCount - 1
             return (
-              <div className="job-card" key={row.jobId}>
-                <div className="job-top">
-                  <span className="job-title">{row.jobTitle}</span>
-                  <span className="chip">{CATEGORY_LABELS[row.category]}</span>
-                </div>
-                <div className="job-meta">
-                  <span>{row.suburb}</span>
-                  {row.timeFrame && <span>· {row.timeFrame}</span>}
-                  <span className="job-date">· from {row.customerName} on {formatDate(row.requestedAt)}</span>
-                  {row.expiresAt && <span className="job-date">· closes {formatDate(row.expiresAt)}</span>}
-                </div>
-                <p className="job-desc">{row.description}</p>
-
-                {row.quoteId && (
-                  <div className="pipe-quote">
-                    <span>Your quote{row.quotedAt ? ` · ${formatDate(row.quotedAt)}` : ''}</span>
-                    <span className="pipe-quote-amt">
-                      {row.quoteTotal !== null && <>Customer pays {formatMoney(row.quoteTotal)}</>}
-                      {row.providerPayable !== null && <> · you get {formatMoney(row.providerPayable)}</>}
-                    </span>
+              <article className={`pr-card pr-${layout}${canQuote ? ' is-action' : ''}${panelOpen ? ' is-open' : ''}`} key={row.jobId}>
+                <div className="pr-head">
+                  <span className="mc-avatar pr-avatar" aria-hidden="true">{initialsOf(row.customerName)}</span>
+                  <div className="pr-body">
+                    <h3 className="pr-title">{row.jobTitle}</h3>
+                    <div className="pr-meta">
+                      <span className="mc-chip">{industryOf(row)}</span>
+                      <span className="mc-line"><PinIcon /> {row.suburb}</span>
+                      {row.requestRef && <span className="mj-ref"><code>{row.requestRef}</code></span>}
+                      {closes && <span className={`pr-closes${closes.today ? ' is-today' : ''}`}>{closes.label}</span>}
+                    </div>
+                    <p className="pr-sub">
+                      {row.customerName} · requested {formatDate(row.requestedAt)}
+                      {others > 0 && <> · also sent to {others} other provider{others === 1 ? '' : 's'}</>}
+                      {row.timeFrame && <> · {row.timeFrame}</>}
+                      {canQuote && row.draftSavedAt && <> · <span className="pr-draft">draft saved</span></>}
+                    </p>
+                    {layout === 'list' && <p className="pr-desc">{row.description}</p>}
                   </div>
-                )}
 
-                <div className="job-foot">
-                  <span className="job-by">{row.targetCount > 1 ? `You + ${row.targetCount - 1} other provider(s)` : 'Sent to you only'}</span>
-                  {canQuote ? (
-                    openFor === row.jobId || declineFor === row.jobId ? null : (
-                      <div className="job-actions">
-                        <button className="btn btn-ghost-dark btn-sm" onClick={() => openDecline(row.jobId)}>Decline</button>
-                        <button className="btn btn-amber btn-sm" onClick={() => openQuote(row.jobId)}>Send a quote</button>
+                  <div className="pr-side">
+                    {row.quoteId && (
+                      <div className="pr-amt">
+                        {row.quoteTotal !== null && <span><span className="pr-amt-label">Customer pays</span> {formatMoney(row.quoteTotal)}</span>}
+                        {row.providerPayable !== null && <span className="pr-amt-you"><span className="pr-amt-label">You get</span> {formatMoney(row.providerPayable)}</span>}
+                        {row.quotedAt && <span className="pr-amt-label">Quoted {formatDate(row.quotedAt)}</span>}
                       </div>
-                    )
-                  ) : row.outcome === 'WON' ? (
-                    <span className="tag-ok">✓ Won · {statusLabel(row.jobStatus)}</span>
-                  ) : row.outcome === 'REPLIED' ? (
-                    <span className="tag-ok">✓ Quote sent</span>
-                  ) : (
-                    <span className="tag-muted">{OUTCOME_LABELS[row.outcome]}</span>
-                  )}
-                </div>
-
-                {row.requestRef && (
-                  <div className="ref-list">
-                    <span className="ref-item"><code className="req-ref">{row.requestRef}</code></span>
+                    )}
+                    {canQuote ? (
+                      panelOpen ? null : (
+                        <div className="pr-actions">
+                          <button className={layout === 'grid' ? 'pr-link' : 'mt-btn-ghost'} onClick={() => openDecline(row.jobId)}>Decline</button>
+                          <button className="mt-continue" onClick={() => openQuote(row.jobId)}>
+                            {row.draftSavedAt ? 'Continue quote' : 'Send a quote'} →
+                          </button>
+                        </div>
+                      )
+                    ) : row.outcome === 'WON' ? (
+                      <span className="pr-tag is-won">✓ Won · {statusLabel(row.jobStatus)}</span>
+                    ) : row.outcome === 'REPLIED' ? (
+                      <span className="pr-tag is-sent">✓ Quote sent</span>
+                    ) : (
+                      <span className="pr-tag">{OUTCOME_LABELS[row.outcome]}</span>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {row.outcome === 'DECLINED' && row.declineMessage && (
-                  <div className="decline-note">
-                    <span className="decline-note-head">
+                  <div className="mj-declined">
+                    <span className="mj-declined-head">
                       You declined this request{row.declinedAt ? ` on ${formatDate(row.declinedAt)}` : ''}
                     </span>
                     <p>{row.declineMessage}</p>
@@ -472,30 +535,32 @@ export default function ProviderRequests() {
                 )}
 
                 {declineFor === row.jobId && (
-                  <div className="decline-form">
+                  <div className="pr-panel pr-decline">
                     <h4>Are you sure you want to decline this request?</h4>
-                    <p className="decline-lead">
+                    <p className="pr-panel-lead">
                       The customer will be told you can't take it on, and will see the message you write
                       below. This cannot be undone, and you won't be able to quote on it afterwards.
                     </p>
-                    {declineError && <div className="msg err">{declineError}</div>}
+                    {declineError && <div className="jr-msg is-err">{declineError}</div>}
 
-                    <label htmlFor={`decline-${row.jobId}`}>Your message to the customer</label>
-                    <textarea
-                      id={`decline-${row.jobId}`}
-                      rows={3}
-                      value={declineMessage}
-                      onChange={(e) => setDeclineMessage(e.target.value)}
-                      placeholder="e.g. Sorry, we're fully booked until 20 October — happy to quote after that."
-                    />
+                    <label className="mt-field" htmlFor={`decline-${row.jobId}`}>
+                      <span>YOUR MESSAGE TO THE CUSTOMER</span>
+                      <textarea
+                        id={`decline-${row.jobId}`}
+                        rows={3}
+                        value={declineMessage}
+                        onChange={(e) => setDeclineMessage(e.target.value)}
+                        placeholder="e.g. Sorry, we're fully booked until 20 October — happy to quote after that."
+                      />
+                    </label>
 
-                    <div className="decline-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={cancelDecline}>
+                    <div className="pr-panel-actions">
+                      <button type="button" className="mt-btn-ghost" onClick={cancelDecline}>
                         Back — don't decline
                       </button>
                       <button
                         type="button"
-                        className="btn btn-danger btn-sm"
+                        className="pr-danger"
                         disabled={declineMessage.trim().length === 0 || declining}
                         onClick={() => confirmDecline(row.jobId)}
                       >
@@ -506,101 +571,103 @@ export default function ProviderRequests() {
                 )}
 
                 {canQuote && openFor === row.jobId && (
-                  <form className="quote-form" onSubmit={(e) => submitQuote(e, row.jobId)}>
-                    {formError && <div className="msg err">{formError}</div>}
+                  <form className="pr-panel pr-quote" onSubmit={(e) => submitQuote(e, row.jobId)}>
+                    <h4>Your quote</h4>
+                    {formError && <div className="jr-msg is-err">{formError}</div>}
 
-                    <label>Line items</label>
-                    <div className="qline qline-head">
-                      <span className="qline-desc">Line item</span>
-                      <span className="qline-amt">Amount</span>
-                      <span className="qline-gst">GST</span>
-                      <span className="qline-sees">Customer sees</span>
-                      {lines.length > 1 && <span className="qline-x-space" />}
-                    </div>
-                    {lines.map((l, i) => (
-                      <div className="qline" key={i}>
-                        <input
-                          className="qline-desc"
-                          placeholder="Description (e.g. Vacate clean, 2-bed)"
-                          value={l.description}
-                          onChange={(e) => setLine(i, 'description', e.target.value)}
-                        />
-                        <input
-                          className="qline-amt"
-                          type="number" min="0" step="0.01" placeholder="0.00"
-                          value={l.amount}
-                          onChange={(e) => setLine(i, 'amount', e.target.value)}
-                        />
-                        <select
-                          className="qline-gst"
-                          value={l.gstApplicable ? 'INC' : 'FREE'}
-                          onChange={(e) => setLine(i, 'gstApplicable', e.target.value === 'INC')}
-                          title="Does GST apply to this line?"
-                          aria-label="GST treatment for this line"
-                        >
-                          <option value="INC">+ GST</option>
-                          <option value="FREE">GST-free</option>
-                        </select>
-                        {/* What the customer will be shown for this line, live as
-                            the provider types (UAT Round 6 3.1). */}
-                        <span className="qline-sees" title="What the customer will see for this line">
-                          {customerSees(l.amount) === null ? '—' : formatMoney(customerSees(l.amount) as number)}
-                        </span>
-                        {lines.length > 1 && (
-                          <button type="button" className="qline-x" onClick={() => removeLine(i)} title="Remove">×</button>
-                        )}
+                    <div className="pr-lines" role="table" aria-label="Line items">
+                      <div className="pr-line is-head" role="row">
+                        <span role="columnheader">Line item</span>
+                        <span role="columnheader">Amount</span>
+                        <span role="columnheader">GST</span>
+                        <span role="columnheader">Customer sees</span>
+                        <span aria-hidden="true" />
                       </div>
-                    ))}
-                    <button type="button" className="btn btn-ghost-dark btn-xs" onClick={addLine} style={{ marginTop: 4 }}>+ Add line</button>
-                    <p className="field-hint">
+                      {lines.map((l, i) => (
+                        <div className="pr-line" role="row" key={i}>
+                          <input
+                            placeholder="Description (e.g. Vacate clean, 2-bed)"
+                            aria-label="Description"
+                            value={l.description}
+                            onChange={(e) => setLine(i, 'description', e.target.value)}
+                          />
+                          <input
+                            type="number" min="0" step="0.01" placeholder="0.00" aria-label="Amount"
+                            value={l.amount}
+                            onChange={(e) => setLine(i, 'amount', e.target.value)}
+                          />
+                          <select
+                            value={l.gstApplicable ? 'INC' : 'FREE'}
+                            onChange={(e) => setLine(i, 'gstApplicable', e.target.value === 'INC')}
+                            title="Does GST apply to this line?"
+                            aria-label="GST treatment for this line"
+                          >
+                            <option value="INC">+ GST</option>
+                            <option value="FREE">GST-free</option>
+                          </select>
+                          {/* What the customer will be shown for this line, live as
+                              the provider types (UAT Round 6 3.1). */}
+                          <span className="pr-sees" title="What the customer will see for this line">
+                            {customerSees(l.amount, l.gstApplicable) === null ? '—' : formatMoney(customerSees(l.amount, l.gstApplicable) as number)}
+                          </span>
+                          {lines.length > 1
+                            ? <button type="button" className="pr-x" onClick={() => removeLine(i)} aria-label="Remove line">×</button>
+                            : <span aria-hidden="true" />}
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" className="pr-link is-add" onClick={addLine}>+ Add line</button>
+                    <p className="pr-hint">
                       <strong>Customer sees</strong> is your amount plus the platform's{' '}
-                      {rate === null ? 'uplift' : `${rate.upliftPercent}% uplift`} — it is the figure the
-                      customer is shown for that line, and the one they'll ask you about.
+                      {rate === null ? 'uplift' : `${rate.upliftPercent}% uplift`}
+                      {rate !== null && <> ({Math.round(rate.upliftPercent * 1.1 * 100) / 100}% on a line with no GST added, which then carries the platform's GST)</>}
+                      {' '}— it is the figure the customer is shown for that line, and the one they'll ask you about.
                     </p>
-                    <p className="field-hint">
+                    <p className="pr-hint">
                       Mark a line GST-free for anything you don't charge GST on — a government fee, a
                       permit, a disbursement passed on at cost. If you aren't GST-registered, no GST is
                       added either way.
                     </p>
 
-                    <div className="row2" style={{ marginTop: 12 }}>
-                      <div>
-                        <label>Bonus Mate Points (optional, A$)</label>
+                    <div className="pr-two">
+                      <label className="mt-field">
+                        <span>BONUS MATE POINTS (OPTIONAL, A$)</span>
                         <input type="number" min="0" step="0.01" value={bonus} onChange={(e) => { setBonus(e.target.value); edited() }} placeholder="0.00" />
-                      </div>
-                      <div>
-                        <label>Payment</label>
-                        <select value={paymentType} onChange={(e) => { setPaymentType(e.target.value as PaymentType); edited() }}>
-                          <option value="FULL">Full payment</option>
-                          <option value="STAGED">Staged (milestones)</option>
-                        </select>
+                      </label>
+                      <div className="mt-field">
+                        <span>PAYMENT</span>
+                        <div className="pr-seg" role="group" aria-label="Payment type">
+                          <button type="button" className={paymentType === 'FULL' ? 'is-on' : ''} aria-pressed={paymentType === 'FULL'}
+                            onClick={() => { if (paymentType !== 'FULL') { setPaymentType('FULL'); edited() } }}>Full payment</button>
+                          <button type="button" className={paymentType === 'STAGED' ? 'is-on' : ''} aria-pressed={paymentType === 'STAGED'}
+                            onClick={() => { if (paymentType !== 'STAGED') { setPaymentType('STAGED'); edited() } }}>Staged (milestones)</button>
+                        </div>
                       </div>
                     </div>
 
                     {paymentType === 'STAGED' && (
-                      <div className="stage-editor">
-                        <label>Payment stages (percentages)</label>
+                      <div className="pr-stages">
+                        <span className="pr-stages-title">Payment stages (percentages)</span>
                         {stages.map((st, i) => (
-                          <div className="qline" key={i}>
+                          <div className="pr-stage" key={i}>
                             <input
-                              className="qline-desc"
                               placeholder="Stage name (e.g. Advance, Inspection)"
+                              aria-label="Stage name"
                               value={st.name}
                               onChange={(e) => setStage(i, 'name', e.target.value)}
                             />
                             <input
-                              className="qline-amt"
-                              type="number" min="0" max="100" step="0.01" placeholder="%"
+                              type="number" min="0" max="100" step="0.01" placeholder="%" aria-label="Stage percent"
                               value={st.percent}
                               onChange={(e) => setStage(i, 'percent', e.target.value)}
                             />
-                            {stages.length > 1 && (
-                              <button type="button" className="qline-x" onClick={() => removeStage(i)} title="Remove">×</button>
-                            )}
+                            {stages.length > 1
+                              ? <button type="button" className="pr-x" onClick={() => removeStage(i)} aria-label="Remove stage">×</button>
+                              : <span aria-hidden="true" />}
                           </div>
                         ))}
-                        <button type="button" className="btn btn-ghost-dark btn-xs" onClick={addStage} style={{ marginTop: 4 }}>+ Add stage</button>
-                        <div className={`stage-completion${completionPct() <= 0 ? ' bad' : ''}`}>
+                        <button type="button" className="pr-link is-add" onClick={addStage}>+ Add stage</button>
+                        <div className={`pr-completion${completionPct() <= 0 ? ' is-bad' : ''}`}>
                           {completionPct() > 0
                             ? `Completion stage (auto): ${completionPct()}%`
                             : 'Stages must total less than 100% — leave room for the completion stage.'}
@@ -608,51 +675,56 @@ export default function ProviderRequests() {
                       </div>
                     )}
 
-                    <label style={{ marginTop: 12 }}>Message (optional)</label>
-                    <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="When you can start, what's included…" />
+                    <label className="mt-field">
+                      <span>MESSAGE TO THE CUSTOMER (OPTIONAL)</span>
+                      <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="When you can start, what's included…" />
+                    </label>
 
-                    {previewError && <div className="msg err" style={{ marginTop: 10 }}>{previewError}</div>}
+                    {previewError && <div className="jr-msg is-err">{previewError}</div>}
 
-                    {preview && (
-                      <div className="quote-breakdown">
-                        {/* The workbook's "Provider receive" chain (UAT Round 6 3.2).
-                            Each amount below is shown EXCLUSIVE of GST - previously
-                            each line added its own GST before display, which is where
-                            the reported $33 / $33 / -$11 came from. The figures
-                            themselves were always calculated on the raw line total. */}
-                        <div className="qb-row"><span>Total before other charges</span><span>{formatMoney(preview.providerNet + preview.commission + preview.points)}</span></div>
-                        <div className="qb-less">Less</div>
-                        <div className="qb-row"><span>Platform commission ({preview.commissionRate}%)</span><span>−{formatMoney(preview.commission)}</span></div>
-                        <div className="qb-row"><span>Customer Mate Points ({preview.pointsRate}%)</span><span>−{formatMoney(preview.points)}</span></div>
-                        <div className="qb-row qb-bonus"><span>Bonus points (you fund)</span><span>−{formatMoney(preview.bonus)}</span></div>
-                        <div className="qb-row qb-sub"><span>Sub total</span><span>{formatMoney(preview.providerNet - preview.bonus)}</span></div>
-                        <div className="qb-row"><span>GST 10%</span><span>{formatMoney(preview.providerPayable - (preview.providerNet - preview.bonus))}</span></div>
-                        <div className="qb-row qb-you"><span>You get paid</span><span>{formatMoney(preview.providerPayable)}</span></div>
-                        <div className="qb-row qb-points"><span>Customer earns</span><span>{formatMoney(preview.pointsEarned)} in points</span></div>
-                        <div className="qb-row qb-total"><span>Customer pays</span><span>{formatMoney(preview.customerTotal)}</span></div>
-                        {preview.stages && preview.stages.length > 0 && (
-                          <div className="stage-preview">
-                            <div className="stage-preview-head">Payment stages</div>
-                            {preview.stages.map((st, i) => (
-                              <div className="stage-row" key={i}>
-                                <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
-                                <span>{formatMoney(st.customerTotal)}</span>
-                              </div>
-                            ))}
+                    {preview && (() => {
+                      // How the owner's ledger spec (Part 0) says Preview should read:
+                      // invoice to customer, less platform charges (commission, Mate
+                      // Points and any bonus you fund, each with its GST), you get paid.
+                      // Sums of the priced figures only; nothing is recalculated.
+                      const chargesGst = preview.commissionGst + preview.pointsGst + preview.bonusGst
+                      const charges = preview.commission + preview.points + preview.bonus + chargesGst
+                      return (
+                        <div className="pr-breakdown">
+                          <div className="pr-b-row is-total">
+                            <span>Invoice to customer</span>
+                            <span>{formatMoney(preview.customerTotal)} <span className="pr-b-incl">(incl GST {formatMoney(preview.invoiceGst ?? 0)})</span></span>
                           </div>
-                        )}
-                      </div>
-                    )}
+                          <div className="pr-b-row">
+                            <span>Less platform charges</span>
+                            <span>−{formatMoney(charges)} <span className="pr-b-incl">(incl GST {formatMoney(chargesGst)})</span></span>
+                          </div>
+                          <div className="pr-b-row is-you"><span>You get paid</span><span>{formatMoney(preview.providerPayable)}</span></div>
+                          <div className="pr-b-row is-points"><span>Customer earns</span><span>{formatMoney(preview.pointsEarned)} in points</span></div>
+                          {preview.stages && preview.stages.length > 0 && (
+                            <div className="pr-b-stages">
+                              <span className="pr-b-less">Payment stages</span>
+                              {preview.stages.map((st, i) => (
+                                <div className="pr-b-row" key={i}>
+                                  <span>{st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
+                                  <span>{formatMoney(st.customerTotal)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
 
-                    <div className="quote-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={cancelQuote}>Cancel</button>
-                      <button type="button" className="btn btn-ghost-dark btn-sm" disabled={savingDraft} onClick={() => saveDraft(row.jobId)}>
+                    <div className="pr-panel-actions">
+                      <button type="button" className="mt-btn-ghost" onClick={cancelQuote}>Cancel</button>
+                      <button type="button" className="mt-btn-ghost" disabled={savingDraft} onClick={() => saveDraft(row.jobId)}>
                         {savingDraft ? 'Saving…' : 'Save'}
                       </button>
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => doPreview(row.jobId)}>Preview</button>
+                      <button type="button" className="mt-btn-ghost" onClick={() => doPreview(row.jobId)}>Preview</button>
                       <button
                         type="submit"
-                        className="btn btn-amber btn-sm"
+                        className="mt-continue"
                         disabled={submitting || preview === null}
                         title={preview === null ? 'Run Preview first to see the full amounts' : undefined}
                       >
@@ -660,7 +732,7 @@ export default function ProviderRequests() {
                       </button>
                     </div>
 
-                    <p className="quote-hint">
+                    <p className="pr-hint is-status">
                       {preview === null
                         ? 'Send quote unlocks once you have previewed the full amounts.'
                         : 'Previewed — you can still edit and save before sending.'}
@@ -669,11 +741,48 @@ export default function ProviderRequests() {
                     </p>
                   </form>
                 )}
-              </div>
+              </article>
             )
           })}
         </div>
       )}
-    </>
+    </div>
+  )
+}
+
+/**
+ * "Closes in n days" from the request's closing date, for requests still
+ * waiting on a quote. Null when there's no closing date or it has passed.
+ */
+function closesIn(row: ProviderRequestRow): { label: string; today: boolean } | null {
+  if (row.outcome !== 'RECEIVED' || row.quoteId !== null || !row.expiresAt) return null
+  const ms = new Date(row.expiresAt).getTime() - Date.now()
+  if (ms <= 0) return null
+  const days = Math.floor(ms / 86400000)
+  if (days === 0) return { label: 'Closes today', today: true }
+  return { label: `Closes in ${days} day${days === 1 ? '' : 's'}`, today: false }
+}
+
+/* ---------- icons (decorative) ---------- */
+
+function BubbleIcon() {
+  return (
+    <svg aria-hidden="true" className="mt-head-ico" width="46" height="46" viewBox="0 0 24 24" fill="none"
+      stroke="#0B2038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12.5h5" stroke="#D9A400" strokeWidth="2" />
+    </svg>
+  )
+}
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5A6E86"
+      strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" /></svg>
+  )
+}
+function PinIcon() {
+  return (
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="#0B2038">
+      <path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+    </svg>
   )
 }

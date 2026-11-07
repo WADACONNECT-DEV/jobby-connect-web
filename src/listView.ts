@@ -177,6 +177,19 @@ export function optionsFrom<T>(
   }
 }
 
+/**
+ * Sets a remembered choice from outside the page that owns it, e.g. the Account
+ * Ledger's Pay button opening Your Requests & Jobs on its Completed tab.
+ */
+export function setPersistedValue(key: string, value: string): void {
+  valueCache.set(key, value)
+  try {
+    sessionStorage.setItem(VALUE_PREFIX + key, value)
+  } catch {
+    // in-memory cache still holds it
+  }
+}
+
 /* ---------------- hooks ---------------- */
 
 /**

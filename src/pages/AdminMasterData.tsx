@@ -6,6 +6,7 @@ import {
   bpsToPercent,
   formatDate,
   percentToBps,
+  type BusinessDetails,
   type PlatformSettings,
   type MasterIndustry,
   type MasterPlan,
@@ -52,7 +53,7 @@ export default function AdminMasterData() {
       {tab === 'suburbs' && <Suburbs onError={setError} />}
       {tab === 'plans' && <Plans onError={setError} />}
       {tab === 'rates' && <Rates onError={setError} />}
-      {tab === 'settings' && <Settings onError={setError} />}
+      {tab === 'settings' && <><Settings onError={setError} /><Business onError={setError} /></>}
     </>
   )
 }
@@ -224,6 +225,10 @@ function Plans({ onError }: { onError: (m: string) => void }) {
   const [minImg, setMinImg] = useState('0')
   const [maxImg, setMaxImg] = useState('5')
   const [maxMb, setMaxMb] = useState('10')
+  // Premium provider profile (V39, owner decision 5): price and billing period
+  // are admin settings; the switch can't go on without a price.
+  const [price, setPrice] = useState('')
+  const [period, setPeriod] = useState('')
 
   const load = () => api<MasterPlan[]>('/admin/master/plans', 'GET').then(setRows).catch(report)
   useEffect(() => { load() }, [])
@@ -243,6 +248,7 @@ function Plans({ onError }: { onError: (m: string) => void }) {
   function startEdit(r: MasterPlan) {
     setEditing(r.id)
     setMinImg(String(r.minImages)); setMaxImg(String(r.maxImages)); setMaxMb(String(r.maxImageMb))
+    setPrice(r.price === null || r.price === undefined ? '' : String(r.price)); setPeriod(r.billingPeriod ?? '')
   }
 
   async function saveLimits(r: MasterPlan) {
@@ -251,9 +257,16 @@ function Plans({ onError }: { onError: (m: string) => void }) {
         minImages: Number(minImg) || 0,
         maxImages: Number(maxImg) || 0,
         maxImageMb: Number(maxMb) || 1,
+        price: price.trim() === '' ? undefined : Number(price),
+        billingPeriod: period,
       })
       setEditing(null); load()
     } catch (e) { report(e) }
+  }
+
+  /** Switch the Premium profile on or off. The API refuses "on" without a price. */
+  async function togglePremium(r: MasterPlan) {
+    try { await api(`/admin/master/plans/${r.id}`, 'PUT', { premiumProfile: !r.premiumProfile }); load() } catch (e) { report(e) }
   }
 
   /** Only one plan governs customer uploads; setting it clears the others. */
@@ -267,6 +280,7 @@ function Plans({ onError }: { onError: (m: string) => void }) {
         <thead>
           <tr>
             <th>Plan</th><th>Sort</th><th>Min images</th><th>Max images</th><th>Max MB</th>
+            <th>Price</th><th>Billing</th><th>Premium profile</th>
             <th>Customer uploads</th><th>Active</th><th></th>
           </tr>
         </thead>
@@ -280,12 +294,28 @@ function Plans({ onError }: { onError: (m: string) => void }) {
                   <td><input className="md-sort" type="number" min="0" value={minImg} onChange={(e) => setMinImg(e.target.value)} /></td>
                   <td><input className="md-sort" type="number" min="0" value={maxImg} onChange={(e) => setMaxImg(e.target.value)} /></td>
                   <td><input className="md-sort" type="number" min="1" value={maxMb} onChange={(e) => setMaxMb(e.target.value)} /></td>
+                  <td><input className="md-sort" type="number" min="0" step="0.01" placeholder="0.00" value={price} onChange={(e) => setPrice(e.target.value)} aria-label="Price" /></td>
+                  <td>
+                    <select className="md-sort" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Billing period">
+                      <option value="">—</option>
+                      <option value="MONTHLY">Monthly</option>
+                      <option value="YEARLY">Yearly</option>
+                    </select>
+                  </td>
                 </>
               ) : (
                 <>
                   <td>{r.minImages}</td><td>{r.maxImages}</td><td>{r.maxImageMb}</td>
+                  <td>{r.price === null || r.price === undefined ? <span className="muted">—</span> : `$${r.price.toFixed(2)}`}</td>
+                  <td>{r.billingPeriod === 'MONTHLY' ? 'Monthly' : r.billingPeriod === 'YEARLY' ? 'Yearly' : <span className="muted">—</span>}</td>
                 </>
               )}
+              <td>
+                {r.premiumProfile
+                  ? <><span className="tag-ok">On</span>{' '}<button className="btn btn-ghost-dark btn-xs" onClick={() => togglePremium(r)}>Switch off</button></>
+                  : <button className="btn btn-ghost-dark btn-xs" onClick={() => togglePremium(r)} disabled={r.price === null || r.price === undefined}
+                      title={r.price === null || r.price === undefined ? 'Enter a price first (Limits)' : undefined}>Switch on</button>}
+              </td>
               <td>
                 {r.customerDefault
                   ? <span className="tag-ok">Uses this plan</span>
@@ -300,7 +330,7 @@ function Plans({ onError }: { onError: (m: string) => void }) {
                   </>
                 ) : (
                   <>
-                    <button className="btn btn-ghost-dark btn-xs" onClick={() => startEdit(r)}>Limits</button>{' '}
+                    <button className="btn btn-ghost-dark btn-xs" onClick={() => startEdit(r)}>Edit</button>{' '}
                     <button className="btn btn-ghost-dark btn-xs" onClick={() => toggle(r)}>{r.active ? 'Deactivate' : 'Activate'}</button>
                   </>
                 )}
@@ -317,6 +347,11 @@ function Plans({ onError }: { onError: (m: string) => void }) {
       <p className="md-note">
         Image limits apply per subscription tier. Customers hold no subscription, so job-request
         photos use whichever plan is marked "Uses this plan".
+      </p>
+      <p className="md-note">
+        Premium profile: enter the plan's price and billing period with Edit, then switch it on. Providers on
+        that plan get the Premium public profile (logo, photos, highlights). It stays off until a price is
+        entered. Charging for the plan is not built yet; the price is shown to providers only.
       </p>
     </div>
   )
@@ -456,6 +491,70 @@ function inForce(r: MasterRate): boolean {
   if (r.effectiveFrom && Date.parse(r.effectiveFrom) > now) return false
   if (r.effectiveTo && Date.parse(r.effectiveTo) <= now) return false
   return true
+}
+
+/* ---------------- Jobby-Connect business details ---------------- */
+/**
+ * Jobby-Connect's own details for its invoices and receipts (ledger spec Part
+ * 1.8): the "from" block of every charges tax invoice and payout receipt, and the
+ * foot of the customer receipt. Each document copies them when issued.
+ */
+function Business({ onError }: { onError: (m: string) => void }) {
+  const report = useReporter(onError)
+  const [form, setForm] = useState<Omit<BusinessDetails, 'updatedAt'>>({
+    legalName: '', abn: '', address: '', email: '', phone: '', collectedNote: '',
+  })
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const apply = (b: BusinessDetails) => {
+    setForm({
+      legalName: b.legalName ?? '', abn: b.abn ?? '', address: b.address ?? '',
+      email: b.email ?? '', phone: b.phone ?? '', collectedNote: b.collectedNote ?? '',
+    })
+    setUpdatedAt(b.updatedAt)
+  }
+  useEffect(() => { api<BusinessDetails>('/admin/master/business', 'GET').then(apply).catch(report) }, [])
+
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value })
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      apply(await api<BusinessDetails>('/admin/master/business', 'PUT', form))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) { report(err) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="md-panel md-business">
+      <h3 className="md-business-title">Jobby-Connect business details</h3>
+      <form className="md-business-form" onSubmit={save}>
+        <label>Legal name<input value={form.legalName ?? ''} onChange={set('legalName')} placeholder="Registered business name" /></label>
+        <label>ABN<input value={form.abn ?? ''} onChange={set('abn')} placeholder="11 digits" /></label>
+        <label className="is-wide">Business address<input value={form.address ?? ''} onChange={set('address')} /></label>
+        <label>Contact email<input type="email" value={form.email ?? ''} onChange={set('email')} /></label>
+        <label>Phone (optional)<input value={form.phone ?? ''} onChange={set('phone')} /></label>
+        <label className="is-wide">"Collected on behalf of the provider" note
+          <textarea rows={2} value={form.collectedNote ?? ''} onChange={set('collectedNote')}
+            placeholder="Left blank, receipts say: Collected by Jobby-Connect for {provider}." />
+        </label>
+        <div className="md-business-actions">
+          <button className="btn btn-amber btn-sm" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+          {saved && <span className="md-saved">Saved</span>}
+          {updatedAt && <span className="md-note-inline">Last changed {formatDate(updatedAt)}</span>}
+        </div>
+      </form>
+      <p className="md-note">
+        These print on every Jobby-Connect document issued from now on: the charges tax invoice (INV-…-C), the
+        payout receipt (REPT-…-P) and the foot of the customer receipt (REPT-…). Documents already issued keep the
+        details they were issued with.
+      </p>
+    </div>
+  )
 }
 
 /* ---------------- Platform settings ---------------- */

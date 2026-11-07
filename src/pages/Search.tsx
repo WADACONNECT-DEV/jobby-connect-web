@@ -1,13 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { Stars } from '../components/Stars'
+import { ProviderResultCard } from '../components/mates/ProviderResultCard'
 import { SuburbPicker } from '../components/SuburbPicker'
 import { useMaxProvidersPerRequest } from '../platform'
 import {
-  CATEGORY_LABELS,
   SEARCH_SORT_LABELS,
-  formatMoney,
   type MasterIndustry,
   type MasterSuburb,
   type ProviderSearchSort,
@@ -100,64 +98,94 @@ export default function Search() {
 
   function proceed() {
     if (selected.length === 0) return
-    navigate('/new-request', { state: { providers: selected } })
+    // The industry searched for comes along, so the request form starts on it (step J1).
+    navigate('/new-request', { state: { providers: selected, industryId } })
   }
 
   const isSelected = (id: string) => selected.some((s) => s.userId === id)
+  const atCap = selected.length >= maxProviders
 
+  /**
+   * Find & Request Quotes (redesign step 4), in the Your Jobby Mates look.
+   * Same search call, industries, suburb picker, sorts, selection cap, save and
+   * hand-off to the request form as before. Result cards no longer show the
+   * six old categories; they show the provider's industries, services and
+   * suburbs, now returned by the search.
+   */
   return (
-    <>
-      <div className="page-head">
-        <h2>Find a provider</h2>
+    <div className="mt">
+      <div className="mt-head">
+        <div className="mt-head-copy">
+          <MagnifierIcon />
+          <div>
+            <h2 className="mt-title">Find &amp; Request Quotes</h2>
+            <p className="mt-sub">Choose the service and the suburb — you'll see providers who cover both.</p>
+          </div>
+        </div>
       </div>
-      <p className="page-intro">
-        Choose the service you need and the suburb the work is in. You'll see the providers who
-        actually cover that industry in that suburb.
-      </p>
 
-      <form className="search-filters" onSubmit={onSearch}>
-        <div>
-          <label htmlFor="search-industry">Service Industry</label>
+      <form className="mt-search fq-search" onSubmit={onSearch}>
+        <label className="mt-field" htmlFor="search-industry">
+          <span>SERVICE INDUSTRY</span>
           <select id="search-industry" value={industryId} onChange={(e) => setIndustryId(e.target.value)}>
             <option value="">Choose an industry…</option>
             {industries.map((i) => (
               <option key={i.id} value={i.id}>{i.name}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label htmlFor="search-suburb">Suburb</label>
+        </label>
+        <div className="mt-field fq-suburb">
+          <span><label htmlFor="search-suburb">SUBURB</label></span>
           <SuburbPicker id="search-suburb" value={suburbText} onChange={setSuburbText} onSelect={setSuburb} />
         </div>
-        <div>
-          <label htmlFor="search-sort">Sort by</label>
+        <label className="mt-field" htmlFor="search-sort">
+          <span>SORT BY</span>
           <select id="search-sort" value={sort} onChange={(e) => changeSort(e.target.value as ProviderSearchSort)}>
             {SORTS.map((s) => <option key={s} value={s}>{SEARCH_SORT_LABELS[s]}</option>)}
           </select>
-        </div>
+        </label>
         <button
-          className="btn btn-amber"
+          className="mt-search-btn"
           type="submit"
           disabled={!canSearch || searching}
-          style={{ alignSelf: 'end' }}
           title={canSearch ? undefined : 'Choose an industry and a suburb first'}
         >
-          {searching ? 'Searching…' : 'Apply'}
+          <SearchIcon /> {searching ? 'Searching…' : 'Search'}
         </button>
       </form>
 
       {!canSearch && (
-        <p className="field-hint">
+        <p className="fq-hint">
           Both a service industry and a suburb are needed before searching — otherwise you'd see
           providers who don't work in your area.
         </p>
       )}
 
       {error && <div className="msg err">{error}</div>}
-      {searching && <div className="loading">Searching…</div>}
+
+      {selected.length > 0 && (
+        <div className="mt-selbar" role="status">
+          <span className="mt-selbar-count">{selected.length} of {maxProviders} providers selected</span>
+          <span className="mt-selbar-note">Only selected providers will receive your request.</span>
+          <span className="mt-selbar-actions">
+            <button type="button" className="mt-clear" onClick={() => setSelected([])}>Clear</button>
+            <button type="button" className="mt-continue" onClick={proceed}>
+              Continue with {selected.length} <ArrowIcon />
+            </button>
+          </span>
+        </div>
+      )}
+
+      {searching && <div className="mt-empty"><p>Searching…</p></div>}
+
+      {results === null && !searching && (
+        <div className="mt-empty">
+          <p>Choose a service industry and a suburb, then press Search.</p>
+        </div>
+      )}
 
       {results !== null && !searching && results.length === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>
             No providers cover {industries.find((i) => i.id === industryId)?.name ?? 'that industry'} in{' '}
             {suburb?.name ?? 'that suburb'} yet. Try a nearby suburb, or a different service.
@@ -165,60 +193,47 @@ export default function Search() {
         </div>
       )}
 
-      {results && results.length > 0 && (
-        <div className="job-list" style={{ marginBottom: 90 }}>
-          {results.map((p) => (
-            <div className={`job-card prov-card${isSelected(p.userId) ? ' prov-selected' : ''}`} key={p.userId}>
-              <div className="job-top">
-                <span className="job-title">{p.businessName}</span>
-                <span className="prov-rating">
-                  {p.reviewCount > 0 ? (
-                    <><Stars value={p.averageRating} /><span className="prov-rating-num">{p.averageRating.toFixed(1)} ({p.reviewCount})</span></>
-                  ) : (<span className="prov-new">No reviews yet</span>)}
-                </span>
-              </div>
-
-              {/* The three figures the ranking is built on, so the order on
-                  screen is explainable rather than mysterious (3.3-3.5). */}
-              <div className="job-meta prov-stats">
-                {p.reviewCount > 0 && <span><strong>{p.ratingPercent}%</strong> rating</span>}
-                <span>{p.jobsCompleted} job{p.jobsCompleted === 1 ? '' : 's'} completed</span>
-                {p.promoPoints > 0 && (
-                  <span className="prov-points">+{formatMoney(p.promoPoints)} Mate Points offered</span>
-                )}
-              </div>
-
-              <div className="job-meta"><span>{p.serviceArea}</span></div>
-              <div className="prov-cats">
-                {p.categories.map((c) => <span className="chip" key={c}>{CATEGORY_LABELS[c]}</span>)}
-              </div>
-              <div className="job-foot">
-                <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(`/providers/${p.userId}`)}>View profile</button>
-                <div className="job-actions">
-                  <button className="btn btn-sm btn-ghost-dark" onClick={() => saveMate(p)} disabled={savedMates.has(p.userId)}>
-                    {savedMates.has(p.userId) ? '♥ Saved' : '♡ Save'}
-                  </button>
-                  <button
-                    className={`btn btn-sm ${isSelected(p.userId) ? 'btn-green' : 'btn-amber'}`}
-                    onClick={() => toggleSelect(p)}
-                    disabled={!isSelected(p.userId) && selected.length >= maxProviders}
-                  >
-                    {isSelected(p.userId) ? '✓ Added' : '+ Add to request'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {results && results.length > 0 && !searching && (
+        <>
+          <h3 className="mt-count">{results.length} provider{results.length === 1 ? '' : 's'} found</h3>
+          <div className="mt-list">
+            {results.map((p) => (
+              <ProviderResultCard
+                key={p.userId}
+                provider={p}
+                selected={isSelected(p.userId)}
+                blocked={!isSelected(p.userId) && atCap}
+                blockedTitle={`You can request up to ${maxProviders} providers at once`}
+                saved={savedMates.has(p.userId)}
+                onToggle={() => toggleSelect(p)}
+                onViewProfile={() => navigate(`/providers/${p.userId}`)}
+                onSave={() => saveMate(p)}
+              />
+            ))}
+          </div>
+        </>
       )}
+    </div>
+  )
+}
 
-      {/* Sticky selection bar */}
-      {selected.length > 0 && (
-        <div className="select-bar">
-          <span>{selected.length} of {maxProviders} selected: {selected.map((s) => s.businessName).join(', ')}</span>
-          <button className="btn btn-amber" onClick={proceed}>Request quotes →</button>
-        </div>
-      )}
-    </>
+/* ---------- icons (decorative) ---------- */
+
+function MagnifierIcon() {
+  return (
+    <svg aria-hidden="true" className="mt-head-ico" width="46" height="46" viewBox="0 0 24 24" fill="none"
+      stroke="#0F2A4A" strokeWidth="1.9" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" stroke="#D9A400" strokeWidth="2.4" /></svg>
+  )
+}
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF"
+      strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" /></svg>
+  )
+}
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+      strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
   )
 }

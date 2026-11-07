@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { Stars } from '../components/Stars'
-import { ListControls } from '../components/ListControls'
+import { MateCard } from '../components/mates/MateCard'
 import { byDate, byNumber, byText, useListView, usePersistedValue, type FilterOption } from '../listView'
 import { useMaxProvidersPerRequest } from '../platform'
-import { formatDate, type Mate } from '../types'
+import { type Mate } from '../types'
 
-/** Distinct values across a list-valued field (industries, suburbs). */
+/** Distinct values across a list-valued field (industries, services, suburbs). */
 function optionsFromList(pick: (m: Mate) => string[]) {
   return (rows: Mate[]): FilterOption[] => {
     const seen = new Set<string>()
@@ -16,21 +15,40 @@ function optionsFromList(pick: (m: Mate) => string[]) {
   }
 }
 
+/** Fixed choices for the Rating filter - "Any rating" is the empty value. */
+const RATING_OPTIONS: FilterOption[] = [
+  { value: '4', label: '4.0 and above' },
+  { value: '4.5', label: '4.5 and above' },
+]
+
 type Layout = 'grid' | 'list'
 
+/**
+ * Your Jobby Mates (redesign step 3, owner's mates design).
+ *
+ * Same data and actions as before: GET /mates, DELETE /mates/{id}, and the
+ * selected providers handed to /new-request. The per-card "Request a quote"
+ * button is replaced by "Add to request" + "Continue with n" (owner decision),
+ * which uses the same hand-off.
+ *
+ * New: a Rating filter, and - from three fields added to GET /mates - the
+ * provider's description, service tags with a SERVICE filter, and an
+ * "Offering bonus points" filter. Every filter and the sort and layout are
+ * remembered when the customer comes Back (UAT Round 1 §5.3).
+ */
 export default function Mates() {
   const navigate = useNavigate()
   const [mates, setMates] = useState<Mate[] | null>(null)
   const [error, setError] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const resultsRef = useRef<HTMLHeadingElement | null>(null)
 
   // Grid is the default: the first screen should show several providers at a
-  // glance (UAT Round 2 §4.2). The choice is remembered for the session, which
-  // is also what keeps it intact when the customer comes back from a provider's
-  // mini-site or the request form (Round 1 §5.3, Round 2 open item 7.3).
+  // glance (UAT Round 2 §4.2). The choice is remembered for the session.
   const [layout, setLayout] = usePersistedValue<Layout>('customer.mates.layout', 'grid')
 
   // Which mates are ticked for a single multi-provider request. Deliberately
-  // NOT persisted — a stale selection surviving a page revisit would be a
+  // NOT persisted - a stale selection surviving a page revisit would be a
   // surprise, and the customer is choosing it in the moment.
   const [selected, setSelected] = useState<string[]>([])
 
@@ -38,7 +56,7 @@ export default function Mates() {
   const maxProviders = useMaxProvidersPerRequest()
 
   const list = useListView<Mate>('customer.mates', mates, {
-    search: (m) => `${m.businessName ?? ''} ${m.providerName} ${m.serviceArea ?? ''} ${m.industries.join(' ')} ${m.suburbs.join(' ')}`,
+    search: (m) => `${m.businessName ?? ''} ${m.providerName} ${m.serviceArea ?? ''} ${m.bio ?? ''} ${m.industries.join(' ')} ${(m.services ?? []).join(' ')} ${m.suburbs.join(' ')}`,
     filters: [
       {
         key: 'industry',
@@ -47,10 +65,28 @@ export default function Mates() {
         match: (m, value) => m.industries.includes(value),
       },
       {
+        key: 'service',
+        label: 'services',
+        options: optionsFromList((m) => m.services ?? []),
+        match: (m, value) => (m.services ?? []).includes(value),
+      },
+      {
         key: 'suburb',
         label: 'suburbs',
         options: optionsFromList((m) => m.suburbs),
         match: (m, value) => m.suburbs.includes(value),
+      },
+      {
+        key: 'rating',
+        label: 'rating',
+        options: () => RATING_OPTIONS,
+        match: (m, value) => m.reviewCount > 0 && m.averageRating >= Number(value),
+      },
+      {
+        key: 'bonus',
+        label: 'bonus points',
+        options: () => [{ value: 'yes', label: 'Offering bonus points' }],
+        match: (m) => (m.promoPoints ?? 0) > 0,
       },
     ],
     sorts: [
@@ -63,6 +99,9 @@ export default function Mates() {
     defaultSortKey: 'saved',
     defaultSortDir: 'desc',
   })
+
+  const optionsFor = (key: string) => list.filters.find((f) => f.key === key)?.options ?? []
+  const filterValue = (key: string) => list.view.filters[key] ?? ''
 
   function load() {
     return api<Mate[]>('/mates', 'GET')
@@ -90,137 +129,260 @@ export default function Mates() {
     })
   }
 
-  /** Ask one mate for a quote — the per-card action, unchanged. */
-  function requestQuote(m: Mate) {
-    navigate('/new-request', {
-      state: { providers: [{ userId: m.providerUserId, businessName: nameOf(m) }] },
-    })
-  }
-
   /** Ask everyone currently ticked, in one request (UAT Round 2 §6.1). */
   function requestFromSelected() {
     if (!mates || selected.length === 0) return
     const chosen = selected
       .map((id) => mates.find((m) => m.providerUserId === id))
       .filter((m): m is Mate => Boolean(m))
-      .map((m) => ({ userId: m.providerUserId, businessName: nameOf(m) }))
+      // Their industries come along, so the request form can start on the one they share (step J1).
+      .map((m) => ({ userId: m.providerUserId, businessName: nameOf(m), industries: m.industries }))
     navigate('/new-request', { state: { providers: chosen } })
   }
 
+  /** Filtering is already instant; the button takes the customer to the results. */
+  function goToResults() {
+    resultsRef.current?.focus()
+    resultsRef.current?.scrollIntoView({ block: 'nearest' })
+  }
+
   const atCap = selected.length >= maxProviders
-  const selectedNames = mates
-    ? selected.map((id) => mates.find((m) => m.providerUserId === id)).filter(Boolean).map((m) => nameOf(m as Mate))
-    : []
+  const capTitle = `You can request up to ${maxProviders} providers at once`
+  const hasMates = mates !== null && mates.length > 0
+  const activeFilterCount = ['rating', 'bonus'].filter((k) => filterValue(k)).length
 
   return (
-    <>
-      {/* The Back button that used to sit here moved up to the dashboard in
-          UAT Round 7 §3, where it now sits beneath the tab bar for both roles.
-          Two Back buttons stacked on this one tab would be worse than none. */}
-
-      <div className="page-head">
-        <h2>Your Jobby Mates</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/home/referrals')}>Invite a Jobby Mate</button>
+    <div className="mt">
+      {/* Header */}
+      <div className="mt-head">
+        <div className="mt-head-copy">
+          <PeopleHeartIcon />
+          <div>
+            <h2 className="mt-title">Your Jobby Mates</h2>
+            <p className="mt-sub">Providers you've saved. Request a quote without searching again.</p>
+          </div>
+        </div>
+        <button className="mt-invite" onClick={() => navigate('/home/referrals')}>
+          <InviteIcon /> Invite a Jobby Mate
+        </button>
       </div>
-      <p className="page-intro">Providers you've saved. Request a quote from a trusted mate without searching again.</p>
 
       {error && <div className="msg err">{error}</div>}
       {mates === null && !error && <div className="loading">Loading…</div>}
 
       {mates !== null && mates.length === 0 && !error && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>You haven't saved any providers yet. Save a provider while searching to add them here.</p>
-          <button className="btn btn-amber" style={{ marginTop: 12 }} onClick={() => navigate('/home/find')}>Find providers</button>
+          <button className="mt-btn-navy" onClick={() => navigate('/home/find')}>Find providers</button>
         </div>
       )}
 
-      {mates && mates.length > 0 && (
-        <div className="mates-controls">
-          <ListControls list={list} searchPlaceholder="Search your mates" countLabel="mates" />
-          <div className="view-toggle" role="group" aria-label="View">
-            <button
-              type="button"
-              className={`view-btn${layout === 'grid' ? ' on' : ''}`}
-              aria-pressed={layout === 'grid'}
-              onClick={() => setLayout('grid')}
-            >
-              Grid
-            </button>
-            <button
-              type="button"
-              className={`view-btn${layout === 'list' ? ' on' : ''}`}
-              aria-pressed={layout === 'list'}
-              onClick={() => setLayout('list')}
-            >
-              List
-            </button>
-          </div>
-        </div>
-      )}
+      {hasMates && (
+        <>
+          {/* Search row */}
+          <form className="mt-search" role="search" onSubmit={(e) => { e.preventDefault(); goToResults() }}>
+            <label className="mt-field is-wide">
+              <span>SEARCH YOUR MATES</span>
+              <span className="mt-input">
+                <SearchIcon />
+                <input type="search" value={list.view.search} placeholder="Provider name or keyword"
+                  onChange={(e) => list.setSearch(e.target.value)} />
+              </span>
+            </label>
+            <label className="mt-field">
+              <span>INDUSTRY</span>
+              <select value={filterValue('industry')} onChange={(e) => list.setFilter('industry', e.target.value)}>
+                <option value="">All industries</option>
+                {optionsFor('industry').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="mt-field">
+              <span>SERVICE</span>
+              <select value={filterValue('service')} onChange={(e) => list.setFilter('service', e.target.value)}>
+                <option value="">All services</option>
+                {optionsFor('service').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="mt-field">
+              <span>SUBURB</span>
+              <select value={filterValue('suburb')} onChange={(e) => list.setFilter('suburb', e.target.value)}>
+                <option value="">All suburbs</option>
+                {optionsFor('suburb').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <button type="submit" className="mt-search-btn"><SearchIcon light /> Search</button>
+          </form>
 
-      {mates && mates.length > 0 && list.shown === 0 && (
-        <div className="empty">
-          <p>No mates match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
-        </div>
-      )}
+          <button type="button" className="mt-filters-toggle" aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((o) => !o)}>
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </button>
 
-      {list.shown > 0 && (
-        <div className={layout === 'grid' ? 'mate-grid' : 'job-list'}>
-          {list.visible.map((m) => {
-            const isSelected = selected.includes(m.providerUserId)
-            return (
-              <div className={`job-card mate-card${isSelected ? ' mate-selected' : ''}`} key={m.providerUserId}>
-                <div className="job-top">
-                  <label className="mate-pick" title={!isSelected && atCap ? `You can request up to ${maxProviders} providers at once` : 'Include in one request'}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={!isSelected && atCap}
-                      onChange={() => toggle(m.providerUserId)}
-                    />
-                    <span className="job-title">{nameOf(m)}</span>
+          <div className="mt-body">
+            {/* Left panel */}
+            <aside className={`mt-side${filtersOpen ? ' is-open' : ''}`} aria-label="Refine your mates">
+              <div className="mt-side-head">
+                <h3>Refine your mates</h3>
+                <button type="button" className="mt-reset" onClick={list.clear}>Reset</button>
+              </div>
+
+              <fieldset className="mt-group">
+                <legend>Rating</legend>
+                <label className="mt-radio">
+                  <input type="radio" name="mt-rating" checked={!filterValue('rating')}
+                    onChange={() => list.setFilter('rating', '')} />
+                  Any rating
+                </label>
+                {RATING_OPTIONS.map((o) => (
+                  <label className="mt-radio" key={o.value}>
+                    <input type="radio" name="mt-rating" checked={filterValue('rating') === o.value}
+                      onChange={() => list.setFilter('rating', o.value)} />
+                    {o.label}
                   </label>
-                  <span className="prov-rating">
-                    {m.reviewCount > 0 ? (
-                      <><Stars value={m.averageRating} /><span className="prov-rating-num">{m.averageRating.toFixed(1)} ({m.reviewCount})</span></>
-                    ) : (<span className="prov-new">No reviews yet</span>)}
+                ))}
+              </fieldset>
+
+              <fieldset className="mt-group">
+                <legend>Only show</legend>
+                <label className="mt-radio">
+                  <input type="checkbox" checked={filterValue('bonus') === 'yes'}
+                    onChange={(e) => list.setFilter('bonus', e.target.checked ? 'yes' : '')} />
+                  Offering bonus points
+                </label>
+              </fieldset>
+
+              <div className="mt-note">
+                <HeartBlueIcon />
+                <span><strong>Your saved providers</strong><br />Keep your favourites close.</span>
+              </div>
+            </aside>
+
+            {/* Main column */}
+            <section className="mt-main">
+              {selected.length > 0 && (
+                <div className="mt-selbar" role="status">
+                  <span className="mt-selbar-count">{selected.length} of {maxProviders} providers selected</span>
+                  <span className="mt-selbar-note">Only selected providers will receive your request.</span>
+                  <span className="mt-selbar-actions">
+                    <button type="button" className="mt-clear" onClick={() => setSelected([])}>Clear</button>
+                    <button type="button" className="mt-continue" onClick={requestFromSelected}>
+                      Continue with {selected.length} <ArrowIcon />
+                    </button>
                   </span>
                 </div>
-                <div className="job-meta">
-                  {m.industries.map((industry) => <span className="chip" key={industry}>{industry}</span>)}
-                  {m.serviceArea && <span>{m.serviceArea}</span>}
-                  {m.jobsCompleted > 0 && <span>· {m.jobsCompleted} job{m.jobsCompleted > 1 ? 's' : ''} completed</span>}
-                  {m.lastJobAt && <span className="job-date">· last used {formatDate(m.lastJobAt)}</span>}
-                </div>
-                <div className="job-foot">
-                  <button className="btn btn-ghost-dark btn-sm" onClick={() => navigate(`/providers/${m.providerUserId}`)}>Profile</button>
-                  <div className="job-actions">
-                    <button className="btn btn-ghost-dark btn-sm" onClick={() => remove(m.providerUserId)}>Remove</button>
-                    <button className="btn btn-amber btn-sm" onClick={() => requestQuote(m)}>Request a quote</button>
+              )}
+
+              <div className="mt-toolbar">
+                <h3 className="mt-count" ref={resultsRef} tabIndex={-1}>
+                  {list.shown === list.total
+                    ? `${list.total} saved mate${list.total === 1 ? '' : 's'}`
+                    : `${list.shown} of ${list.total} saved mates`}
+                </h3>
+                <div className="mt-toolbar-end">
+                  <label className="mt-sort">
+                    <span>Sort by</span>
+                    <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+                      {list.sorts.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                    </select>
+                  </label>
+                  <div className="mt-view" role="group" aria-label="View">
+                    <button type="button" className={layout === 'list' ? 'is-on' : ''} aria-pressed={layout === 'list'}
+                      onClick={() => setLayout('list')}><ListIcon /> List</button>
+                    <button type="button" className={layout === 'grid' ? 'is-on' : ''} aria-pressed={layout === 'grid'}
+                      onClick={() => setLayout('grid')}><GridIcon /> Grid</button>
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
 
-      {/* One request to several mates at once, so the "sent to" list on the
-          request can genuinely show more than one name (UAT Round 2 §6.1). */}
-      {selected.length > 0 && (
-        <div className="mate-selectbar">
-          <span>
-            {selected.length} of {maxProviders} selected: <strong>{selectedNames.join(', ')}</strong>
-          </span>
-          <div className="job-actions">
-            <button className="btn btn-ghost-dark btn-sm" onClick={() => setSelected([])}>Clear selection</button>
-            <button className="btn btn-amber btn-sm" onClick={requestFromSelected}>
-              Request quotes from {selected.length}
-            </button>
+              {list.shown === 0 ? (
+                <div className="mt-empty">
+                  <p>No mates match these filters.</p>
+                  <button className="mt-btn-ghost" onClick={list.clear}>Clear filters</button>
+                </div>
+              ) : (
+                <div className={layout === 'grid' ? 'mt-grid' : 'mt-list'}>
+                  {list.visible.map((m) => {
+                    const isSelected = selected.includes(m.providerUserId)
+                    return (
+                      <MateCard
+                        key={m.providerUserId}
+                        mate={m}
+                        name={nameOf(m)}
+                        layout={layout}
+                        selected={isSelected}
+                        blocked={!isSelected && atCap}
+                        blockedTitle={capTitle}
+                        onToggle={() => toggle(m.providerUserId)}
+                        onViewProfile={() => navigate(`/providers/${m.providerUserId}`)}
+                        onRemove={() => remove(m.providerUserId)}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="mt-more">
+                <SearchIcon />
+                <span><strong>Need someone new?</strong>{' '}
+                  <button type="button" className="mt-more-link" onClick={() => navigate('/home/find')}>
+                    Find more providers →
+                  </button></span>
+              </div>
+            </section>
           </div>
-        </div>
+        </>
       )}
-    </>
+    </div>
+  )
+}
+
+/* ---------- icons (decorative) ---------- */
+
+function PeopleHeartIcon() {
+  return (
+    <svg aria-hidden="true" className="mt-head-ico" width="52" height="52" viewBox="0 0 48 48" fill="none"
+      stroke="#0F2A4A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M24 40L9.5 26a8.5 8.5 0 0 1 12-12L24 16.5l2.5-2.5a8.5 8.5 0 0 1 12 12" />
+      <circle cx="33" cy="29" r="4.5" />
+      <path d="M25 44c0-4.4 3.6-7.5 8-7.5s8 3.1 8 7.5" />
+    </svg>
+  )
+}
+function InviteIcon() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="4" /><path d="M2 21c0-4 3-7 7-7s7 3 7 7M19 8v6M16 11h6" /></svg>
+  )
+}
+function SearchIcon({ light = false }: { light?: boolean }) {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={light ? '#FFFFFF' : '#5A6E86'}
+      strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" /></svg>
+  )
+}
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+      strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+  )
+}
+function ListIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></svg>
+  )
+}
+function GridIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="7" rx="1" />
+      <rect x="4" y="13" width="7" height="7" rx="1" /><rect x="13" y="13" width="7" height="7" rx="1" /></svg>
+  )
+}
+function HeartBlueIcon() {
+  return (
+    <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="#2F7BE0">
+      <path d="M12 21l-8.4-8.1a5.3 5.3 0 0 1 7.5-7.5L12 6.3l.9-.9a5.3 5.3 0 0 1 7.5 7.5z" />
+    </svg>
   )
 }

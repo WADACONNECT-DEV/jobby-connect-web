@@ -57,6 +57,9 @@ export interface Job {
   /** Who the request was actually sent to, named (UAT Round 2 s6.1). */
   targetProviders: JobTargetProvider[]
   createdAt: string
+  /** The job's industry (step J1); null on older jobs, which show the category. */
+  industryId?: string | null
+  industryName?: string | null
 }
 
 /** A provider a quote request was sent to. */
@@ -133,6 +136,46 @@ export interface ProviderProfile {
   /** Promotional Mate Points advertised on quotes, in dollars. */
   promoPoints: number
   createdAt: string
+  /** Whether the provider's plan unlocks the Premium public profile (V39). */
+  premiumProfile?: boolean
+  /** What's saved for the Premium page (V41), Premium or not. */
+  premium?: PremiumContent | null
+}
+
+/* ---- Premium profile content (step P3) ---- */
+
+export const HIGHLIGHT_ICONS = ['YEARS', 'LICENSED', 'INSURED', 'FAST_REPLY', 'LOCAL', 'GUARANTEE', 'AWARD', 'TEAM'] as const
+export type HighlightIcon = (typeof HIGHLIGHT_ICONS)[number]
+export const HIGHLIGHT_ICON_LABELS: Record<HighlightIcon, string> = {
+  YEARS: 'Years in business',
+  LICENSED: 'Licensed',
+  INSURED: 'Insured',
+  FAST_REPLY: 'Fast reply',
+  LOCAL: 'Local',
+  GUARANTEE: 'Guarantee',
+  AWARD: 'Award',
+  TEAM: 'Team',
+}
+
+export interface PremiumHighlight { icon: HighlightIcon | null; title: string; subLine: string | null }
+export interface PremiumAboutSection { title: string; body: string | null }
+export interface PremiumServiceListing {
+  /** Null on a listing not saved yet. Sent back on save so its photo stays attached. */
+  id: string | null
+  title: string
+  description: string | null
+  subcategoryId: string | null
+  subcategoryName?: string | null
+}
+
+export interface PremiumContent {
+  headline: string | null
+  intro: string | null
+  website: string | null
+  videoUrl: string | null
+  highlights: PremiumHighlight[]
+  aboutSections: PremiumAboutSection[]
+  serviceListings: PremiumServiceListing[]
 }
 
 export interface ProviderSummary {
@@ -148,6 +191,10 @@ export interface ProviderSummary {
   jobsCompleted: number
   /** Promotional Mate Points this provider advertises, in dollars. */
   promoPoints: number
+  /** Redesign step 4: the same chips a saved mate shows. */
+  industries: string[]
+  services: string[]
+  suburbs: string[]
 }
 
 /** How search results are ordered (UAT Round 4 s3.5). */
@@ -190,6 +237,10 @@ export interface ProviderPublic {
   contactHours: string | null
   services: ProviderService[]
   suburbs: string[]
+  /** Whether this provider's plan unlocks the Premium public profile (V39). */
+  premiumProfile?: boolean
+  /** The Premium page content (V41); null unless the plan grants Premium. */
+  premium?: PremiumContent | null
 }
 
 export interface Mate {
@@ -204,6 +255,11 @@ export interface Mate {
   jobsCompleted: number
   lastJobAt: string | null
   savedAt: string
+  /** Redesign step 3: description, service tags and bonus offer for the Mates tab. */
+  bio: string | null
+  services: string[]
+  /** Bonus points the provider offers, in dollars. 0 = no offer. */
+  promoPoints: number
 }
 
 // Admin types (unchanged)
@@ -290,12 +346,23 @@ export function formatDateTime(iso: string): string {
 
 
 // ---- Master data (Phase B) ----
+/**
+ * What to show as a job's industry (step J1): its industry name, or the old
+ * category's label on jobs made before industries were recorded.
+ */
+export function industryOf(x: { industryName?: string | null; category: ServiceCategory }): string {
+  return x.industryName || CATEGORY_LABELS[x.category] || x.category
+}
+
 export interface MasterIndustry {
   id: string
   code: string | null
   name: string
   active: boolean
   sortOrder: number
+  /** The industry's group from the owner's master list (redesign step 11), when known. */
+  group?: string | null
+  groupOrder?: number | null
 }
 
 export interface MasterSubcategory {
@@ -312,6 +379,8 @@ export interface MasterSuburb {
   state: string
   postcode: string | null
   active: boolean
+  /** Local council, e.g. "Casey" (redesign step 11), when known. */
+  lga?: string | null
 }
 
 export interface MasterPlan {
@@ -323,6 +392,10 @@ export interface MasterPlan {
   maxImages: number
   maxImageMb: number
   customerDefault: boolean
+  /** Premium provider profile plan (V39): on/off, price in dollars (null until set), MONTHLY or YEARLY. */
+  premiumProfile?: boolean
+  price?: number | null
+  billingPeriod?: 'MONTHLY' | 'YEARLY' | null
 }
 
 export interface MasterRate {
@@ -379,6 +452,8 @@ export interface CustomerQuoteStage {
 export interface CustomerQuoteLine {
   description: string
   amount: number
+  /** No GST is added to this line — shown with "* GST-free item" (ledger spec Part 0). */
+  gstFree?: boolean
 }
 
 export interface CustomerQuote {
@@ -414,6 +489,8 @@ export interface QuoteRate {
   pointsPercent: number
   /** What turns the provider's price into the customer-facing figure. */
   upliftPercent: number
+  /** Whether the provider is registered for GST (ledger spec Part 0). */
+  gstRegistered?: boolean
 }
 
 export interface ProviderQuoteLine {
@@ -446,6 +523,8 @@ export interface ProviderQuote {
   status: QuoteStatus | null
   settlementStatus: SettlementStatus | null
   createdAt: string | null
+  /** GST on the provider's invoice to the customer, as shown to the customer (ledger spec Part 0). */
+  invoiceGst?: number
 }
 
 export interface ProviderQuoteStage {
@@ -547,6 +626,18 @@ export interface WalletEntry {
   amount: number
   memo: string | null
   date: string
+  /**
+   * Redesign step 5 (ledger view). Full timestamp, so same-day movements keep
+   * their order and dates show in Melbourne time. The job fields are null when
+   * a movement isn't tied to a job (referral, adjustment).
+   */
+  createdAt?: string | null
+  jobId?: string | null
+  jobTitle?: string | null
+  requestRef?: string | null
+  providerName?: string | null
+  /** The job's category code; label it with CATEGORY_LABELS. */
+  category?: string | null
 }
 export interface Wallet {
   balance: number
@@ -618,9 +709,12 @@ export type ReferralPointsStatus =
   | 'PAID'
   | 'DECLINED'
   | 'PAYMENT_OVERDUE'
+  /** Redesign step 6: an invite nobody has registered from yet (display only). */
+  | 'INVITED' | 'INVITE_EXPIRED'
 
 export interface MateConnection {
-  referralRecordId: string
+  /** Null on an invite row. */
+  referralRecordId: string | null
   direction: 'REFERRED_BY_ME' | 'REFERRED_ME'
   otherPartyId: string
   otherPartyType: ReferrerType
@@ -630,6 +724,12 @@ export interface MateConnection {
   pointsAmount: number
   pointsStatus: ReferralPointsStatus
   createdAt: string
+  /** Redesign step 6: pointsAmount in dollars at the admin per-point rate. */
+  pointsValue?: number | null
+  /** Set only on an invite row (no referralRecordId yet). */
+  inviteId?: string | null
+  inviteMobile?: string | null
+  expiresAt?: string | null
 }
 
 export interface SendInviteRequest {
@@ -663,6 +763,8 @@ export function referralStatusLabel(s: ReferralPointsStatus): string {
     case 'PAID': return 'Points granted'
     case 'DECLINED': return 'Declined'
     case 'PAYMENT_OVERDUE': return 'Points overdue'
+    case 'INVITED': return 'Invited — waiting to join'
+    case 'INVITE_EXPIRED': return 'Invite expired'
     default: return s
   }
 }
@@ -739,6 +841,10 @@ export interface ProviderRequestRow {
   declinedAt: string | null
   /** Full Quote Request ID for this record (UAT Round 4 s8.4). */
   requestRef: string | null
+  /** Redesign step 9: when an unsent quote draft was last saved, else null. */
+  draftSavedAt?: string | null
+  /** The job's industry name (step J1); null on older jobs, which show the category. */
+  industryName?: string | null
 }
 
 /** A saved, unpriced quote form (UAT Round 3 s7). One per request. */
@@ -814,6 +920,7 @@ export type EventType =
   | 'JOB_STARTED' | 'PROGRESS_UPDATED' | 'JOB_COMPLETED' | 'JOB_CANCELLED'
   | 'PAYMENT_RECEIVED' | 'REVIEW_SUBMITTED' | 'PAYOUT_RELEASED' | 'REVIEW_REQUESTED'
   | 'REFERRAL_INVITED' | 'REFERRAL_REWARDED'
+  | 'PASSWORD_RESET' | 'EMAIL_CHANGE_CONFIRM' | 'EMAIL_CHANGED'
 
 export const EVENT_LABELS: Record<EventType, string> = {
   QUOTE_RECEIVED: 'Quote received',
@@ -835,6 +942,10 @@ export const EVENT_LABELS: Record<EventType, string> = {
   REVIEW_REQUESTED: 'Rate your provider',
   REFERRAL_INVITED: 'Referral invited',
   REFERRAL_REWARDED: 'Referral rewarded',
+  // Email only (redesign step 2) - shows in the admin Communications log.
+  PASSWORD_RESET: 'Password reset link',
+  EMAIL_CHANGE_CONFIRM: 'Confirm new email',
+  EMAIL_CHANGED: 'Email changed notice',
 }
 
 export interface NotificationItem {
@@ -900,3 +1011,144 @@ export interface PlatformSettings {
   maxProvidersPerRequest: number
   updatedAt: string
 }
+
+/* ---- Account Ledger and documents (owner's ledger spec, step L3) ---- */
+
+export type DocumentType = 'INV' | 'INV_C' | 'REPT' | 'REPT_P'
+
+export interface DocParty {
+  name: string | null
+  abn: string | null
+  ref: string | null
+  address: string | null
+  email: string | null
+  phone: string | null
+}
+
+export interface DocLine { description: string; price: number; gst: number | null; total: number; gstFree: boolean }
+export interface DocCharge { label: string; amount: number; gst: number; total: number }
+export interface DocReceipt { date: string; method: string; amount: number }
+
+/** An issued invoice or receipt, exactly as issued (GET /documents/{number}). */
+export interface AccountDocument {
+  number: string
+  type: DocumentType
+  title: string
+  issuedAt: string
+  requestRef: string | null
+  from: DocParty | null
+  to: DocParty | null
+  jobTitle: string | null
+  stageName: string | null
+  stageNumber: number | null
+  quoteApprovedAt: string | null
+  completedAt: string | null
+  gstRegistered: boolean
+  lines: DocLine[] | null
+  subtotal: number | null
+  gst: number | null
+  total: number | null
+  pointsEarned: number | null
+  charges: DocCharge[] | null
+  chargesSubtotal: number | null
+  chargesGst: number | null
+  chargesTotal: number | null
+  receipts: DocReceipt[] | null
+  received: number | null
+  collected: number | null
+  paidToProvider: number | null
+  payoutReference: string | null
+  related: { invoice: string | null; charges: string | null; receipt: string | null; payout: string | null } | null
+  notes: string[] | null
+}
+
+export type LedgerRowKind = 'INVOICE' | 'PAYMENT' | 'POINTS' | 'SENT' | 'CHARGES' | 'PAYOUT'
+
+export interface LedgerRow {
+  date: string
+  kind: LedgerRowKind
+  number: string
+  requestRef: string | null
+  jobId: string
+  quoteId: string
+  stageId: string | null
+  counterparty: string | null
+  counterpartyRef: string | null
+  industry: string | null
+  suburb: string | null
+  description: string
+  invoiced: number | null
+  paid: number | null
+  sent: number | null
+  charges: number | null
+  received: number | null
+  gst: number | null
+  amount: number
+  balance: number
+  owing: boolean
+}
+
+export interface LedgerStatement {
+  role: 'customer' | 'provider'
+  from: string | null
+  to: string | null
+  opening: number
+  closing: number
+  totals: {
+    invoiced: number; paid: number; owing: number
+    sent: number; charges: number; received: number
+    gstCollected: number; gstOnCharges: number; gstNet: number; stillToReceive: number
+  }
+  rows: LedgerRow[]
+}
+
+/* ---- Admin: document search and trace (ledger spec Part 1.6, step L4) ---- */
+
+export interface DocumentSummary {
+  number: string
+  type: DocumentType
+  issuedAt: string
+  total: number
+  gst: number
+  stageId: string | null
+  requestRef: string | null
+}
+
+export interface AdminDocumentTrace {
+  quoteId: string
+  requestRef: string | null
+  jobTitle: string | null
+  customer: DocParty | null
+  provider: DocParty | null
+  units: { stageId: string | null; label: string; documents: DocumentSummary[] }[]
+  payments: { date: string; unit: string; method: string; cash: number; matePoints: number | null; status: string; reference: string | null }[]
+}
+
+/** Jobby-Connect's business details for its documents (ledger spec Part 1.8). */
+export interface BusinessDetails {
+  legalName: string | null
+  abn: string | null
+  address: string | null
+  email: string | null
+  phone: string | null
+  collectedNote: string | null
+  updatedAt: string | null
+}
+
+/* ---- Premium profile photos (step P2) ---- */
+
+export type ProfileMediaKind = 'LOGO' | 'HERO' | 'GALLERY' | 'SERVICE'
+
+/** One photo on a provider's Premium public profile. Bytes come from /profile-media/{id}. */
+export interface ProfileMedia {
+  id: string
+  kind: ProfileMediaKind
+  /** For SERVICE photos: the service listing it belongs to. */
+  serviceRef: string | null
+  sortOrder: number
+  originalFilename: string | null
+  width: number | null
+  height: number | null
+  createdAt: string
+}
+

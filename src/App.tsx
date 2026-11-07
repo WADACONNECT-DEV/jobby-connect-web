@@ -1,11 +1,17 @@
-import { Navigate, Outlet, Route, Routes, useNavigate, Link } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom'
 import { useAuth, RequireAuth } from './auth'
 import { NotificationBell } from './components/NotificationBell'
+import { AccountMenu } from './components/frame/AccountMenu'
 import { RequireAdmin } from './adminAuth'
 import Landing from './pages/Landing'
 import ForProviders from './pages/ForProviders'
 import Register from './pages/Register'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import ConfirmEmail from './pages/ConfirmEmail'
 import Home from './pages/Home'
 import Search from './pages/Search'
 import NewRequest from './pages/NewRequest'
@@ -14,6 +20,10 @@ import MyQuotes from './pages/MyQuotes'
 import MyWork from './pages/MyWork'
 import ProviderRequests from './pages/ProviderRequests'
 import ProviderProfile from './pages/ProviderProfile'
+import CustomerLedger from './pages/CustomerLedger'
+import ProviderLedger from './pages/ProviderLedger'
+import DocumentView from './pages/DocumentView'
+import AdminDocuments from './pages/AdminDocuments'
 import ProviderView from './pages/ProviderView'
 import Mates from './pages/Mates'
 import JobbyMate from './pages/JobbyMate'
@@ -32,36 +42,54 @@ import Account from './pages/Account'
 import WalletPage from './pages/Wallet'
 import Notifications from './pages/Notifications'
 
+/**
+ * Top bar on every logged-in page (redesign step 3, owner's mates design).
+ * Same destinations and the same log-out action as before; the name link and
+ * the Log out button now live in the avatar menu.
+ */
 function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   return (
-    <header className="site-header">
-      <Link to={user ? '/home' : '/'} className="brand">
-        <span className="brand-mark">J</span>
-        <span className="brand-name">JOBBY-CONNECT</span>
-      </Link>
-      <div className="spacer" />
-      {user && (
-        <>
-          <NotificationBell />
-          <Link to="/account" className="whoami whoami-link" title="Account settings">{user.fullName}</Link>
-          <button className="btn btn-nav" onClick={() => { logout(); navigate('/') }}>Log out</button>
-        </>
-      )}
+    <header className="app-bar">
+      <div className="app-bar-in">
+        <Link to={user ? '/home' : '/'} className="lp-brand">
+          <span className="lp-brand-j" aria-hidden="true">J</span>
+          <span className="lp-brand-name">JOBBY-CONNECT</span>
+        </Link>
+        {user && (
+          <div className="app-bar-end">
+            <NotificationBell />
+            <AccountMenu fullName={user.fullName} onLogout={() => { logout(); navigate('/') }} />
+          </div>
+        )}
+      </div>
     </header>
   )
 }
 
+/**
+ * The dashboard (/home and its tabs) and Account draw their own full-width navy
+ * band, so they aren't boxed into the narrow page column the other logged-in
+ * pages use.
+ */
 function UserLayout() {
+  const { pathname } = useLocation()
+  const isDashboard = pathname === '/home' || pathname.startsWith('/home/') || pathname === '/account'
   return (
-    <>
+    <div className="app-shell">
       <Header />
-      <main className="wrap">
+      <main className={isDashboard ? 'app-main' : 'wrap'}>
         <Outlet />
       </main>
-      <footer className="site-foot">Jobby-Connect · React + TypeScript</footer>
-    </>
+      <footer className="app-foot">
+        <span>© Jobby-Connect 2026</span>
+        <span aria-hidden="true">·</span>
+        <Link to="/privacy">Privacy</Link>
+        <span aria-hidden="true">·</span>
+        <Link to="/terms">Terms</Link>
+      </footer>
+    </div>
   )
 }
 
@@ -78,6 +106,7 @@ export default function App() {
         <Route path="password" element={<AdminChangePassword />} />
         <Route path="approvals" element={<AdminApprovals />} />
         <Route path="finance" element={<AdminFinance />} />
+        <Route path="documents" element={<AdminDocuments />} />
         <Route path="referrals" element={<AdminReferrals />} />
         <Route path="communications" element={<AdminCommunications />} />
       </Route>
@@ -87,10 +116,22 @@ export default function App() {
       <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
       <Route path="/for-providers" element={user ? <Navigate to="/home" replace /> : <ForProviders />} />
 
+      {/* ---- Account pages: same own-frame style as the landing pages (redesign step 2) ----
+          Log in and sign-up still send a logged-in user to the dashboard. Forgot /
+          reset password, Terms and Privacy open for anyone: a logged-in user may
+          still need to reset, and the legal pages are linked from everywhere. */}
+      <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      {/* The confirm link for a change of login email (redesign step 8). Open to
+          anyone: it may be opened on a device that isn't logged in. */}
+      <Route path="/confirm-email" element={<ConfirmEmail />} />
+
       {/* ---- Customer / Provider app ---- */}
       <Route element={<UserLayout />}>
-        <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
-        <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
 
         {/* The dashboard. Both roles now work the same way (UAT Round 7 §3):
             every tab is a real child route, so the back button, deep links and
@@ -110,6 +151,7 @@ export default function App() {
           <Route path="points" element={<WalletPage />} />
           <Route path="referrals" element={<JobbyMate />} />
           <Route path="find" element={<Search />} />
+          <Route path="ledger" element={<CustomerLedger />} />
 
           {/* Provider tabs (UAT Round 7 §3), in the order the round specifies.
               "Provider Profile" is the same page previously called My Provider
@@ -119,6 +161,7 @@ export default function App() {
           <Route path="work" element={<MyWork />} />
           <Route path="provider-profile" element={<ProviderProfile />} />
           <Route path="referrals-provider" element={<JobbyMate />} />
+          <Route path="ledger-provider" element={<ProviderLedger />} />
         </Route>
 
         {/* Old links keep working — anything that still points at a pre-tab
@@ -144,6 +187,8 @@ export default function App() {
             inside the dashboard chrome. */}
         <Route path="/new-request" element={<RequireAuth><NewRequest /></RequireAuth>} />
         <Route path="/providers/:userId" element={<RequireAuth><ProviderView /></RequireAuth>} />
+        {/* Invoices and receipts (Account Ledger), A4 with print styles. */}
+        <Route path="/documents/:number" element={<RequireAuth><DocumentView /></RequireAuth>} />
 
         {/* Referrals are reachable from both roles, so this one keeps its own
             route as well as being customer tab 4. */}

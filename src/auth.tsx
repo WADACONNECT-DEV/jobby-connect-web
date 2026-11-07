@@ -7,10 +7,17 @@ import type { AuthResponse, User } from './types'
 interface AuthState {
   user: User | null
   loading: boolean
-  register: (fullName: string, email: string, password: string) => Promise<void>
+  /** Mobile is optional; blank is not sent (redesign step 2). */
+  register: (fullName: string, email: string, password: string, mobile?: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   refresh: () => Promise<void>
+  /**
+   * Switch to a token the API has just issued for this user (redesign step 8:
+   * a password change signs out other sessions and returns a fresh token so
+   * this browser stays logged in).
+   */
+  adoptToken: (res: AuthResponse) => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -46,8 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     user,
     loading,
-    register: async (fullName, email, password) => {
-      const res = await api<AuthResponse>('/auth/register', 'POST', { fullName, email, password })
+    register: async (fullName, email, password, mobile) => {
+      const trimmed = mobile?.trim()
+      const res = await api<AuthResponse>('/auth/register', 'POST',
+        trimmed ? { fullName, email, password, mobile: trimmed } : { fullName, email, password })
       await handleAuth(res)
     },
     login: async (email, password) => {
@@ -67,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = await api<User>('/me', 'GET')
       setUser(u)
     },
+    adoptToken: handleAuth,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
