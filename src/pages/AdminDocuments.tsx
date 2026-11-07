@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { formatMoney, type AccountDocument, type AdminDocumentTrace, type DocumentType } from '../types'
+import { formatMoney, type AccountDocument, type AdminDocumentTrace, type DocumentBackfillResult, type DocumentType } from '../types'
 import { DocumentSheet } from './DocumentView'
 import { showDate } from '../components/ledger/LedgerParts'
 
@@ -24,6 +24,23 @@ export default function AdminDocuments() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState<{ doc: AccountDocument; receipt: AccountDocument | null; payout: AccountDocument | null } | null>(null)
+
+  // Backfill: documents for jobs completed before documents existed (ledger spec 1.7).
+  const [backfillBusy, setBackfillBusy] = useState(false)
+  const [backfill, setBackfill] = useState<DocumentBackfillResult | null>(null)
+  const [backfillError, setBackfillError] = useState('')
+
+  async function runBackfill() {
+    if (!window.confirm('Issue invoices and receipts for every job completed before documents existed? Numbers that already exist are skipped, so this is safe to run again. On a large database it takes a few minutes.')) return
+    setBackfillBusy(true); setBackfillError(''); setBackfill(null)
+    try {
+      setBackfill(await api<DocumentBackfillResult>('/admin/documents/backfill', 'POST'))
+    } catch (err) {
+      setBackfillError(err instanceof Error ? err.message : 'The backfill failed.')
+    } finally {
+      setBackfillBusy(false)
+    }
+  }
 
   async function search(e: FormEvent) {
     e.preventDefault()
@@ -80,6 +97,32 @@ export default function AdminDocuments() {
 
       {error && <div className="msg err">{error}</div>}
       {results !== null && results.length === 0 && <div className="md-empty">No document matches “{q.trim()}”.</div>}
+
+      <section className="md-panel ad-backfill">
+        <div className="ad-backfill-row">
+          <div>
+            <h3 className="ad-backfill-title">Backfill documents</h3>
+            <p className="page-intro" style={{ margin: 0 }}>
+              Issues the invoice, charges invoice, receipt and payout receipt for every job completed before
+              documents existed, dated when each thing happened. Numbers that already exist are skipped, so it's
+              safe to run again. It also runs once by itself when the app starts on a database that hasn't had it.
+            </p>
+          </div>
+          <button className="btn btn-amber btn-sm" disabled={backfillBusy} onClick={runBackfill}>
+            {backfillBusy ? 'Running… this can take a few minutes' : 'Run backfill'}
+          </button>
+        </div>
+        {backfillError && <div className="msg err">{backfillError}</div>}
+        {backfill && (
+          <div className={`msg ${backfill.errors === 0 ? 'ok' : 'err'}`}>
+            Checked {backfill.quotesChecked} accepted quote{backfill.quotesChecked === 1 ? '' : 's'} ·{' '}
+            {backfill.unitsPastCompletion} job{backfill.unitsPastCompletion === 1 ? '' : 's'}/stage{backfill.unitsPastCompletion === 1 ? '' : 's'} past completion ·{' '}
+            <strong>{backfill.documentsIssued} document{backfill.documentsIssued === 1 ? '' : 's'} issued</strong>
+            {backfill.errors > 0 && <> · {backfill.errors} skipped with errors. First: {backfill.firstError}</>}
+            {backfill.errors === 0 && backfill.documentsIssued === 0 && <> · everything already had its documents.</>}
+          </div>
+        )}
+      </section>
 
       {results?.map((t) => (
         <section className="md-panel ad-trace" key={t.quoteId}>
