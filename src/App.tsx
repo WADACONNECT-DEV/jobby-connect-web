@@ -3,6 +3,7 @@ import { useAuth, RequireAuth } from './auth'
 import { NotificationBell } from './components/NotificationBell'
 import { RequireAdmin } from './adminAuth'
 import Landing from './pages/Landing'
+import ForProviders from './pages/ForProviders'
 import Register from './pages/Register'
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -81,9 +82,13 @@ export default function App() {
         <Route path="communications" element={<AdminCommunications />} />
       </Route>
 
+      {/* ---- Landing pages: their own top bar and footer, not the site header ----
+          Owner's Version 3 design. Logged-in users go straight to the dashboard. */}
+      <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
+      <Route path="/for-providers" element={user ? <Navigate to="/home" replace /> : <ForProviders />} />
+
       {/* ---- Customer / Provider app ---- */}
       <Route element={<UserLayout />}>
-        <Route path="/" element={user ? <Navigate to="/home" replace /> : <Landing />} />
         <Route path="/register" element={user ? <Navigate to="/home" replace /> : <Register />} />
         <Route path="/login" element={user ? <Navigate to="/home" replace /> : <Login />} />
 
