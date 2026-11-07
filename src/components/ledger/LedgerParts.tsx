@@ -7,8 +7,10 @@ import { CATEGORY_LABELS, formatMoney, type LedgerRow, type LedgerStatement, typ
 /**
  * The Account Ledger, shared by the customer and provider pages (owner's ledger
  * spec, Part 2). Data is GET /me/ledger only: every figure comes from the issued
- * documents, and the running balance is the API's, worked out over the whole
- * history oldest first, so no filter on this screen changes a row's balance.
+ * documents. The Balance column starts from the period's opening balance (the
+ * sum of everything before the period) and runs down the period's lines oldest
+ * first, so it always reads on from the Opening balance row; the other filters
+ * (customer, suburb, search) hide lines but never change a balance.
  *
  * The period, opening and closing rows and the summary cards are display
  * summaries of the rows already loaded. Dates are Melbourne dates.
@@ -34,10 +36,15 @@ const PERIODS: { key: Period; label: string }[] = [
 
 /* ---------- dates (Melbourne) ---------- */
 
-const dateFmt = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric' })
 const isoDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export const showDate = (iso: string | null | undefined) => (iso ? dateFmt.format(new Date(iso)) : '')
+/** "4 Jul 2026" in Melbourne time (always the 3-letter month; the browser's en-AU gives "June", "Sept"). */
+export const showDate = (iso: string | null | undefined) => {
+  if (!iso) return ''
+  const [y, m, d] = isoDayFmt.format(new Date(iso)).split('-').map(Number)
+  return `${d} ${MONTHS[m - 1]} ${y}`
+}
 const dayOf = (iso: string) => isoDayFmt.format(new Date(iso))
 const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`
@@ -75,7 +82,8 @@ function periodRange(period: Period, from: string, to: string): [string | null, 
   }
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100
+/** Two places, and never -0 (which would print as "-$0.00"). */
+const round2 = (n: number) => { const v = Math.round(n * 100) / 100; return v === 0 ? 0 : v }
 const sum = (rows: LedgerRow[], pick: (r: LedgerRow) => number | null) => round2(rows.reduce((s, r) => s + (pick(r) ?? 0), 0))
 const industryLabel = (code: string | null) => (code ? CATEGORY_LABELS[code as ServiceCategory] ?? code : '')
 
@@ -112,6 +120,11 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
   const periodRows = all.filter(inPeriod)
   const opening = start === null ? 0 : sum(all.filter((r) => dayOf(r.date) < start), (r) => r.amount)
   const closing = round2(opening + sum(periodRows, (r) => r.amount))
+  // Balance after each line of the period, running on from the opening balance.
+  const balances = new Map<LedgerRow, number>()
+  let running = opening
+  for (const r of periodRows) { running = round2(running + (r.amount ?? 0)); balances.set(r, running) }
+  const balanceOf = (r: LedgerRow) => balances.get(r) ?? r.balance
 
   const options = useMemo(() => ({
     who: Array.from(new Set(all.map((r) => r.counterparty).filter(Boolean) as string[])).sort(),
@@ -161,13 +174,13 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
   function table(): (string | number | null)[][] {
     const blank = header.slice(0, -1).map(() => null)
     const out: (string | number | null)[][] = []
-    if (!filtered) out.push(['Opening balance', ...blank.slice(1), opening])
+    out.push(['Opening balance', ...blank.slice(1), opening])
     shown.forEach((r) => {
       out.push(provider
-        ? [showDate(r.date), r.number, r.requestRef, who2(r), r.suburb, r.description, r.sent, r.charges, r.received, r.gst, r.balance]
-        : [showDate(r.date), r.number, r.requestRef, r.counterparty, industryLabel(r.industry), r.description, r.invoiced, r.paid, r.balance])
+        ? [showDate(r.date), r.number, r.requestRef, who2(r), r.suburb, r.description, r.sent, r.charges, r.received, r.gst, balanceOf(r)]
+        : [showDate(r.date), r.number, r.requestRef, r.counterparty, industryLabel(r.industry), r.description, r.invoiced, r.paid, balanceOf(r)])
     })
-    if (!filtered) out.push(['Closing balance', ...blank.slice(1), closing])
+    out.push(['Closing balance', ...blank.slice(1), closing])
     return out
   }
   const fileBase = `account-ledger-${role}-${start ?? 'all'}${end ? `-to-${end}` : ''}`
@@ -269,6 +282,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
           <div className="mp-summary lg-summary" aria-label={`Summary for ${periodLabel}`}>
             {provider ? (
               <>
+                <div className="mp-sum"><span>Opening balance</span><strong>{formatMoney(opening)}</strong></div>
                 <div className="mp-sum"><span>Invoiced</span><strong>{formatMoney(sent)}</strong></div>
                 <div className="mp-sum is-redeemed"><span>Charges</span><strong>−{formatMoney(charges)}</strong></div>
                 <div className="mp-sum is-earned"><span>Received</span><strong>{formatMoney(received)}</strong></div>
@@ -327,11 +341,11 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {current === 1 && !filtered && (
-                    <tr className="lg-period"><td colSpan={cols - 2}>Opening balance</td><td className="is-num" data-label="Opening balance">{formatMoney(opening)}</td><td /></tr>
+                  {current === 1 && (
+                    <tr className="lg-period"><td colSpan={cols - 1}>Opening balance{start ? ` at ${showDate(`${start}T00:00:00+10:00`)}` : ''}</td><td className="is-num" data-label="Opening balance">{formatMoney(opening)}</td></tr>
                   )}
                   {filtered && current === 1 && (
-                    <tr className="lg-note-row"><td colSpan={cols}>Filtered — balances are the running balance of your whole ledger.</td></tr>
+                    <tr className="lg-note-row"><td colSpan={cols}>Filtered — balances are the running balance of your whole ledger for the period, not of the lines shown.</td></tr>
                   )}
                   {pageRows.length === 0 && (
                     <tr className="lg-none"><td colSpan={cols}>No lines match these filters.</td></tr>
@@ -361,7 +375,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
                             <td className="is-num lg-pos" data-label="Paid">{r.paid !== null ? formatMoney(r.paid) : ''}</td>
                           </>
                         )}
-                        <td className="is-num lg-bal" data-label="Balance">{formatMoney(r.balance)}</td>
+                        <td className="is-num lg-bal" data-label="Balance">{formatMoney(balanceOf(r))}</td>
                         <td className="lg-act">
                           <button type="button" className="lg-view" onClick={() => navigate(`/documents/${r.number}`)}>View</button>
                           {!provider && r.owing && (
@@ -371,8 +385,8 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
                       </tr>
                     )
                   })}
-                  {current === pages && !filtered && (
-                    <tr className="lg-period is-closing"><td colSpan={cols - 2}>Closing balance</td><td className="is-num" data-label="Closing balance">{formatMoney(closing)}</td><td /></tr>
+                  {current === pages && (
+                    <tr className="lg-period is-closing"><td colSpan={cols - 1}>Closing balance</td><td className="is-num" data-label="Closing balance">{formatMoney(closing)}</td></tr>
                   )}
                 </tbody>
               </table>

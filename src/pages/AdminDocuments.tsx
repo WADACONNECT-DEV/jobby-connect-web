@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { formatMoney, type AccountDocument, type AdminDocumentTrace, type DocumentBackfillResult, type DocumentType } from '../types'
+import { formatMoney, type AccountDocument, type AdminDocumentTrace, type DocumentBackfillResult, type DocumentRefreshResult, type DocumentType } from '../types'
 import { DocumentSheet } from './DocumentView'
 import { showDate } from '../components/ledger/LedgerParts'
 
@@ -39,6 +39,23 @@ export default function AdminDocuments() {
       setBackfillError(err instanceof Error ? err.message : 'The backfill failed.')
     } finally {
       setBackfillBusy(false)
+    }
+  }
+
+  // Refresh: business details, party blocks, formats and footer notes on issued documents (test data only).
+  const [refreshBusy, setRefreshBusy] = useState(false)
+  const [refresh, setRefresh] = useState<DocumentRefreshResult | null>(null)
+  const [refreshError, setRefreshError] = useState('')
+
+  async function runRefresh() {
+    if (!window.confirm('Rewrite the business details, party blocks, number formats and footer notes on every issued document from today\'s settings and profiles? Amounts, numbers and dates are not touched. For test data only: issued documents are otherwise final.')) return
+    setRefreshBusy(true); setRefreshError(''); setRefresh(null)
+    try {
+      setRefresh(await api<DocumentRefreshResult>('/admin/documents/refresh', 'POST'))
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : 'The refresh failed.')
+    } finally {
+      setRefreshBusy(false)
     }
   }
 
@@ -120,6 +137,33 @@ export default function AdminDocuments() {
             <strong>{backfill.documentsIssued} document{backfill.documentsIssued === 1 ? '' : 's'} issued</strong>
             {backfill.errors > 0 && <> · {backfill.errors} skipped with errors. First: {backfill.firstError}</>}
             {backfill.errors === 0 && backfill.documentsIssued === 0 && <> · everything already had its documents.</>}
+          </div>
+        )}
+      </section>
+
+      <section className="md-panel ad-backfill">
+        <div className="ad-backfill-row">
+          <div>
+            <h3 className="ad-backfill-title">Refresh business details on issued documents <span className="ad-test-only">test data only</span></h3>
+            <p className="page-intro" style={{ margin: 0 }}>
+              Rewrites, on every document already issued, the Jobby-Connect business details, the party blocks
+              (ABN and phone formats, the customer named on charges invoices and payout receipts, the masked payout
+              account) and the footer notes, from today's Settings and profiles. Amounts, numbers and dates are
+              never changed. Use it on test data after changing Settings → Business details; a real issued
+              document is final.
+            </p>
+          </div>
+          <button className="btn btn-amber btn-sm" disabled={refreshBusy} onClick={runRefresh}>
+            {refreshBusy ? 'Refreshing…' : 'Refresh documents'}
+          </button>
+        </div>
+        {refreshError && <div className="msg err">{refreshError}</div>}
+        {refresh && (
+          <div className={`msg ${refresh.errors === 0 ? 'ok' : 'err'}`}>
+            Checked {refresh.documentsChecked} document{refresh.documentsChecked === 1 ? '' : 's'} ·{' '}
+            <strong>{refresh.documentsUpdated} updated</strong>
+            {refresh.errors > 0 && <> · {refresh.errors} skipped with errors. First: {refresh.firstError}</>}
+            {refresh.errors === 0 && refresh.documentsUpdated === 0 && <> · everything was already up to date.</>}
           </div>
         )}
       </section>

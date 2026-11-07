@@ -118,6 +118,9 @@ export interface ProviderProfile {
   userId: string
   businessName: string
   abn: string | null
+  /** Bank account for payouts (V42); payout receipts print only the last 4 digits. */
+  payoutBsb: string | null
+  payoutAccount: string | null
   bio: string | null
   serviceArea: string
   active: boolean
@@ -331,17 +334,42 @@ export function statusLabel(s: JobStatus | QuoteStatus | string): string {
 }
 
 export function formatMoney(amount: number, currency = 'AUD'): string {
-  return new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(amount)
+  // A rounding leftover of -0 would print as "-$0.00".
+  const value = Object.is(amount, -0) || Math.abs(amount) < 0.005 ? 0 : amount
+  return new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(value)
 }
 
+/** "24051015838" -> "24 051 015 838" (2-3-3-3); anything that isn't 11 digits is shown as given. */
+export function formatAbn(abn: string | null | undefined): string {
+  if (!abn) return ''
+  const d = abn.replace(/\D/g, '')
+  if (d.length !== 11) return abn
+  return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8)}`
+}
+
+/** Mobiles "0499 000 002", landlines "03 9000 0000", 1300/1800 "1300 000 000"; +61 shown in the 0 form. */
+export function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return ''
+  let d = phone.replace(/[^0-9+]/g, '')
+  if (d.startsWith('+61')) d = `0${d.slice(3)}`
+  d = d.replace(/\+/g, '')
+  if (d.length === 10 && (d.startsWith('04') || d.startsWith('1300') || d.startsWith('1800'))) return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}`
+  if (d.length === 10 && d.startsWith('0')) return `${d.slice(0, 2)} ${d.slice(2, 6)} ${d.slice(6)}`
+  return phone
+}
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "4 Jul 2026" (always the 3-letter month; the browser's en-AU gives "June", "Sept"). */
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+  const d = new Date(iso)
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
+/** "4 Jul 2026, 2:05 pm". */
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-AU', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  })
+  const time = new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })
+  return `${formatDate(iso)}, ${time}`
 }
 
 
@@ -1060,6 +1088,10 @@ export interface AccountDocument {
   payoutReference: string | null
   related: { invoice: string | null; charges: string | null; receipt: string | null; payout: string | null } | null
   notes: string[] | null
+  /** The customer on INV-…-C and REPT-…-P; null on documents issued before 8 Nov 2026 until the admin refresh. */
+  customer: DocParty | null
+  /** REPT-…-P: the provider's payout account, masked ("••6789"), or null when none is recorded. */
+  bankAccount: string | null
 }
 
 export type LedgerRowKind = 'INVOICE' | 'PAYMENT' | 'POINTS' | 'SENT' | 'CHARGES' | 'PAYOUT'
@@ -1122,6 +1154,25 @@ export interface AdminDocumentTrace {
   provider: DocParty | null
   units: { stageId: string | null; label: string; documents: DocumentSummary[] }[]
   payments: { date: string; unit: string; method: string; cash: number; matePoints: number | null; status: string; reference: string | null }[]
+}
+
+/** What a run of the document backfill did (Admin → Documents → Run backfill). */
+export interface DocumentBackfillResult {
+  quotesChecked: number
+  unitsPastCompletion: number
+  documentsIssued: number
+  errors: number
+  firstError: string | null
+  finishedAt: string
+  markedDone: boolean
+}
+
+/** What Admin -> Documents -> Refresh business details did (test data only). */
+export interface DocumentRefreshResult {
+  documentsChecked: number
+  documentsUpdated: number
+  errors: number
+  firstError: string | null
 }
 
 /** Jobby-Connect's business details for its documents (ledger spec Part 1.8). */

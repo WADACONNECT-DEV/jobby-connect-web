@@ -72,6 +72,8 @@ export default function ProviderProfile() {
   // basic fields
   const [businessName, setBusinessName] = useState('')
   const [abn, setAbn] = useState('')
+  const [payoutBsb, setPayoutBsb] = useState('')
+  const [payoutAccount, setPayoutAccount] = useState('')
   const [bio, setBio] = useState('')
   const [serviceArea, setServiceArea] = useState('')
   const [gstRegistered, setGstRegistered] = useState(false)
@@ -120,6 +122,8 @@ export default function ProviderProfile() {
   function applyProfile(p: Profile | null) {
     setBusinessName(p?.businessName ?? '')
     setAbn(p?.abn ?? '')
+    setPayoutBsb(p?.payoutBsb ?? '')
+    setPayoutAccount(p?.payoutAccount ?? '')
     setBio(p?.bio ?? '')
     setServiceArea(p?.serviceArea ?? '')
     setGstRegistered(p?.gstRegistered ?? false)
@@ -235,7 +239,8 @@ export default function ProviderProfile() {
 
   function snapshotOf(p: Profile | null): string {
     return JSON.stringify([
-      p?.businessName ?? '', p?.abn ?? '', p?.bio ?? '', p?.serviceArea ?? '', p?.gstRegistered ?? false,
+      p?.businessName ?? '', p?.abn ?? '', p?.payoutBsb ?? '', p?.payoutAccount ?? '',
+      p?.bio ?? '', p?.serviceArea ?? '', p?.gstRegistered ?? false,
       p?.promoPoints ? String(p.promoPoints) : '', p?.subscriptionPlanId ?? '',
       (p?.industries ?? []).map((i) => i.id).sort(), (p?.subcategories ?? []).map((s) => s.id).sort(),
       (p?.suburbs ?? []).map((s) => s.id).sort(), p?.siteTheme ?? 'CLASSIC', p?.aboutText ?? '',
@@ -252,7 +257,7 @@ export default function ProviderProfile() {
     ])
   }
   const currentSnapshot = JSON.stringify([
-    businessName, abn, bio, serviceArea, gstRegistered, promoPoints, planId,
+    businessName, abn, payoutBsb.replace(/\D/g, ''), payoutAccount.replace(/\D/g, ''), bio, serviceArea, gstRegistered, promoPoints, planId,
     Array.from(selIndustries).sort(), Array.from(selSubcats).sort(), Array.from(selSuburbs.keys()).sort(),
     siteTheme, aboutText, contactEmail, contactPhone, contactHours,
     premiumSnapshot(premium),
@@ -284,6 +289,8 @@ export default function ProviderProfile() {
     const body = {
       businessName,
       abn: abn || null,
+      payoutBsb: payoutBsb.replace(/\D/g, '') || null,
+      payoutAccount: payoutAccount.replace(/\D/g, '') || null,
       bio: bio || null,
       serviceArea,
       gstRegistered,
@@ -490,6 +497,17 @@ export default function ProviderProfile() {
                 <input type="checkbox" checked={gstRegistered} onChange={(e) => setGstRegistered(e.target.checked)} />
                 <span>My business is registered for GST</span>
               </label>
+              <div className="pr-two pf-two">
+                <label className="mt-field">
+                  <span>PAYOUT BSB</span>
+                  <input value={payoutBsb} inputMode="numeric" maxLength={7} onChange={(e) => setPayoutBsb(e.target.value)} placeholder="e.g. 063-000" />
+                </label>
+                <label className="mt-field">
+                  <span>PAYOUT ACCOUNT NUMBER</span>
+                  <input value={payoutAccount} inputMode="numeric" maxLength={12} onChange={(e) => setPayoutAccount(e.target.value)} placeholder="Where your payouts go" />
+                </label>
+              </div>
+              <p className="pf-hint">Payout receipts show only the last 4 digits of the account.</p>
               <label className="mt-field" htmlFor="promo-points">
                 <span>PROMOTIONAL MATE POINTS OFFERED (OPTIONAL)</span>
                 <input

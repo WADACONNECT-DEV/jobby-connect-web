@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
-import { formatMoney, type AccountDocument, type DocParty } from '../types'
+import { formatAbn, formatMoney, formatPhone, type AccountDocument, type DocParty } from '../types'
 import { showDate } from '../components/ledger/LedgerParts'
 
 /**
  * One invoice or receipt as issued (owner's ledger spec, Part 2, and the sample
- * documents in invoice-fullgst.png / invoice-nogst.png):
+ * documents in 04-account-ledger/design/ledger-v1):
  *   INV     tax invoice (or "Invoice" when the provider isn't GST-registered)
  *   INV-C   Jobby-Connect's charges tax invoice
  *   REPT    receipt, with a PAID stamp
@@ -16,7 +16,8 @@ import { showDate } from '../components/ledger/LedgerParts'
  * where Save as PDF is the destination - enough for now, per the spec.
  *
  * Paid date, balance and payout date come from the related documents when they
- * have been issued; nothing is recalculated.
+ * have been issued; nothing is recalculated. ABNs, phone numbers and dates are
+ * printed in the owner's formats ("24 051 015 838", "0499 000 002", "4 Jul 2026").
  */
 export default function DocumentView() {
   const { number = '' } = useParams<{ number: string }>()
@@ -62,6 +63,9 @@ export default function DocumentView() {
   )
 }
 
+/** The not-registered note is printed as a highlighted band, as in the owner's sample. */
+const isGstBand = (note: string) => note.startsWith('No GST has been charged')
+
 /**
  * The document itself, as printed. Shared by this page and the admin portal's
  * Documents search, so everyone sees the same layout.
@@ -71,6 +75,7 @@ export function DocumentSheet({ doc, receipt, payout }: {
   receipt: AccountDocument | null
   payout: AccountDocument | null
 }) {
+  const notes = (doc.notes ?? []).filter((n) => !isGstBand(n))
   return (
     <article className={`dv-page is-${doc.type.toLowerCase()}`} aria-label={`${doc.title} ${doc.number}`}>
       <header className="dv-head">
@@ -87,12 +92,11 @@ export function DocumentSheet({ doc, receipt, payout }: {
       {doc.type === 'REPT' && <Receipt doc={doc} />}
       {doc.type === 'REPT_P' && <PayoutReceipt doc={doc} />}
 
-      {(doc.notes ?? []).length > 0 && (
-        <footer className="dv-notes">
-          {(doc.notes ?? []).map((n, i) => <p key={i}>{n}</p>)}
-          {doc.requestRef && <code className="dv-req">{doc.requestRef}</code>}
-        </footer>
-      )}
+      <footer className="dv-notes">
+        {notes.map((n, i) => <p key={i}>{n}</p>)}
+        {doc.type === 'REPT_P' && doc.payoutReference && <p>Payment reference: {doc.payoutReference}</p>}
+        {doc.requestRef && <code className="dv-req">{doc.requestRef}</code>}
+      </footer>
     </article>
   )
 }
@@ -102,6 +106,9 @@ export function DocumentSheet({ doc, receipt, payout }: {
 function Invoice({ doc, receipt }: { doc: AccountDocument; receipt: AccountDocument | null }) {
   const paid = receipt?.received ?? null
   const balance = doc.total !== null ? Math.round(((doc.total ?? 0) - (paid ?? 0)) * 100) / 100 : null
+  const band = (doc.notes ?? []).find(isGstBand)
+  // Documents issued before 8 Nov 2026 carry the points in a field but not in the footer.
+  const pointsInFooter = (doc.notes ?? []).some((n) => n.includes('Mate Points'))
   return (
     <>
       <div className="dv-two">
@@ -123,7 +130,7 @@ function Invoice({ doc, receipt }: { doc: AccountDocument; receipt: AccountDocum
             <th scope="col">Description</th>
             <th scope="col" className="is-num">Price</th>
             {doc.gstRegistered && <th scope="col" className="is-num">GST</th>}
-            <th scope="col" className="is-num">Total</th>
+            {doc.gstRegistered && <th scope="col" className="is-num">Total</th>}
           </tr>
         </thead>
         <tbody>
@@ -132,14 +139,14 @@ function Invoice({ doc, receipt }: { doc: AccountDocument; receipt: AccountDocum
               <td>{l.description}{l.gstFree && doc.gstRegistered && (doc.gst ?? 0) > 0 ? ' *' : ''}</td>
               <td className="is-num">{formatMoney(l.price)}</td>
               {doc.gstRegistered && <td className="is-num">{l.gst !== null ? formatMoney(l.gst) : '—'}</td>}
-              <td className="is-num">{formatMoney(l.total)}</td>
+              {doc.gstRegistered && <td className="is-num">{formatMoney(l.total)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
 
       <div className="dv-totals">
-        <Row label="Subtotal" value={doc.subtotal} />
+        {doc.gstRegistered && <Row label="Subtotal" value={doc.subtotal} />}
         {doc.gstRegistered && <Row label="GST" value={doc.gst} />}
         <Row label="Total" value={doc.total} strong />
         {receipt && paid !== null && (
@@ -148,7 +155,9 @@ function Invoice({ doc, receipt }: { doc: AccountDocument; receipt: AccountDocum
         {receipt && <Row label="Balance due" value={balance} strong />}
       </div>
 
-      {doc.pointsEarned !== null && doc.pointsEarned > 0 && (
+      {band && <p className="dv-band">{band}</p>}
+
+      {!pointsInFooter && doc.pointsEarned !== null && doc.pointsEarned > 0 && (
         <p className="dv-small">You earned <strong>{formatMoney(doc.pointsEarned)} Mate Points</strong>{receipt ? `. Receipt ${receipt.number}.` : '.'}</p>
       )}
     </>
@@ -163,7 +172,8 @@ function ChargesInvoice({ doc, payout }: { doc: AccountDocument; payout: Account
           <PartyLine p={doc.to} withAbn />
         </Block>
         <Block label="FOR">
-          <div>{doc.related?.invoice}{doc.jobTitle ? ` · ${jobLine(doc)}` : ''}</div>
+          <div>{doc.related?.invoice}{doc.customer ? ` (${shortName(doc.customer.name)}${doc.customer.ref ? `, ${doc.customer.ref}` : ''})` : ''}</div>
+          {doc.jobTitle && <div>{jobLine(doc)}</div>}
           <div>Date: {showDate(doc.issuedAt)}</div>
         </Block>
       </div>
@@ -247,24 +257,25 @@ function Receipt({ doc }: { doc: AccountDocument }) {
 }
 
 function PayoutReceipt({ doc }: { doc: AccountDocument }) {
+  const customerName = doc.customer?.name ?? 'customer'
   return (
     <>
       <div className="dv-two">
         <Block label="PAID TO">
           <PartyLine p={doc.to} />
+          <div>Bank account {doc.bankAccount ?? '— not recorded on your profile'}</div>
         </Block>
         <Block label="FOR">
-          <div>{doc.related?.invoice}</div>
+          <div>{doc.related?.invoice}{doc.customer ? ` · ${doc.customer.name}${doc.customer.ref ? ` (${doc.customer.ref})` : ''}` : ''}</div>
           <div>{jobLine(doc)}</div>
         </Block>
       </div>
 
       <div className="dv-summary">
-        <Row label={`Collected from customer (${doc.related?.receipt ?? ''})`} value={doc.collected} />
+        <Row label={`Collected from ${customerName} (${doc.related?.receipt ?? ''})`} value={doc.collected} />
         <Row label={`Less charges (${doc.related?.charges ?? ''})`} value={doc.chargesTotal !== null ? -doc.chargesTotal : null} />
         <Row label={`Paid to you · ${showDate(doc.issuedAt)}`} value={doc.paidToProvider} strong />
       </div>
-      {doc.payoutReference && <p className="dv-small">Payment reference: {doc.payoutReference}</p>}
     </>
   )
 }
@@ -275,13 +286,20 @@ function jobLine(doc: AccountDocument): string {
   return [doc.jobTitle, doc.stageName ? `Stage ${doc.stageNumber}: ${doc.stageName}` : null].filter(Boolean).join(' — ')
 }
 
+/** "Olivia Anderson" -> "Olivia A." */
+function shortName(full: string | null): string {
+  if (!full) return ''
+  const parts = full.trim().split(/\s+/)
+  return parts.length < 2 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
 function SupplierBlock({ p }: { p: DocParty | null }) {
   if (!p) return null
   return (
     <div className="dv-from">
       <strong>{p.name}</strong>
-      {p.abn && <span>ABN {p.abn}</span>}
-      <span>{[p.ref, p.phone].filter(Boolean).join(' · ')}</span>
+      {p.abn && <span>ABN {formatAbn(p.abn)}</span>}
+      <span>{[p.ref, formatPhone(p.phone)].filter(Boolean).join(' · ')}</span>
     </div>
   )
 }
@@ -290,9 +308,9 @@ function PlatformBlock({ p }: { p: DocParty | null }) {
   return (
     <div className="dv-from">
       <strong className="dv-brand"><span className="dv-j">J</span> {p?.name ?? 'Jobby-Connect'}</strong>
-      <span>{p?.abn ? `ABN ${p.abn}` : 'ABN —'}</span>
+      <span>{p?.abn ? `ABN ${formatAbn(p.abn)}` : 'ABN —'}</span>
       {p?.address && <span>{p.address}</span>}
-      {(p?.email || p?.phone) && <span>{[p?.email, p?.phone].filter(Boolean).join(' · ')}</span>}
+      {(p?.email || p?.phone) && <span>{[p?.email, formatPhone(p?.phone)].filter(Boolean).join(' · ')}</span>}
     </div>
   )
 }
@@ -302,7 +320,7 @@ function PartyLine({ p, withAbn = false }: { p: DocParty | null; withAbn?: boole
   return (
     <div>
       <strong>{p.name}</strong>{p.ref && !withAbn ? ` · ${p.ref}` : ''}
-      {withAbn && <div>{[p.abn ? `ABN ${p.abn}` : null, p.ref].filter(Boolean).join(' · ')}</div>}
+      {withAbn && <div>{[p.abn ? `ABN ${formatAbn(p.abn)}` : null, p.ref].filter(Boolean).join(' · ')}</div>}
     </div>
   )
 }
