@@ -32,6 +32,7 @@ export function loadPlatformSettings(): Promise<PlatformSettings> {
 /** Drop the cached settings — used after an admin changes them. */
 export function clearPlatformSettings() {
   settingsCache = null
+  publicSettingsCache = null
 }
 
 /** The configured cap, ready to use in a component. */
@@ -41,6 +42,51 @@ export function useMaxProvidersPerRequest(): number {
   useEffect(() => {
     let alive = true
     loadPlatformSettings().then((s) => {
+      if (alive && s.maxProvidersPerRequest > 0) setMax(s.maxProvidersPerRequest)
+    })
+    return () => { alive = false }
+  }, [])
+
+  return max
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings for visitors who aren't logged in                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The same cap, for the landing pages.
+ *
+ * GET /master/settings needs a login, and landing-page visitors don't have
+ * one, so the pages read GET /settings/public instead — a deliberately small
+ * reply ({ maxProvidersPerRequest }) so nothing else is ever exposed to the
+ * public by accident. Owner decision 3 Nov 2026 §1: the "Up to n" wording must
+ * show the admin setting, never a typed number.
+ *
+ * Same fallback rule as above: if the call fails, show the documented default
+ * rather than an empty gap in the sentence.
+ */
+interface PublicSettings {
+  maxProvidersPerRequest: number
+}
+
+let publicSettingsCache: Promise<PublicSettings> | null = null
+
+function loadPublicSettings(): Promise<PublicSettings> {
+  if (!publicSettingsCache) {
+    publicSettingsCache = api<PublicSettings>('/settings/public', 'GET').catch(() => ({
+      maxProvidersPerRequest: DEFAULT_MAX_PROVIDERS_PER_REQUEST,
+    }))
+  }
+  return publicSettingsCache
+}
+
+export function usePublicMaxProvidersPerRequest(): number {
+  const [max, setMax] = useState(DEFAULT_MAX_PROVIDERS_PER_REQUEST)
+
+  useEffect(() => {
+    let alive = true
+    loadPublicSettings().then((s) => {
       if (alive && s.maxProvidersPerRequest > 0) setMax(s.maxProvidersPerRequest)
     })
     return () => { alive = false }

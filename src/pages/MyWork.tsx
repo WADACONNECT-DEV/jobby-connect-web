@@ -2,12 +2,13 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { usePersistedValue } from '../listView'
+import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
+import { initialsOf } from '../components/mates/MateCard'
 import { Stars } from '../components/Stars'
 import { ProgressBar } from '../components/ProgressBar'
 import { ImageUploader } from '../components/ImageUploader'
 import {
-  CATEGORY_LABELS,
+  industryOf,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -119,8 +120,13 @@ export default function MyWork() {
    * Mark the work complete from here, exactly as Your Quotes does — same
    * endpoint, same effect (UAT Round 4 7). A staged quote is completed one
    * stage at a time, which is how the settlement ladder works.
+   *
+   * Quote and stage ids are typed string | null because a quote preview has no
+   * id yet. A saved quote always has one; if a null ever reaches here there is
+   * nothing to complete, so it does nothing.
    */
-  async function markComplete(quoteId: string, stageId: string | null) {
+  async function markComplete(quoteId: string | null, stageId: string | null) {
+    if (!quoteId) return
     setActionError(''); setBusyId(stageId ?? quoteId)
     try {
       await api<SettlementResult>('/settlement/complete', 'POST', { quoteId, stageId })
@@ -210,6 +216,36 @@ export default function MyWork() {
   })
 
   const inTab = classified.filter((c) => c.sub === tab)
+
+  // List or Grid, remembered (redesign step 10). List is the default.
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.work.layout', 'list')
+
+  // Search, industry and sort within the open sub-tab (redesign step 10).
+  // Narrows what is shown only; the sub-tab grouping above is unchanged.
+  type Row = (typeof classified)[number]
+  const list = useListView<Row>(`provider.work.${tab}`, jobs === null ? null : inTab, {
+    search: (c) => `${c.job.title} ${c.job.suburb} ${c.job.customerName} ${c.job.jobAddress ?? ''}`,
+    filters: [
+      {
+        key: 'category',
+        label: 'industries',
+        options: optionsFrom<Row>(
+          // By industry name (step J1); older jobs use their category's label.
+          (c) => industryOf(c.job),
+        ),
+        match: (c, value) => industryOf(c.job) === value,
+      },
+    ],
+    sorts: [
+      { key: 'requested', label: 'Date requested', compare: byDate<Row>((c) => c.job.createdAt), defaultDir: 'desc' },
+      { key: 'title', label: 'Job title', compare: byText<Row>((c) => c.job.title), defaultDir: 'asc' },
+      { key: 'customer', label: 'Customer', compare: byText<Row>((c) => c.job.customerName), defaultDir: 'asc' },
+      { key: 'suburb', label: 'Suburb', compare: byText<Row>((c) => c.job.suburb), defaultDir: 'asc' },
+    ],
+    defaultSortKey: 'requested',
+    defaultSortDir: 'desc',
+  })
+  const industries = list.filters.find((f) => f.key === 'category')?.options ?? []
   const countOf = (key: WorkTab) => classified.filter((c) => c.sub === key).length
 
   const emptyCopy: Record<WorkTab, string> = {
@@ -219,73 +255,124 @@ export default function MyWork() {
   }
 
   return (
-    <>
-      <div className="page-head">
-        <h2>Your work</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/home/requests')}>See requests</button>
+    <div className="mt pr yw">
+      <div className="mt-head">
+        <div className="mt-head-copy">
+          <ToolboxIcon />
+          <div>
+            <h2 className="mt-title">Your work</h2>
+            <p className="mt-sub">Jobs you've won. Start the work, keep the customer posted on progress, then mark completion and submit your review under “Your quotes” to get paid.</p>
+          </div>
+        </div>
       </div>
-      <p className="page-intro">Jobs you've won. Start the work, keep the customer posted on progress, then mark completion and submit your review under “Your quotes” to get paid.</p>
 
       {error && <div className="msg err">{error}</div>}
-      {actionError && <div className="msg err">{actionError}</div>}
+      {actionError && <div className="jr-msg is-err">{actionError}</div>}
       {jobs === null && !error && <div className="loading">Loading…</div>}
 
       {jobs !== null && jobs.length === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>No assigned work yet. Win a quote and it'll show up here.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/home/requests')} style={{ marginTop: 12 }}>See requests to me</button>
+          <button className="mt-continue" onClick={() => navigate('/home/requests')}>See requests to me</button>
         </div>
       )}
 
       {jobs !== null && jobs.length > 0 && (
-        <div className="pipe-tabs" role="tablist">
+        <div className="mj-subtabs" role="tablist" aria-label="Your work">
           {WORK_TABS.map((t) => (
             <button
               key={t.key}
               role="tab"
               aria-selected={tab === t.key}
-              className={`pipe-tab${tab === t.key ? ' active' : ''}`}
+              className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
               onClick={() => setTab(t.key)}
             >
               {t.label}
-              <span className="pipe-count">{countOf(t.key)}</span>
+              <span className="mj-badge">{countOf(t.key)}</span>
             </button>
           ))}
         </div>
       )}
 
-      {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
-        <div className="empty"><p>{emptyCopy[tab]}</p></div>
+      {inTab.length > 0 && (
+        <div className="mt-search pr-filters yw-filters">
+          <label className="mt-field is-wide">
+            <span>SEARCH JOBS</span>
+            <span className="mt-input">
+              <SearchIcon />
+              <input type="search" value={list.view.search} placeholder="Title, suburb, customer or address"
+                onChange={(e) => list.setSearch(e.target.value)} />
+            </span>
+          </label>
+          <label className="mt-field">
+            <span>INDUSTRY</span>
+            <select value={list.view.filters.category ?? ''} onChange={(e) => list.setFilter('category', e.target.value)}>
+              <option value="">All industries</option>
+              {industries.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="mt-field">
+            <span>SORT BY</span>
+            <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
+              {list.sorts.map((so) => <option key={so.key} value={so.key}>{so.label}</option>)}
+            </select>
+          </label>
+          <div className="mt-view pr-view" role="group" aria-label="View">
+            <button type="button" className={layout === 'list' ? 'is-on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>List</button>
+            <button type="button" className={layout === 'grid' ? 'is-on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>Grid</button>
+          </div>
+        </div>
       )}
 
       {inTab.length > 0 && (
-        <div className="job-list">
-          {inTab.map(({ job, myQuote, awaitingCompletion, awaitingPayment, awaitingReview, markedComplete }) => {
+        <h3 className="mt-count">{list.shown === list.total ? `${list.total} job${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} jobs`}</h3>
+      )}
+
+      {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
+        <div className="mt-empty"><p>{emptyCopy[tab]}</p></div>
+      )}
+
+      {inTab.length > 0 && list.shown === 0 && (
+        <div className="mt-empty">
+          <p>No jobs match these filters.</p>
+          <button className="mt-btn-ghost" onClick={list.clear}>Clear filters</button>
+        </div>
+      )}
+
+      {list.shown > 0 && (
+        <div className={layout === 'grid' ? 'pr-grid' : 'pr-list'}>
+          {list.visible.map(({ job, myQuote, awaitingCompletion, awaitingPayment, awaitingReview, markedComplete }) => {
             const busy = busyId === job.id
             const review = reviewByJob[job.id]
             const history = progressByJob[job.id] ?? []
             const latest = history[0]
-            // "Mark Complete becomes available once staged progress sums to
-            // 100%" (UAT Round 4 7). Progress entries are cumulative, so the
-            // latest posted figure is the total.
             const atFullProgress = (latest?.percent ?? 0) >= 100
-            // This provider's own Quote Request ID for the job (UAT Round 4 8.4),
-            // so the same reference follows the work through to completion.
             const myRef = (job.targetProviders ?? []).find((t) => t.userId === user?.id)?.requestRef
+            const panelOpen = progressOpenFor === job.id || historyFor === job.id
+            // Yellow border when the next move is the provider's: review to
+            // release payment, or progress at 100% and not yet marked complete.
+            const yourMove = job.status === 'IN_PROGRESS' && (awaitingReview || (atFullProgress && awaitingCompletion))
             return (
-              <div className="job-card" key={job.id}>
-                <div className="job-top">
-                  <span className="job-title">{job.title}</span>
-                  <span className={`status status-${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
+              <article className={`pr-card pr-${layout} yw-card${yourMove ? ' is-action' : ''}${panelOpen ? ' is-open' : ''}`} key={job.id}>
+                <div className="yq-top">
+                  <h3 className="pr-title">{job.title}</h3>
+                  <span className={`yq-status is-${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
+                  {myRef && <span className="mj-ref"><code>{myRef}</code></span>}
                 </div>
-                <div className="job-meta">
-                  <span className="chip">{CATEGORY_LABELS[job.category]}</span>
-                  <span>{job.suburb}</span>
-                  {job.timeFrame && <span>· {job.timeFrame}</span>}
-                  <span className="job-date">· {formatDate(job.createdAt)}</span>
+
+                <div className="yq-cust">
+                  <span className="mc-avatar yq-avatar" aria-hidden="true">{initialsOf(job.customerName)}</span>
+                  <span>{job.customerName}</span>
                 </div>
-                <p className="job-desc">{job.description}</p>
-                <p className="job-assigned">Customer: <strong>{job.customerName}</strong></p>
+
+                <div className="pr-meta">
+                  <span className="mc-chip">{industryOf(job)}</span>
+                  <span className="mc-line"><PinIcon /> {job.suburb}</span>
+                  {job.timeFrame && <span className="pr-sub">{job.timeFrame}</span>}
+                  <span className="pr-sub">Requested {formatDate(job.createdAt)}</span>
+                </div>
+                {job.jobAddress && <p className="yw-addr"><span className="pr-amt-label">Job address</span> {job.jobAddress}</p>}
+                <p className="pr-desc">{job.description}</p>
 
                 {latest && (
                   <ProgressBar
@@ -296,24 +383,58 @@ export default function MyWork() {
 
                 {history.length > 1 && (
                   <button
-                    className="btn btn-ghost-dark btn-xs"
-                    style={{ marginTop: 8 }}
+                    className="pr-link yq-toggle"
                     onClick={() => setHistoryFor(historyFor === job.id ? null : job.id)}
+                    aria-expanded={historyFor === job.id}
                   >
                     {historyFor === job.id ? 'Hide progress history' : `Progress history (${history.length})`}
                   </button>
                 )}
 
                 {historyFor === job.id && (
-                  <div className="prog-list">
+                  <div className="yw-history">
                     {history.map((entry) => (
-                      <div className="prog-row" key={entry.id}>
-                        <span className="prog-row-pct">{entry.percent}%</span>
-                        <span className="prog-row-note">{entry.note ?? '—'}</span>
-                        <span className="prog-row-date">{formatDateTime(entry.createdAt)}</span>
+                      <div className="yw-hist-row" key={entry.id}>
+                        <span className="yw-hist-pct">{entry.percent}%</span>
+                        <span className="yw-hist-note">{entry.note ?? '—'}</span>
+                        <span className="yw-hist-date">{formatDateTime(entry.createdAt)}</span>
                       </div>
                     ))}
                   </div>
+                )}
+
+                {/* Gone the moment the job is marked complete, not disabled —
+                    UAT Round 7 §8 tightened Round 5's lock to removal. There
+                    must be no control to attempt an entry through, so both the
+                    form and the button that opens it disappear together. */}
+                {job.status === 'IN_PROGRESS' && !markedComplete && progressOpenFor === job.id && (
+                  <form className="pr-panel yw-progress" onSubmit={(e) => postProgress(e, job.id)}>
+                    <h4>Update progress</h4>
+                    {progressError && <div className="jr-msg is-err">{progressError}</div>}
+                    <div className="pr-two yw-two">
+                      <label className="mt-field">
+                        <span>PERCENTAGE COMPLETE</span>
+                        <input
+                          type="number" min="0" max="100" step="1"
+                          value={percent}
+                          onChange={(e) => setPercent(e.target.value)}
+                          placeholder="0–100"
+                        />
+                      </label>
+                      <label className="mt-field">
+                        <span>NOTE (OPTIONAL)</span>
+                        <input
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="What's done, what's next…"
+                        />
+                      </label>
+                    </div>
+                    <div className="pr-panel-actions">
+                      <button type="button" className="mt-btn-ghost" onClick={() => setProgressOpenFor(null)}>Cancel</button>
+                      <button type="submit" className="mt-continue" disabled={busy}>{busy ? 'Saving…' : 'Post update'}</button>
+                    </div>
+                  </form>
                 )}
 
                 {latest && (job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
@@ -335,80 +456,45 @@ export default function MyWork() {
                   />
                 )}
 
-                {/* Gone the moment the job is marked complete, not disabled —
-                    UAT Round 7 §8 tightened Round 5's lock to removal. There
-                    must be no control to attempt an entry through, so both the
-                    form and the button that opens it disappear together. */}
-                {job.status === 'IN_PROGRESS' && !markedComplete && progressOpenFor === job.id && (
-                  <form className="prog-form" onSubmit={(e) => postProgress(e, job.id)}>
-                    {progressError && <div className="msg err">{progressError}</div>}
-                    <div className="row2">
-                      <div>
-                        <label>Percentage complete</label>
-                        <input
-                          type="number" min="0" max="100" step="1"
-                          value={percent}
-                          onChange={(e) => setPercent(e.target.value)}
-                          placeholder="0–100"
-                        />
-                      </div>
-                      <div>
-                        <label>Note (optional)</label>
-                        <input
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="What's done, what's next…"
-                        />
-                      </div>
-                    </div>
-                    <div className="quote-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => setProgressOpenFor(null)}>Cancel</button>
-                      <button type="submit" className="btn btn-amber btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Post update'}</button>
-                    </div>
-                  </form>
-                )}
-
-                {myRef && (
-                  <div className="ref-list">
-                    <span className="ref-item"><code className="req-ref">{myRef}</code></span>
-                  </div>
-                )}
+                {/* The customer's own request photos, view only (handoff Part L).
+                    Renders nothing when the customer sent none. */}
+                <ImageUploader jobId={job.id} kind="REQUEST" canUpload={false} label="Photos the customer sent" />
 
                 {/* Mark complete, available here as well as under Your Quotes
                     (UAT Round 4 7). Offered once the posted progress reaches
                     100%, and only for units still awaiting completion. */}
                 {job.status === 'IN_PROGRESS' && myQuote && (atFullProgress || awaitingPayment || awaitingReview) && (
-                  <div className="work-complete">
+                  <div className="yw-complete">
                     {myQuote.stages && myQuote.stages.length > 0 ? (
                       <>
-                        <span className="work-complete-head">Mark each stage complete as you finish it</span>
+                        <span className="yw-complete-head">Mark each stage complete as you finish it</span>
                         {myQuote.stages.map((st) => (
-                          <div className="stage-row" key={st.id}>
-                            <span className="stage-name">{st.name} · {formatMoney(st.customerTotal)}</span>
+                          <div className="yw-stage" key={st.id}>
+                            <span className="yw-stage-name">{st.name} · {formatMoney(st.customerTotal)}</span>
                             {st.settlementStatus === 'PENDING_COMPLETION' ? (
                               <button
-                                className="btn btn-green btn-sm"
+                                className="yq-btn is-complete"
                                 disabled={busyId === st.id}
                                 onClick={() => markComplete(myQuote.id, st.id)}
                               >
                                 {busyId === st.id ? 'Marking…' : 'Mark complete'}
                               </button>
                             ) : (
-                              <span className="stage-settle">{settlementLabel(st.settlementStatus ?? 'PENDING_COMPLETION')}</span>
+                              <span className="yq-settle">{settlementLabel(st.settlementStatus ?? 'PENDING_COMPLETION')}</span>
                             )}
                           </div>
                         ))}
                       </>
                     ) : myQuote.settlementStatus === 'PENDING_COMPLETION' ? (
                       <button
-                        className="btn btn-green btn-sm"
+                        className="yq-btn is-complete"
                         disabled={busyId === myQuote.id}
                         onClick={() => markComplete(myQuote.id, null)}
                       >
                         {busyId === myQuote.id ? 'Marking…' : 'Mark job complete'}
                       </button>
                     ) : (
-                      <span className="stage-settle">{settlementLabel(myQuote.settlementStatus ?? 'PENDING_COMPLETION')}</span>
+                      <span className="yq-settle">{settlementLabel(myQuote.settlementStatus ?? 'PENDING_COMPLETION')}</span>
                     )}
 
                     {/* The payout is released by the post-job review, which lives
@@ -416,9 +502,9 @@ export default function MyWork() {
                         here after being paid (UAT Round 5 3.1.4) - the same trap
                         that put Mark Complete on the wrong screen in Round 4. */}
                     {awaitingReview && myQuote && (
-                      <div className="work-next">
+                      <div className="yw-next">
                         <span>The customer has paid. Submit your post-job review to release the payout.</span>
-                        <button className="btn btn-amber btn-sm" onClick={() => navigate(reviewLink(myQuote))}>
+                        <button className="mt-continue" onClick={() => navigate(reviewLink(myQuote))}>
                           Review &amp; get paid
                         </button>
                       </div>
@@ -427,14 +513,14 @@ export default function MyWork() {
                 )}
 
                 {job.status === 'COMPLETED' && review && (
-                  <div className="review-done">
-                    <span className="review-label">Customer rating:</span> <Stars value={review.rating} />
-                    {review.comment && <p className="review-comment">"{review.comment}"</p>}
+                  <div className="yw-rating">
+                    <span className="pr-amt-label">Customer rating</span> <Stars value={review.rating} />
+                    {review.comment && <p className="pr-desc">"{review.comment}"</p>}
                   </div>
                 )}
 
-                <div className="job-foot">
-                  <span className="job-by">
+                <div className="yw-foot">
+                  <span className="yw-state">
                     {job.status === 'ACCEPTED' && 'Ready to start'}
                     {job.status === 'IN_PROGRESS' && awaitingReview && 'Paid by the customer — submit your review to get paid'}
                     {job.status === 'IN_PROGRESS' && !awaitingReview && awaitingPayment && 'Marked complete — awaiting customer payment'}
@@ -445,12 +531,12 @@ export default function MyWork() {
                     {job.status === 'COMPLETED' && review && 'Completed 🎉'}
                     {job.status === 'CANCELLED' && 'Closed'}
                   </span>
-                  <div className="job-actions">
+                  <div className="pr-actions">
                     {job.status === 'ACCEPTED' && (
-                      <button className="btn btn-green btn-sm" disabled={busy} onClick={() => action(job.id, 'start')}>{busy ? 'Starting…' : 'Start work'}</button>
+                      <button className="mt-continue" disabled={busy} onClick={() => action(job.id, 'start')}>{busy ? 'Starting…' : 'Start work'}</button>
                     )}
                     {job.status === 'IN_PROGRESS' && !markedComplete && progressOpenFor !== job.id && (
-                      <button className="btn btn-amber btn-sm" onClick={() => openProgress(job.id)}>
+                      <button className="mt-continue" onClick={() => openProgress(job.id)}>
                         {latest ? 'Update progress' : 'Post progress'}
                       </button>
                     )}
@@ -459,11 +545,36 @@ export default function MyWork() {
                         before acceptance, or by Dispute after it. */}
                   </div>
                 </div>
-              </div>
+              </article>
             )
           })}
         </div>
       )}
-    </>
+    </div>
+  )
+}
+
+/* ---------- icons (decorative) ---------- */
+
+function ToolboxIcon() {
+  return (
+    <svg aria-hidden="true" className="mt-head-ico" width="46" height="46" viewBox="0 0 24 24" fill="none"
+      stroke="#0B2038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8" />
+      <path d="M3 13h18" /><path d="M10 13v2h4v-2" stroke="#D9A400" strokeWidth="2.2" />
+    </svg>
+  )
+}
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5A6E86"
+      strokeWidth="2.2" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" /></svg>
+  )
+}
+function PinIcon() {
+  return (
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="#0B2038">
+      <path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+    </svg>
   )
 }

@@ -6,8 +6,9 @@ import { ListControls } from '../components/ListControls'
 import { ProgressBar } from '../components/ProgressBar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageUploader } from '../components/ImageUploader'
+import { initialsOf } from '../components/mates/MateCard'
 import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
-import { CATEGORY_LABELS, METHOD_LABELS, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type ServiceCategory, type SettlementStatus, type Wallet } from '../types'
+import { METHOD_LABELS, industryOf, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type SettlementStatus, type Wallet } from '../types'
 
 /**
  * Your Requests & Jobs, split into status sub-pages (UAT Round 7 §7).
@@ -29,6 +30,15 @@ const JOBS_TABS = [
 ] as const
 
 type JobsTab = (typeof JOBS_TABS)[number]['key']
+
+/** The review button's label per star rating, from the Functional Specification (§2.8). */
+const RATING_LABELS: Record<number, string> = {
+  5: 'Great Job Mate',
+  4: 'Good Job Mate',
+  3: 'Thanks for the Job',
+  2: 'Do Better Next Time Mate',
+  1: 'Not Up to Standard',
+}
 
 const EMPTY_COPY: Record<JobsTab, string> = {
   OPEN: 'No open requests. Find a provider and ask for a quote.',
@@ -104,6 +114,9 @@ export default function MyJobs() {
   const [comment, setComment] = useState('')
   const [reviewError, setReviewError] = useState('')
 
+  // "Show more" on a long description. Display only, not remembered.
+  const [fullDesc, setFullDesc] = useState<Set<string>>(new Set())
+
   // Which sub-page is open survives leaving the tab and coming back
   // (Round 1 §5.3, restated in Round 7 check 3.3).
   const [tab, setTab] = usePersistedValue<JobsTab>('customer.jobs.tab', 'OPEN')
@@ -139,8 +152,9 @@ export default function MyJobs() {
       {
         key: 'category',
         label: 'industries',
-        options: optionsFrom<Job>((job) => job.category, (value) => CATEGORY_LABELS[value as ServiceCategory]),
-        match: (job, value) => job.category === value,
+        // By industry name (step J1); older jobs use their category's label.
+        options: optionsFrom<Job>((job) => industryOf(job)),
+        match: (job, value) => industryOf(job) === value,
       },
     ],
     sorts: [
@@ -297,8 +311,21 @@ export default function MyJobs() {
     } finally { setBusyId(null) }
   }
 
+  const owes = (q: CustomerQuote) => q.settlementStatus === 'PENDING_PAYMENT'
+    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')
+
+  /**
+   * The sub-tab badge turns yellow when a job on that sub-tab is waiting for
+   * the customer: quotes to look at (QUOTED) or a payment due. Uses data the
+   * page already holds; nothing new is fetched.
+   */
+  function waitingIn(key: JobsTab): boolean {
+    return (jobs ?? []).some((job) => subPageOf(job, quotesByJob[job.id]) === key
+      && (job.status === 'QUOTED' || (quotesByJob[job.id] ?? []).some(owes)))
+  }
+
   return (
-    <>
+    <div className="mj">
       <ConfirmDialog
         open={pendingAccept !== null}
         title="Accept this quote now?"
@@ -320,63 +347,80 @@ export default function MyJobs() {
         </p>
       </ConfirmDialog>
 
-      <div className="page-head">
-        <h2>Your requests &amp; jobs</h2>
-        <button className="btn btn-amber" onClick={() => navigate('/search')}>New request</button>
+      {/* Header row, as on Your Jobby Mates (redesign step 4). */}
+      <div className="mt-head">
+        <div className="mt-head-copy">
+          <ClipboardIcon />
+          <div>
+            <h2 className="mt-title">Your Requests &amp; Jobs</h2>
+            <p className="mt-sub">Every request, quote and job in one place.</p>
+          </div>
+        </div>
+        <button className="mt-invite" onClick={() => navigate('/search')}>
+          <PlusIcon /> New request
+        </button>
       </div>
 
       {error && <div className="msg err">{error}</div>}
       {jobs === null && !error && <div className="loading">Loading…</div>}
 
       {jobs !== null && jobs.length === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>You haven't requested any quotes yet.</p>
-          <button className="btn btn-amber" onClick={() => navigate('/search')} style={{ marginTop: 12 }}>Find providers</button>
+          <button className="mt-btn-navy" onClick={() => navigate('/search')}>Find providers</button>
         </div>
       )}
 
       {jobs !== null && jobs.length > 0 && (
-        <div className="pipe-tabs" role="tablist">
-          {JOBS_TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`pipe-tab${tab === t.key ? ' active' : ''}${t.key === 'COMPLETED' && owingCount > 0 ? ' due' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-              <span className="pipe-count">{countOf(t.key)}</span>
-            </button>
-          ))}
+        <div className="mj-subtabs" role="tablist" aria-label="Requests and jobs">
+          {JOBS_TABS.map((t) => {
+            const waiting = waitingIn(t.key)
+            return (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={tab === t.key}
+                className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+                <span className={`mj-badge${waiting ? ' is-waiting' : ''}`}>{countOf(t.key)}</span>
+              </button>
+            )
+          })}
         </div>
       )}
 
       {jobs !== null && jobs.length > 0 && owingCount > 0 && tab !== 'COMPLETED' && (
-        <div className="banner banner-pending">
-          <strong>Payment due.</strong> {owingCount === 1 ? 'A job is' : `${owingCount} jobs are`} waiting
-          to be paid — {owingCount === 1 ? "it's" : "they're"} under Completed.{' '}
-          <button className="link-btn" onClick={() => setTab('COMPLETED')}>Open Completed</button>
+        <div className="mt-selbar mj-owing" role="status">
+          <span><strong>Payment due.</strong> {owingCount === 1 ? 'A job is' : `${owingCount} jobs are`} waiting
+            to be paid — {owingCount === 1 ? "it's" : "they're"} under Completed.</span>
+          <button className="mt-continue" onClick={() => setTab('COMPLETED')}>Open Completed <ArrowIcon /></button>
         </div>
       )}
 
       {jobs && jobs.length > 0 && inTab.length > 0 && (
-        <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
+        <div className="mj-controls">
+          <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
+        </div>
       )}
 
       {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
-        <div className="empty"><p>{EMPTY_COPY[tab]}</p></div>
+        <div className="mt-empty">
+          <p>{EMPTY_COPY[tab]}</p>
+          <button className="mt-btn-navy" onClick={() => navigate('/home/find')}>Find providers</button>
+        </div>
       )}
 
       {jobs && inTab.length > 0 && list.shown === 0 && (
-        <div className="empty">
+        <div className="mt-empty">
           <p>No requests match these filters.</p>
-          <button className="btn btn-ghost-dark" style={{ marginTop: 12 }} onClick={list.clear}>Clear filters</button>
+          <button className="mt-btn-ghost" onClick={list.clear}>Clear filters</button>
         </div>
       )}
 
       {jobs && list.shown > 0 && (
-        <div className="job-list">
+        <div className="mj-list">
           {list.visible.map((job) => {
             const quotes = quotesByJob[job.id]
             const isOpen = list.isExpanded(job.id)
@@ -384,297 +428,330 @@ export default function MyJobs() {
             const review = reviewByJob[job.id]
             const history = progressByJob[job.id] ?? []
             const latest = history[0]
+            const group = subPageOf(job, quotes)
+            const targets = job.targetProviders ?? []
+            const refs = targets.filter((t) => t.requestRef)
+            const declined = targets.filter((t) => t.status === 'DECLINED')
+            const descOpen = fullDesc.has(job.id)
+            const longDesc = job.description.length > 160
             return (
-              <div className="job-card" key={job.id}>
-                <div className="job-top">
-                  <span className="job-title">{job.title}</span>
-                  <span className={`status status-${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
+              <article className="mj-card" key={job.id}>
+                <div className="mj-top">
+                  <h3 className="mj-title">{job.title}</h3>
+                  <span className={`mj-status is-${group.toLowerCase()}`}>{statusLabel(job.status)}</span>
+                  <span className="mj-date">{formatDate(job.createdAt)}</span>
                 </div>
-                <div className="job-meta">
-                  <span className="chip">{CATEGORY_LABELS[job.category]}</span>
-                  <span>{job.suburb}</span>
-                  {job.timeFrame && <span>· {job.timeFrame}</span>}
-                  <span className="job-date">· {formatDate(job.createdAt)}</span>
+
+                <div className="mj-meta">
+                  <span className="mc-chip">{industryOf(job)}</span>
+                  <span className="mc-line"><PinIcon /> {job.suburb}</span>
+                  {job.timeFrame && <span className="mj-muted">{job.timeFrame}</span>}
+                  {/* The Quote Request ID for each invited provider (UAT Round 4
+                      8.4) - exactly as issued, the reference to quote when asking
+                      about this job. */}
+                  {refs.map((t) => (
+                    <span className="mj-ref" key={t.userId} title={t.name}>
+                      <code>{t.requestRef}</code>
+                      {refs.length > 1 && <span className="mj-ref-name">{t.name}</span>}
+                    </span>
+                  ))}
                 </div>
-                <p className="job-desc">{job.description}</p>
 
-                {/* Photos the customer sent with the request; editable while it's still open. */}
-                <ImageUploader
-                  jobId={job.id}
-                  kind="REQUEST"
-                  canUpload={job.status === 'OPEN'}
-                  label="Photos you sent"
-                />
-
-                {latest && (
-                  <ProgressBar
-                    percent={latest.percent}
-                    caption={`Updated ${formatDateTime(latest.createdAt)}${latest.note ? ` · ${latest.note}` : ''}`}
-                  />
-                )}
-
-                {history.length > 1 && (
-                  <button
-                    className="btn btn-ghost-dark btn-xs"
-                    style={{ marginTop: 8 }}
-                    onClick={() => setHistoryFor(historyFor === job.id ? null : job.id)}
-                  >
-                    {historyFor === job.id ? 'Hide progress history' : `Progress history (${history.length})`}
+                <p className={`mj-desc${descOpen || !longDesc ? '' : ' is-clamped'}`}>{job.description}</p>
+                {longDesc && (
+                  <button type="button" className="mj-link" onClick={() => setFullDesc((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(job.id)) next.delete(job.id); else next.add(job.id)
+                    return next
+                  })}>
+                    {descOpen ? 'Show less' : 'Show more'}
                   </button>
                 )}
 
-                {historyFor === job.id && (
-                  <div className="prog-list">
-                    {history.map((entry) => (
-                      <div className="prog-row" key={entry.id}>
-                        <span className="prog-row-pct">{entry.percent}%</span>
-                        <span className="prog-row-note">{entry.note ?? '—'}</span>
-                        <span className="prog-row-date">{formatDateTime(entry.createdAt)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
-                  <ImageUploader jobId={job.id} kind="PROGRESS" label="Progress photos" />
-                )}
-                {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
-                  <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
-                )}
-
                 {job.status === 'OPEN' && (
-                  <p className="job-assigned">
-                    {job.targetProviders && job.targetProviders.length > 0 ? (
-                      <>Sent to: <strong>{job.targetProviders.map((t) => t.name).join(', ')}</strong> · awaiting quotes</>
-                    ) : (
-                      <>Sent to {job.targetCount} provider{job.targetCount > 1 ? 's' : ''} · awaiting quotes</>
-                    )}
-                  </p>
-                )}
-
-                {/* The Quote Request ID for each invited provider (UAT Round 4
-                    8.4) — the reference to quote when asking about this job. */}
-                {(job.targetProviders ?? []).some((t) => t.requestRef) && (
-                  <div className="ref-list">
-                    {(job.targetProviders ?? []).filter((t) => t.requestRef).map((t) => (
-                      <span className="ref-item" key={t.userId}>
-                        <code className="req-ref">{t.requestRef}</code> {t.name}
+                  <div className="mj-sent">
+                    <span className="mj-label">Sent to</span>
+                    {targets.length > 0 ? (
+                      <span className="mj-people">
+                        {targets.map((t) => (
+                          <span className={`mj-person${t.status === 'DECLINED' ? ' is-declined' : ''}`} key={t.userId}>
+                            <span className="mj-initials" aria-hidden="true">{initialsOf(t.name)}</span>{t.name}
+                          </span>
+                        ))}
                       </span>
-                    ))}
+                    ) : (
+                      <span>{job.targetCount} provider{job.targetCount > 1 ? 's' : ''}</span>
+                    )}
+                    <span className="mj-muted">· awaiting quotes</span>
                   </div>
                 )}
 
                 {/* A provider who declined, with their reason, so the customer
                     isn't left waiting on a quote that will never come. */}
-                {(job.targetProviders ?? [])
-                  .filter((t) => t.status === 'DECLINED')
-                  .map((t) => (
-                    <div className="decline-note" key={t.userId}>
-                      <span className="decline-note-head">{t.name} declined this request</span>
-                      {t.declineMessage && <p>{t.declineMessage}</p>}
-                    </div>
-                  ))}
-                {job.providerName && job.status !== 'OPEN' && (
-                  <p className="job-assigned">Assigned to <strong>{job.providerName}</strong></p>
-                )}
-
-                <div className="job-foot">
-                  <button className="btn btn-ghost-dark btn-sm" onClick={() => toggleQuotes(job.id)}>
-                    {isOpen
-                      ? (job.status === 'OPEN' ? 'Hide quotes' : 'Hide quote')
-                      : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
-                  </button>
-                  <div className="job-actions">
-                    {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
-                        form edits and nothing else, on this screen and on the
-                        provider's. */}
-                    {job.status === 'COMPLETED' && review === null && reviewOpenFor !== job.id && (
-                      <button className="btn btn-amber btn-sm" onClick={() => openReview(job.id)}>Leave a review</button>
-                    )}
+                {declined.map((t) => (
+                  <div className="mj-declined" key={t.userId}>
+                    <span className="mj-declined-head">
+                      <span className="mj-initials is-grey" aria-hidden="true">{initialsOf(t.name)}</span>
+                      {t.name} declined this request
+                    </span>
+                    {t.declineMessage && <p>{t.declineMessage}</p>}
                   </div>
+                ))}
+
+                {/* Photos the customer sent with the request; editable while it's still open. */}
+                <div className="mj-photos">
+                  <ImageUploader jobId={job.id} kind="REQUEST" canUpload={job.status === 'OPEN'} label="Photos you sent" />
+                  {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                    <ImageUploader jobId={job.id} kind="PROGRESS" label="Progress photos" />
+                  )}
+                  {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                    <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
+                  )}
                 </div>
 
-                {job.status === 'COMPLETED' && review && (
-                  <div className="review-done">
-                    <Stars value={review.rating} />
-                    {review.comment && <p className="review-comment">"{review.comment}"</p>}
-                  </div>
-                )}
-
-                {reviewOpenFor === job.id && (
-                  <form className="review-form" onSubmit={(e) => submitReview(e, job.id)}>
-                    {reviewError && <div className="msg err">{reviewError}</div>}
-                    <label>How was {job.providerName}?</label>
-                    <StarInput value={rating} onChange={setRating} />
-                    <label style={{ marginTop: 10 }}>Comment (optional)</label>
-                    <textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="How did the job go?" />
-                    <div className="quote-actions">
-                      <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => setReviewOpenFor(null)}>Cancel</button>
-                      <button type="submit" className="btn btn-amber btn-sm" disabled={busy}>{busy ? 'Submitting…' : 'Submit review'}</button>
-                    </div>
-                  </form>
-                )}
-
-                {job.status !== 'OPEN' && quotes && quotes.length > 0
-                  && !quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
-                    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))
-                  && quotes.some((q) => q.settlementStatus === 'PENDING_COMPLETION'
-                    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_COMPLETION')) && (
-                  <p className="pay-waiting">
-                    Waiting for the provider to mark the work complete — you'll be able to pay here once they do.
-                  </p>
-                )}
-
-                {caps && quotes && quotes.some((q) => q.settlementStatus === 'PENDING_PAYMENT'
-                  || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT')) && (
-                  <div className="pay-bar">
-                    <label className="pay-label">Pay with</label>
-                    <select className="lv-select" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
-                      {caps.methods.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
-                    </select>
-                    {caps.simulationEnabled && (
-                      <>
-                        <label className="pay-label">Test outcome</label>
-                        <select className="lv-select" value={simulate} onChange={(e) => setSimulate(e.target.value as PaymentSimulation)}>
-                          {caps.simulations.map((sim) => (
-                            <option key={sim} value={sim}>{SIMULATION_LABELS[sim]}</option>
-                          ))}
-                        </select>
-                      </>
+                {latest && (
+                  <div className="mj-progress">
+                    <ProgressBar
+                      percent={latest.percent}
+                      caption={`Updated ${formatDateTime(latest.createdAt)}${latest.note ? ` · ${latest.note}` : ''}`}
+                    />
+                    {history.length > 1 && (
+                      <button type="button" className="mj-link" onClick={() => setHistoryFor(historyFor === job.id ? null : job.id)}>
+                        {historyFor === job.id ? 'Hide progress history' : `Progress history (${history.length})`}
+                      </button>
                     )}
-                  </div>
-                )}
-
-                {isOpen && (
-                  <div className="quotes-panel">
-                    {actionError && <div className="msg err">{actionError}</div>}
-                    {loadingQuotes && !quotes && <div className="loading">Loading quotes…</div>}
-                    {quotes && quotes.length === 0 && <p className="quotes-empty">No quotes yet — your providers haven't replied.</p>}
-                    {quotes && quotes.length > 0 && (
-                      <div className="quote-list">
-                        {quotes.map((q) => (
-                          <div className="quote-item" key={q.id}>
-                            <div className="quote-item-main">
-                              <span className="quote-provider">{q.providerName}</span>
-                              <span className="quote-price">{formatMoney(q.total)}</span>
-                            </div>
-
-                            {/* What the quote is made up of (UAT Round 6 2). Each
-                                amount is the figure that applies to the customer -
-                                the provider's own pricing is not shown here, and
-                                nothing on this screen names a platform charge. */}
-                            {q.lineItems && q.lineItems.length > 0 && (
-                              <div className="cq-lines">
-                                <div className="cq-row cq-head">
-                                  <span>Line item</span>
-                                  <span>Amount</span>
-                                </div>
-                                {q.lineItems.map((li, i) => (
-                                  <div className="cq-row" key={i}>
-                                    <span>{li.description}</span>
-                                    <span>{formatMoney(li.amount)}</span>
-                                  </div>
-                                ))}
-                                <div className="cq-row cq-sub">
-                                  <span>Total</span>
-                                  <span>{formatMoney(q.subTotal)}</span>
-                                </div>
-                                <div className="cq-row">
-                                  <span>GST</span>
-                                  <span>{formatMoney(q.gst)}</span>
-                                </div>
-                                <div className="cq-row cq-pay">
-                                  <span>Customer pay</span>
-                                  <span>{formatMoney(q.total)}</span>
-                                </div>
-
-                                <div className="cq-row cq-points-head">
-                                  <span>Standard Mate Points earned</span>
-                                  <span>{formatMoney(q.standardPoints)}</span>
-                                </div>
-                                <div className="cq-row">
-                                  <span>Bonus Mate Points earned</span>
-                                  <span>{formatMoney(q.bonusPoints ?? 0)}</span>
-                                </div>
-                                <div className="cq-row cq-points-total">
-                                  <span>Total Mate Points earned</span>
-                                  <span>{formatMoney(q.pointsEarned)}</span>
-                                </div>
-                              </div>
-                            )}
-
-                            {(!q.lineItems || q.lineItems.length === 0) && (
-                              <div className="quote-points">Earn {formatMoney(q.pointsEarned)} in Mate Points</div>
-                            )}
-                            {q.paymentType === 'STAGED' && q.stages && q.stages.length > 0 && (
-                              <div className="stage-preview">
-                                <div className="stage-preview-head">Paid in stages</div>
-                                {q.stages.map((st) => (
-                                  <div className="stage-row" key={st.id}>
-                                    <span>{st.name} · {st.percent}%</span>
-                                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                      {formatMoney(st.amount)}
-                                      {st.settlementStatus === 'PENDING_PAYMENT' && (
-                                        <button className="btn btn-green btn-xs" disabled={busyId === st.id}
-                                                onClick={() => pay(job.id, q.id, st.id)}>
-                                          {busyId === st.id ? 'Paying…' : 'Pay'}
-                                        </button>
-                                      )}
-                                      {st.settlementStatus && st.settlementStatus !== 'PENDING_PAYMENT' && (
-                                        <span className="stage-settle">{settlementLabel(st.settlementStatus)}</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {q.message && <p className="quote-message">{q.message}</p>}
-                            <div className="quote-item-foot">
-                              <span className={`status status-${q.status.toLowerCase()}`}>{q.status}</span>
-                              {q.paymentType !== 'STAGED' && q.settlementStatus === 'PENDING_PAYMENT' && (
-                                redeemFor === q.id ? (
-                                  <span className="redeem-box">
-                                    <span className="redeem-label">Use points (max {formatMoney(maxRedeem(q.total))}):</span>
-                                    <input className="redeem-input" type="number" min="0" step="0.01"
-                                           max={maxRedeem(q.total)} value={redeemAmt}
-                                           onChange={(e) => setRedeemAmt(e.target.value)} placeholder="0.00" />
-                                    <button className="btn btn-green btn-xs" disabled={busyId === q.id}
-                                            onClick={() => pay(job.id, q.id, null, Math.min(Number(redeemAmt) || 0, maxRedeem(q.total)))}>
-                                      {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(Math.max(0, q.total - Math.min(Number(redeemAmt) || 0, maxRedeem(q.total))))}`}
-                                    </button>
-                                    <button className="btn btn-ghost-dark btn-xs" onClick={() => { setRedeemFor(null); setRedeemAmt('') }}>Cancel</button>
-                                  </span>
-                                ) : (
-                                  <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => pay(job.id, q.id, null)}>
-                                      {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(q.total)}`}
-                                    </button>
-                                    {pointsBalance > 0 && (
-                                      <button className="btn btn-ghost-dark btn-sm" onClick={() => { setRedeemFor(q.id); setRedeemAmt('') }}>Use points</button>
-                                    )}
-                                  </span>
-                                )
-                              )}
-                              {q.paymentType !== 'STAGED' && q.status === 'ACCEPTED' && q.settlementStatus && q.settlementStatus !== 'PENDING_PAYMENT' && (
-                                <span className={`status status-settle`}>{settlementLabel(q.settlementStatus)}</span>
-                              )}
-                              {q.status === 'PENDING' && (
-                                <button className="btn btn-green btn-sm" disabled={busyId === q.id} onClick={() => askAccept(job, q.id)}>
-                                  {busyId === q.id ? 'Accepting…' : 'Accept'}
-                                </button>
-                              )}
-                            </div>
+                    {historyFor === job.id && (
+                      <div className="prog-list">
+                        {history.map((entry) => (
+                          <div className="prog-row" key={entry.id}>
+                            <span className="prog-row-pct">{entry.percent}%</span>
+                            <span className="prog-row-note">{entry.note ?? '—'}</span>
+                            <span className="prog-row-date">{formatDateTime(entry.createdAt)}</span>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
                 )}
-              </div>
+
+                {job.providerName && job.status !== 'OPEN' && (
+                  <div className="mj-assigned">
+                    <span className="mj-initials" aria-hidden="true">{initialsOf(job.providerName)}</span>
+                    <span>Assigned to <strong>{job.providerName}</strong></span>
+                  </div>
+                )}
+
+                {job.status !== 'OPEN' && quotes && quotes.length > 0
+                  && !quotes.some(owes)
+                  && quotes.some((q) => q.settlementStatus === 'PENDING_COMPLETION'
+                    || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_COMPLETION')) && (
+                  <p className="mj-note">
+                    Waiting for the provider to mark the work complete — you'll be able to pay here once they do.
+                  </p>
+                )}
+
+                {caps && quotes && quotes.some(owes) && (
+                  <div className="mj-paybar">
+                    <label className="mj-paylabel">
+                      <span>Pay with</span>
+                      <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+                        {caps.methods.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
+                      </select>
+                    </label>
+                    {caps.simulationEnabled && (
+                      <label className="mj-paylabel">
+                        <span>Test outcome</span>
+                        <select value={simulate} onChange={(e) => setSimulate(e.target.value as PaymentSimulation)}>
+                          {caps.simulations.map((sim) => (
+                            <option key={sim} value={sim}>{SIMULATION_LABELS[sim]}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                <div className="mj-foot">
+                  <button className="mc-btn is-ghost" onClick={() => toggleQuotes(job.id)}>
+                    {isOpen
+                      ? (job.status === 'OPEN' ? 'Hide quotes' : 'Hide quote')
+                      : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
+                  </button>
+                  {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
+                      form edits and nothing else, on this screen and on the
+                      provider's. */}
+                  {job.status === 'COMPLETED' && review === null && reviewOpenFor !== job.id && (
+                    <button className="mc-btn is-selected" onClick={() => openReview(job.id)}>Leave a review</button>
+                  )}
+                </div>
+
+                {job.status === 'COMPLETED' && review && (
+                  <div className="mj-review-done">
+                    <Stars value={review.rating} />
+                    {review.comment && <p>"{review.comment}"</p>}
+                  </div>
+                )}
+
+                {reviewOpenFor === job.id && (
+                  <form className="mj-review" onSubmit={(e) => submitReview(e, job.id)}>
+                    {reviewError && <div className="msg err">{reviewError}</div>}
+                    <span className="mj-review-q">How was {job.providerName}?</span>
+                    <div className="mj-stars"><StarInput value={rating} onChange={setRating} /></div>
+                    <span className="mj-review-word">{RATING_LABELS[rating] ?? ''}</span>
+                    <label className="mj-review-label" htmlFor={`rev-${job.id}`}>Comment (optional)</label>
+                    <textarea id={`rev-${job.id}`} rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="How did the job go?" />
+                    <div className="mj-review-actions">
+                      <button type="button" className="mc-btn is-ghost" onClick={() => setReviewOpenFor(null)}>Cancel</button>
+                      {/* The button carries the rating's label (Functional Spec §2.8):
+                          5 Great Job Mate … 1 Not Up to Standard. */}
+                      <button type="submit" className="mc-btn is-selected" disabled={busy}>{busy ? 'Submitting…' : (RATING_LABELS[rating] ?? 'Submit review')}</button>
+                    </div>
+                  </form>
+                )}
+
+                {isOpen && (
+                  <div className="mj-quotes">
+                    {actionError && <div className="msg err">{actionError}</div>}
+                    {loadingQuotes && !quotes && <div className="loading">Loading quotes…</div>}
+                    {quotes && quotes.length === 0 && <p className="mj-note">No quotes yet — your providers haven't replied.</p>}
+                    {quotes && quotes.map((q) => (
+                      <div className={`mq${q.status === 'ACCEPTED' ? ' is-accepted' : ''}${q.status === 'DECLINED' || q.status === 'WITHDRAWN' ? ' is-out' : ''}`} key={q.id}>
+                        <div className="mq-main">
+                          <div className="mq-head">
+                            <span className="mc-avatar mq-avatar" aria-hidden="true">{initialsOf(q.providerName)}</span>
+                            <div className="mq-who">
+                              <strong>{q.providerName}</strong>
+                              <span className={`mj-status is-quote-${q.status.toLowerCase()}`}>{q.status}</span>
+                            </div>
+                            <div className="mq-total">
+                              <span className="mq-total-amt">{formatMoney(q.total)}</span>
+                              <span className="mq-points">Earn {formatMoney(q.pointsEarned)} in Mate Points</span>
+                            </div>
+                          </div>
+
+                          {/* What the quote is made up of (UAT Round 6 2). Each
+                              amount is the figure that applies to the customer -
+                              the provider's own pricing is not shown here, and
+                              nothing on this screen names a platform charge. */}
+                          {q.lineItems && q.lineItems.length > 0 && (
+                            <div className="mq-lines">
+                              <div className="mq-row is-head"><span>Line item</span><span>Amount</span></div>
+                              {q.lineItems.map((li, i) => (
+                                <div className="mq-row" key={i}><span>{li.description}{li.gstFree && q.gst > 0 ? ' *' : ''}</span><span>{formatMoney(li.amount)}</span></div>
+                              ))}
+                              <div className="mq-row is-sub"><span>Total</span><span>{formatMoney(q.subTotal)}</span></div>
+                              <div className="mq-row"><span>GST</span><span>{formatMoney(q.gst)}</span></div>
+                              <div className="mq-row is-pay"><span>Customer pay</span><span>{formatMoney(q.total)}</span></div>
+                              <div className="mq-row is-points-head"><span>Standard Mate Points earned</span><span>{formatMoney(q.standardPoints)}</span></div>
+                              <div className="mq-row"><span>Bonus Mate Points earned</span><span>{formatMoney(q.bonusPoints ?? 0)}</span></div>
+                              <div className="mq-row is-points-total"><span>Total Mate Points earned</span><span>{formatMoney(q.pointsEarned)}</span></div>
+                              {/* Marked only when the quote has GST on other lines; with no
+                                  GST at all the "*" would mark every line and say nothing. */}
+                              {q.gst > 0 && q.lineItems.some((li) => li.gstFree) && (
+                                <div className="mq-note">* GST-free item</div>
+                              )}
+                            </div>
+                          )}
+
+                          {q.paymentType === 'STAGED' && q.stages && q.stages.length > 0 && (
+                            <ol className="mq-stages" aria-label="Paid in stages">
+                              {q.stages.map((st) => (
+                                <li className={`mq-stage is-${(st.settlementStatus ?? 'none').toLowerCase()}`} key={st.id}>
+                                  <span className="mq-stage-dot" aria-hidden="true" />
+                                  <span className="mq-stage-name">{st.name} · {st.percent}%</span>
+                                  <span className="mq-stage-amt">{formatMoney(st.amount)}</span>
+                                  {st.settlementStatus === 'PENDING_PAYMENT' && (
+                                    <button className="mq-pay is-small" disabled={busyId === st.id}
+                                            onClick={() => pay(job.id, q.id, st.id)}>
+                                      {busyId === st.id ? 'Paying…' : 'Pay'}
+                                    </button>
+                                  )}
+                                  {st.settlementStatus && st.settlementStatus !== 'PENDING_PAYMENT' && (
+                                    <span className="mq-stage-state">{settlementLabel(st.settlementStatus)}</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+
+                          {q.message && <blockquote className="mq-message">{q.message}</blockquote>}
+                        </div>
+
+                        <div className="mq-actions">
+                          {q.paymentType !== 'STAGED' && q.settlementStatus === 'PENDING_PAYMENT' && (
+                            redeemFor === q.id ? (
+                              <div className="mq-redeem">
+                                <label>
+                                  <span>Use points (max {formatMoney(maxRedeem(q.total))})</span>
+                                  <input type="number" min="0" step="0.01"
+                                         max={maxRedeem(q.total)} value={redeemAmt}
+                                         onChange={(e) => setRedeemAmt(e.target.value)} placeholder="0.00" />
+                                </label>
+                                <button className="mq-pay" disabled={busyId === q.id}
+                                        onClick={() => pay(job.id, q.id, null, Math.min(Number(redeemAmt) || 0, maxRedeem(q.total)))}>
+                                  {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(Math.max(0, q.total - Math.min(Number(redeemAmt) || 0, maxRedeem(q.total))))}`}
+                                </button>
+                                <button className="mc-btn is-ghost" onClick={() => { setRedeemFor(null); setRedeemAmt('') }}>Cancel</button>
+                              </div>
+                            ) : (
+                              <>
+                                <button className="mq-pay" disabled={busyId === q.id} onClick={() => pay(job.id, q.id, null)}>
+                                  {busyId === q.id ? 'Paying…' : `Pay ${formatMoney(q.total)}`}
+                                </button>
+                                {pointsBalance > 0 && (
+                                  <button className="mc-btn is-ghost" onClick={() => { setRedeemFor(q.id); setRedeemAmt('') }}>Use points</button>
+                                )}
+                              </>
+                            )
+                          )}
+                          {q.paymentType !== 'STAGED' && q.status === 'ACCEPTED' && q.settlementStatus && q.settlementStatus !== 'PENDING_PAYMENT' && (
+                            <span className="mq-state">{settlementLabel(q.settlementStatus)}</span>
+                          )}
+                          {q.status === 'PENDING' && (
+                            <button className="mq-accept" disabled={busyId === q.id} onClick={() => askAccept(job, q.id)}>
+                              {busyId === q.id ? 'Accepting…' : 'Accept'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
             )
           })}
         </div>
       )}
-    </>
+    </div>
+  )
+}
+
+/* ---------- icons (decorative) ---------- */
+
+function ClipboardIcon() {
+  return (
+    <svg aria-hidden="true" className="mt-head-ico" width="48" height="48" viewBox="0 0 24 24" fill="none"
+      stroke="#0F2A4A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 4V2.5h6V4" /><path d="M9 11h6M9 15h6M9 19h3" />
+    </svg>
+  )
+}
+function PlusIcon() {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+      strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+  )
+}
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+      strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+  )
+}
+function PinIcon() {
+  return (
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="#0F2A4A">
+      <path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+    </svg>
   )
 }

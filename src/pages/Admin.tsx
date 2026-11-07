@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import {
+  CATEGORY_LABELS,
   formatDate,
   formatMoney,
   statusLabel,
@@ -8,6 +9,7 @@ import {
   type AdminJobRow,
   type AdminOverview,
   type AdminProviderRow,
+  type ServiceCategory,
 } from '../types'
 
 export default function Admin() {
@@ -121,7 +123,8 @@ export default function Admin() {
             {visibleJobs.map((j) => (
               <tr key={j.id}>
                 <td>{j.title}</td>
-                <td>{statusLabel(j.category)}</td>
+                {/* The industry name (step J1), or the old category's label on older jobs. */}
+                <td>{CATEGORY_LABELS[j.category as ServiceCategory] ?? j.category}</td>
                 <td><span className={`status status-${j.status.toLowerCase()}`}>{statusLabel(j.status)}</span></td>
                 <td>{j.customerName}</td>
                 <td>{j.providerName ?? <span className="muted">—</span>}</td>
