@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { Stars, StarInput } from '../components/Stars'
@@ -7,6 +7,8 @@ import { ProgressBar } from '../components/ProgressBar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ImageUploader } from '../components/ImageUploader'
 import { initialsOf } from '../components/mates/MateCard'
+import { StatCards, StepLine } from '../components/StepLine'
+import { StickyBar } from '../components/StickyBar'
 import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import { METHOD_LABELS, industryOf, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type SettlementStatus, type Wallet } from '../types'
 
@@ -24,9 +26,9 @@ import { METHOD_LABELS, industryOf, SIMULATION_LABELS, formatDate, formatDateTim
  */
 const JOBS_TABS = [
   { key: 'OPEN', label: 'Open' },
-  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'IN_PROGRESS', label: 'In progress' },
   { key: 'COMPLETED', label: 'Completed' },
-  { key: 'NOT_PROCEEDED', label: 'Not Proceeded' },
+  { key: 'NOT_PROCEEDED', label: 'Not proceeded' },
 ] as const
 
 type JobsTab = (typeof JOBS_TABS)[number]['key']
@@ -85,6 +87,34 @@ function subPageOf(job: Job, quotes: CustomerQuote[] | undefined): JobsTab {
   return markedComplete ? 'COMPLETED' : 'IN_PROGRESS'
 }
 
+/** Amount still to pay on a quote: the whole quote, or its stages that are due. */
+function owingOn(q: CustomerQuote): number {
+  if (q.stages && q.stages.length > 0) {
+    return q.stages.filter((st) => st.settlementStatus === 'PENDING_PAYMENT').reduce((sum, st) => sum + st.amount, 0)
+  }
+  return q.settlementStatus === 'PENDING_PAYMENT' ? q.total : 0
+}
+
+/**
+ * How many of the five steps (Quote accepted → Started → Marked complete →
+ * Paid → Reviewed) a job has passed, from what the page already holds.
+ */
+function stepsDone(job: Job, quotes: CustomerQuote[] | undefined, progress: ProgressEntry[], review: Review | null | undefined): number {
+  if (job.status === 'OPEN' || job.status === 'QUOTED' || job.status === 'CANCELLED') return 0
+  const accepted = (quotes ?? []).find((q) => q.status === 'ACCEPTED')
+  const units: (SettlementStatus | null)[] = accepted
+    ? (accepted.stages && accepted.stages.length > 0 ? accepted.stages.map((st) => st.settlementStatus) : [accepted.settlementStatus])
+    : []
+  const started = progress.length > 0 || job.status === 'COMPLETED' || units.some((u) => u !== 'PENDING_COMPLETION')
+  const complete = job.status === 'COMPLETED' || (units.length > 0 && !units.some((u) => u === 'PENDING_COMPLETION'))
+  const paid = complete && units.length > 0 && !units.some((u) => u === 'PENDING_COMPLETION' || u === 'PENDING_PAYMENT')
+  if (review) return 5
+  if (paid) return 4
+  if (complete) return 3
+  if (started) return 2
+  return 1
+}
+
 export default function MyJobs() {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState<Job[] | null>(null)
@@ -132,6 +162,9 @@ export default function MyJobs() {
   const owingCount = (jobs ?? []).filter((job) =>
     (quotesByJob[job.id] ?? []).some((q) => q.settlementStatus === 'PENDING_PAYMENT'
       || (q.stages ?? []).some((st) => st.settlementStatus === 'PENDING_PAYMENT'))).length
+
+  const toPay = (jobs ?? []).reduce((sum, job) => sum + (quotesByJob[job.id] ?? []).reduce((s2, q) => s2 + owingOn(q), 0), 0)
+  const quotesToReview = (jobs ?? []).filter((job) => job.status === 'QUOTED').length
 
   // Filter / sort / expand state for this box. Held outside the component so
   // it survives leaving the page and coming Back (UAT §5.3).
@@ -324,6 +357,27 @@ export default function MyJobs() {
       && (job.status === 'QUOTED' || (quotesByJob[job.id] ?? []).some(owes)))
   }
 
+  const topBlock = useRef<HTMLDivElement | null>(null)
+  const subTabs = (
+    <div className="mj-subtabs" role="tablist" aria-label="Requests and jobs">
+      {JOBS_TABS.map((t) => {
+        const waiting = waitingIn(t.key)
+        return (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span className={`mj-badge${waiting ? ' is-waiting' : ''}`}>{countOf(t.key)}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className="mj">
       <ConfirmDialog
@@ -352,7 +406,7 @@ export default function MyJobs() {
         <div className="mt-head-copy">
           <ClipboardIcon />
           <div>
-            <h2 className="mt-title">Your Requests &amp; Jobs</h2>
+            <h2 className="mt-title">Your requests &amp; jobs</h2>
             <p className="mt-sub">Every request, quote and job in one place.</p>
           </div>
         </div>
@@ -360,6 +414,15 @@ export default function MyJobs() {
           <PlusIcon /> New request
         </button>
       </div>
+
+      {jobs !== null && jobs.length > 0 && (
+        <StatCards items={[
+          { label: 'Open requests', value: String(countOf('OPEN')) },
+          { label: 'Quotes to review', value: String(quotesToReview) },
+          { label: 'Jobs in progress', value: String(countOf('IN_PROGRESS')) },
+          { label: 'To pay', value: formatMoney(toPay), tone: 'hi' },
+        ]} />
+      )}
 
       {error && <div className="msg err">{error}</div>}
       {jobs === null && !error && <div className="loading">Loading…</div>}
@@ -371,25 +434,8 @@ export default function MyJobs() {
         </div>
       )}
 
-      {jobs !== null && jobs.length > 0 && (
-        <div className="mj-subtabs" role="tablist" aria-label="Requests and jobs">
-          {JOBS_TABS.map((t) => {
-            const waiting = waitingIn(t.key)
-            return (
-              <button
-                key={t.key}
-                role="tab"
-                aria-selected={tab === t.key}
-                className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-                <span className={`mj-badge${waiting ? ' is-waiting' : ''}`}>{countOf(t.key)}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <div ref={topBlock} className="mt-top">
+      {jobs !== null && jobs.length > 0 && subTabs}
 
       {jobs !== null && jobs.length > 0 && owingCount > 0 && tab !== 'COMPLETED' && (
         <div className="mt-selbar mj-owing" role="status">
@@ -403,6 +449,18 @@ export default function MyJobs() {
         <div className="mj-controls">
           <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
         </div>
+      )}
+      </div>
+
+      {jobs && jobs.length > 0 && inTab.length > 0 && (
+        <StickyBar anchor={topBlock}>
+          {subTabs}
+          <span className="sb-field">
+            <input type="search" value={list.view.search} placeholder="Search your requests" aria-label="Search your requests"
+              onChange={(e) => list.setSearch(e.target.value)} />
+          </span>
+          <span className="sb-count">{list.shown} request{list.shown === 1 ? '' : 's'}</span>
+        </StickyBar>
       )}
 
       {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
@@ -508,6 +566,12 @@ export default function MyJobs() {
                     <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
                   )}
                 </div>
+
+                {job.status !== 'OPEN' && job.status !== 'QUOTED' && (
+                  <div className="mj-steps">
+                    <StepLine done={stepsDone(job, quotes, history, review)} />
+                  </div>
+                )}
 
                 {latest && (
                   <div className="mj-progress">
@@ -731,7 +795,7 @@ export default function MyJobs() {
 function ClipboardIcon() {
   return (
     <svg aria-hidden="true" className="mt-head-ico" width="48" height="48" viewBox="0 0 24 24" fill="none"
-      stroke="#0F2A4A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      stroke="#0B2038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 4V2.5h6V4" /><path d="M9 11h6M9 15h6M9 19h3" />
     </svg>
   )
@@ -750,7 +814,7 @@ function ArrowIcon() {
 }
 function PinIcon() {
   return (
-    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="#0F2A4A">
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="#0B2038">
       <path d="M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
     </svg>
   )

@@ -63,7 +63,7 @@ export default function Login() {
 
         <section className="lp-auth-form-side">
           <form className="lp-auth-form" onSubmit={onSubmit} noValidate>
-            <FormHead eyebrow="YOUR JOBBY-CONNECT ACCOUNT" title="Welcome back" sub="Log in to continue." />
+            <FormHead eyebrow="Your Jobby-Connect account" title="Welcome back" sub="Log in to continue." />
             {error && <FormError>{error}</FormError>}
 
             <Field id="login-email" label="Email address" type="email" value={email} onChange={setEmail}

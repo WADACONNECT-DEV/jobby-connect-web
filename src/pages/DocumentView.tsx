@@ -46,7 +46,7 @@ export default function DocumentView() {
   return (
     <div className="dv">
       <div className="dv-toolbar">
-        <button type="button" className="app-back" onClick={() => navigate(-1)}>← Back</button>
+        <button type="button" className="app-back" onClick={() => navigate(-1)}>← Account Ledger</button>
         {doc && (
           <div className="dv-actions">
             <button type="button" className="mt-btn-ghost" onClick={() => window.print()}><PrintIcon /> Print</button>

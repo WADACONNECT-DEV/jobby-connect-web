@@ -41,19 +41,19 @@ export default function ConfirmEmail() {
         <section className="lp-auth-form-side">
           <div className="lp-auth-form">
             {state === 'working' && (
-              <FormHead eyebrow="CHANGE OF EMAIL" title="Confirming…" sub="One moment while we update your account." />
+              <FormHead eyebrow="Change of email" title="Confirming…" sub="One moment while we update your account." />
             )}
             {state === 'done' && (
               <>
                 <div className="lp-auth-done-ico is-ok" aria-hidden="true"><IconMail /></div>
-                <FormHead eyebrow="CHANGE OF EMAIL" title="Email changed"
+                <FormHead eyebrow="Change of email" title="Email changed"
                   sub="Your login email has been updated. Log in with your new email address. You've been logged out on your other devices." />
                 <Link to="/login" className="lp-auth-submit is-link">Log in</Link>
               </>
             )}
             {state === 'error' && (
               <>
-                <FormHead eyebrow="CHANGE OF EMAIL" title="We couldn't confirm that link" sub={message} />
+                <FormHead eyebrow="Change of email" title="We couldn't confirm that link" sub={message} />
                 <Link to="/login" className="lp-auth-submit is-link">Go to log in</Link>
               </>
             )}

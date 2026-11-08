@@ -71,7 +71,7 @@ export default function Register() {
 
         <section className="lp-auth-form-side">
           <form className="lp-auth-form" onSubmit={onSubmit} noValidate>
-            <FormHead eyebrow="JOIN JOBBY-CONNECT" title="Create your free account"
+            <FormHead eyebrow="Join Jobby-Connect" title="Create your free account"
               sub="A few details and you're ready to begin." />
             {error && <FormError>{error}</FormError>}
 

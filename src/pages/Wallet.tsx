@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { usePersistedValue } from '../listView'
+import { StickyBar } from '../components/StickyBar'
 import { CATEGORY_LABELS, formatMoney, type ServiceCategory, type Wallet, type WalletEntry } from '../types'
 
 /**
@@ -64,8 +65,10 @@ function entryTime(e: WalletEntry, fallbackIndex: number): number {
   return Number.isNaN(t) ? fallbackIndex : t
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric' })
 const isoDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** "4 Jul 2026" in Melbourne time, always the 3-letter month. */
+const dateFmt = { format: (d: Date) => { const [y, m, day] = isoDayFmt.format(d).split('-').map(Number); return `${day} ${MONTHS[m - 1]} ${y}` } }
 
 function showDate(row: Row): string {
   return row.entry.createdAt ? dateFmt.format(new Date(row.at)) : row.entry.date
@@ -131,6 +134,7 @@ export default function WalletPage() {
   const [to, setTo] = usePersistedValue<string>('customer.points.to', '')
   const [type, setType] = usePersistedValue<string>('customer.points.type', '')
   const [search, setSearch] = usePersistedValue<string>('customer.points.search', '')
+  const topBlock = useRef<HTMLDivElement | null>(null)
   const [sortDir, setSortDir] = usePersistedValue<'asc' | 'desc'>('customer.points.sort', 'desc')
   const [page, setPage] = useState(1)
 
@@ -250,9 +254,10 @@ export default function WalletPage() {
             </div>
           ) : (
             <>
+              <div ref={topBlock} className="mt-top">
               <div className="mt-search mp-filters">
                 <label className="mt-field">
-                  <span>PERIOD</span>
+                  <span>Period</span>
                   <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
                     {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
                   </select>
@@ -260,24 +265,24 @@ export default function WalletPage() {
                 {period === 'CUSTOM' && (
                   <>
                     <label className="mt-field">
-                      <span>FROM</span>
+                      <span>From</span>
                       <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
                     </label>
                     <label className="mt-field">
-                      <span>TO</span>
+                      <span>To</span>
                       <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
                     </label>
                   </>
                 )}
                 <label className="mt-field">
-                  <span>TYPE</span>
+                  <span>Type</span>
                   <select value={type} onChange={(e) => setType(e.target.value)}>
                     <option value="">All</option>
                     {Object.entries(TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                   </select>
                 </label>
                 <label className="mt-field is-wide">
-                  <span>SEARCH</span>
+                  <span>Search</span>
                   <span className="mt-input">
                     <SearchIcon />
                     <input type="search" value={search} placeholder="Search descriptions"
@@ -292,6 +297,19 @@ export default function WalletPage() {
                 <div className="mp-sum is-redeemed"><span>Redeemed (−)</span><strong>{formatMoney(Math.abs(redeemed))}</strong></div>
                 <div className="mp-sum is-closing"><span>Closing balance</span><strong>{formatMoney(closing)}</strong></div>
               </div>
+              </div>
+
+              <StickyBar anchor={topBlock}>
+                <span className="sb-field">
+                  <select value={period} aria-label="Period" onChange={(e) => setPeriod(e.target.value as Period)}>
+                    {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </select>
+                </span>
+                <span className="sb-field">
+                  <input type="search" value={search} placeholder="Search descriptions" aria-label="Search" onChange={(e) => setSearch(e.target.value)} />
+                </span>
+                <span className="sb-count">{periodLabel} · {shownRows.length} entr{shownRows.length === 1 ? 'y' : 'ies'}</span>
+              </StickyBar>
 
               <div className="mt-toolbar">
                 <h3 className="mt-count">

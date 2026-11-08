@@ -67,15 +67,15 @@ export default function CustomerProfile() {
         {error && <div className="ac-msg is-err" role="alert">{error}</div>}
 
         <label className="mt-field">
-          <span><Ico><PersonIcon /></Ico>FULL NAME</span>
+          <span><Ico><PersonIcon /></Ico>Full name</span>
           <input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
         </label>
         <label className="mt-field">
-          <span><Ico><PhoneIcon /></Ico>MOBILE</span>
+          <span><Ico><PhoneIcon /></Ico>Mobile</span>
           <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="04xx xxx xxx" inputMode="tel" autoComplete="tel" />
         </label>
         <label className="mt-field">
-          <span><Ico><PinIcon /></Ico>YOUR ADDRESS <em>(OPTIONAL)</em></span>
+          <span><Ico><PinIcon /></Ico>Your address <em>(optional)</em></span>
           <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 12 Station St, Pakenham VIC 3810" autoComplete="street-address" />
         </label>
         <p className="cp-hint">Used to fill in the job address on a quote request. You can always type a different address for a particular job.</p>

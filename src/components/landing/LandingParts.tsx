@@ -63,7 +63,8 @@ export function ScrollLink({ to, className, children, ariaCurrent }: {
 /**
  * The landing pages' own top bar — they don't use the app's site header.
  *
- * "How it works" and the active half of the pill scroll within the page; the
+ * "How it works" and the active half of the pill scroll to the page's own
+ * section (For customers / For providers, id "get"); the
  * other half of the pill opens the other landing page.
  */
 export function LandingNav({ theme }: { theme: LandingTheme }) {
@@ -73,12 +74,13 @@ export function LandingNav({ theme }: { theme: LandingTheme }) {
       <nav aria-label="Main" className="lp-nav-in">
         <Link to="/" className="lp-brand">
           <span className="lp-brand-j" aria-hidden="true">J</span>
-          <span className="lp-brand-name">JOBBY-CONNECT</span>
-          {pro && <span className="lp-brand-badge">PROVIDERS</span>}
+          <span className="lp-brand-name">Jobby-Connect</span>
+          {pro && <span className="lp-brand-badge">Providers</span>}
         </Link>
 
         <div className="lp-nav-mid">
-          <ScrollLink to="how" className="lp-nav-link">How it works</ScrollLink>
+          {/* Goes to this page's own section: "For customers" here, "For providers" on the providers page. */}
+          <ScrollLink to="get" className="lp-nav-link">How it works</ScrollLink>
           <span className="lp-pill">
             {pro ? (
               <>

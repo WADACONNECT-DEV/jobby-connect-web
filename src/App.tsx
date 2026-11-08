@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom'
+import { api } from './api'
+import { formatMoney, type Wallet } from './types'
 import { useAuth, RequireAuth } from './auth'
 import { NotificationBell } from './components/NotificationBell'
 import { AccountMenu } from './components/frame/AccountMenu'
@@ -42,29 +45,73 @@ import Account from './pages/Account'
 import WalletPage from './pages/Wallet'
 import Notifications from './pages/Notifications'
 
+const PROVIDER_PATHS = ['/home/requests', '/home/quotes', '/home/work', '/home/provider-profile', '/home/referrals-provider', '/home/ledger-provider', '/provider']
+
 /**
- * Top bar on every logged-in page (redesign step 3, owner's mates design).
- * Same destinations and the same log-out action as before; the name link and
- * the Log out button now live in the avatar menu.
+ * Top bar on every logged-in page (design v2, 8 Nov 2026): logo, the person's
+ * name with their role and ID, the Mate Points chip, the bell and the avatar
+ * menu, on one 64-px row under a yellow rule. The navy welcome band is gone;
+ * what it carried lives here now. Same destinations and the same log-out
+ * action as before.
  */
 function Header() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const [points, setPoints] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (user?.customerProfileComplete) {
+      api<Wallet>('/points/wallet', 'GET').then((w) => setPoints(w.balance)).catch(() => {})
+    } else {
+      setPoints(null)
+    }
+  }, [user?.customerProfileComplete])
+
+  // The provider tabs are the only place the provider hat is on.
+  const asProvider = PROVIDER_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  const sub = asProvider
+    ? ['Provider', user?.providerRef].filter(Boolean).join(' · ')
+    : ['Customer', user?.customerRef].filter(Boolean).join(' · ')
+
   return (
     <header className="app-bar">
       <div className="app-bar-in">
         <Link to={user ? '/home' : '/'} className="lp-brand">
           <span className="lp-brand-j" aria-hidden="true">J</span>
-          <span className="lp-brand-name">JOBBY-CONNECT</span>
+          <span className="lp-brand-name">Jobby-Connect</span>
         </Link>
         {user && (
-          <div className="app-bar-end">
-            <NotificationBell />
-            <AccountMenu fullName={user.fullName} onLogout={() => { logout(); navigate('/') }} />
-          </div>
+          <>
+            <div className="app-greet">
+              <b>{user.fullName}</b>
+              <span>{sub}</span>
+            </div>
+            <div className="app-bar-end">
+              {points !== null && (
+                <Link to="/home/points" className="app-pts" aria-label={`Mate Points balance ${formatMoney(points)}`}>
+                  <CoinIcon />
+                  <span className="app-pts-label">Mate Points</span>
+                  <em>{formatMoney(points)}</em>
+                </Link>
+              )}
+              <NotificationBell />
+              <AccountMenu fullName={user.fullName} onLogout={() => { logout(); navigate('/') }} />
+            </div>
+          </>
         )}
       </div>
     </header>
+  )
+}
+
+/** The coin on the Mate Points chip. Decorative. */
+function CoinIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" fill="#F7C21B" stroke="#D9A400" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="5.5" fill="none" stroke="#D9A400" strokeWidth="1.2" />
+    </svg>
   )
 }
 

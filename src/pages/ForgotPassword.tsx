@@ -42,7 +42,7 @@ export default function ForgotPassword() {
           {sentTo ? (
             <div className="lp-auth-form">
               <div className="lp-auth-done-ico" aria-hidden="true"><IconMail /></div>
-              <FormHead eyebrow="RESET YOUR PASSWORD" title="Check your email"
+              <FormHead eyebrow="Reset your password" title="Check your email"
                 sub={<>If an account exists for <strong>{sentTo}</strong>, we've sent a link to reset your password.
                   The link works once, for 1 hour.</>} />
               <p className="lp-auth-note">
@@ -53,7 +53,7 @@ export default function ForgotPassword() {
             </div>
           ) : (
             <form className="lp-auth-form" onSubmit={onSubmit} noValidate>
-              <FormHead eyebrow="RESET YOUR PASSWORD" title="Forgot your password?"
+              <FormHead eyebrow="Reset your password" title="Forgot your password?"
                 sub="Enter the email address you signed up with and we'll send you a link to set a new one." />
               {error && <FormError>{error}</FormError>}
 

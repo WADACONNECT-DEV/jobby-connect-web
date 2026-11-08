@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { StickyBar } from '../components/StickyBar'
 import { clearPlatformSettings } from '../platform'
 import {
   bpsToPercent,
@@ -28,6 +29,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function AdminMasterData() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('industries')
+  const topBlock = useRef<HTMLDivElement | null>(null)
   const [error, setError] = useState('')
 
   return (
@@ -38,13 +40,23 @@ export default function AdminMasterData() {
       </div>
       <p className="page-intro">Manage the platform catalogue and rates. Changes take effect immediately.</p>
 
-      <div className="md-tabs">
+      <div className="md-tabs" ref={topBlock}>
         {TABS.map((t) => (
           <button key={t.key} className={`md-tab${tab === t.key ? ' on' : ''}`} onClick={() => { setTab(t.key); setError('') }}>
             {t.label}
           </button>
         ))}
       </div>
+      <StickyBar anchor={topBlock}>
+        <div className="md-tabs" style={{ margin: 0, border: 0 }}>
+          {TABS.map((t) => (
+            <button key={t.key} className={`md-tab${tab === t.key ? ' on' : ''}`} onClick={() => { setTab(t.key); setError('') }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="sb-count">Master data</span>
+      </StickyBar>
 
       {error && <div className="msg err">{error}</div>}
 

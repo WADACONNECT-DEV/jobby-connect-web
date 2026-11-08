@@ -409,7 +409,7 @@ export default function ProviderProfile() {
       ? (media.length + premium.highlights.length > 0
         ? <span className="pf-count">{media.length} photo{media.length === 1 ? '' : 's'} · {premium.highlights.length} highlight{premium.highlights.length === 1 ? '' : 's'}</span>
         : null)
-      : <span className="pf-premium">PREMIUM</span>,
+      : <span className="pf-premium">Premium</span>,
   }
 
   const checklist: { label: string; done: boolean }[] = [
@@ -477,7 +477,7 @@ export default function ProviderProfile() {
             <section className="pf-section">
               <h3 className="pf-h">Business details</h3>
               <label className="mt-field">
-                <span>BUSINESS NAME</span>
+                <span>Business name</span>
                 <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Rivertown Plumbing" />
               </label>
               <div className="pr-two pf-two">
@@ -486,7 +486,7 @@ export default function ProviderProfile() {
                   <input value={abn} onChange={(e) => setAbn(e.target.value)} placeholder="Australian Business Number" />
                 </label>
                 <label className="mt-field">
-                  <span>SUBSCRIPTION PLAN</span>
+                  <span>Subscription plan</span>
                   <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
                     <option value="">Default</option>
                     {plans.map((p) => <option key={p.id} value={p.id}>{planLabel(p)}</option>)}
@@ -499,17 +499,17 @@ export default function ProviderProfile() {
               </label>
               <div className="pr-two pf-two">
                 <label className="mt-field">
-                  <span>PAYOUT BSB</span>
+                  <span>Payout BSB</span>
                   <input value={payoutBsb} inputMode="numeric" maxLength={7} onChange={(e) => setPayoutBsb(e.target.value)} placeholder="e.g. 063-000" />
                 </label>
                 <label className="mt-field">
-                  <span>PAYOUT ACCOUNT NUMBER</span>
+                  <span>Payout account number</span>
                   <input value={payoutAccount} inputMode="numeric" maxLength={12} onChange={(e) => setPayoutAccount(e.target.value)} placeholder="Where your payouts go" />
                 </label>
               </div>
               <p className="pf-hint">Payout receipts show only the last 4 digits of the account.</p>
               <label className="mt-field" htmlFor="promo-points">
-                <span>PROMOTIONAL MATE POINTS OFFERED (OPTIONAL)</span>
+                <span>Promotional Mate Points offered (optional)</span>
                 <input
                   id="promo-points"
                   type="number"
@@ -533,7 +533,7 @@ export default function ProviderProfile() {
               <p className="pf-lead">The industries you work in, and the services within each. Your Services page is built from these.</p>
 
               <label className="mt-field">
-                <span>FIND AN INDUSTRY</span>
+                <span>Find an industry</span>
                 <span className="mt-input">
                   <SearchIcon />
                   <input type="search" value={industryQuery} onChange={(e) => setIndustryQuery(e.target.value)} placeholder="e.g. Plumbing" />
@@ -651,7 +651,7 @@ export default function ProviderProfile() {
               <p className="pf-lead">You'll only get requests from customers in the suburbs you pick. Customers just see the suburb names.</p>
 
               <div className="mt-field">
-                <span>ADD SUBURBS</span>
+                <span>Add suburbs</span>
                 <div className="typeahead pf-typeahead">
                   <input
                     value={suburbQuery}
@@ -707,7 +707,7 @@ export default function ProviderProfile() {
                 )}
 
               <label className="mt-field">
-                <span>AREA DESCRIPTION (SHOWN ON YOUR PAGE)</span>
+                <span>Area description (shown on your page)</span>
                 <input value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} placeholder="e.g. Inner Melbourne" />
               </label>
             </section>
@@ -722,7 +722,7 @@ export default function ProviderProfile() {
               </p>
 
               <div className="mt-field">
-                <span>THEME</span>
+                <span>Theme</span>
                 <div className="pf-themes" role="radiogroup" aria-label="Theme">
                   {THEMES.map((t) => (
                     <button key={t.key} type="button" role="radio" aria-checked={siteTheme === t.key}
@@ -742,26 +742,26 @@ export default function ProviderProfile() {
               </div>
 
               <label className="mt-field">
-                <span>SHORT DESCRIPTION <em className="pf-n">{bio.length} / {BIO_MAX}</em></span>
+                <span>Short description <em className="pf-n">{bio.length} / {BIO_MAX}</em></span>
                 <textarea rows={2} maxLength={BIO_MAX} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="One line customers see in search results…" />
               </label>
               <label className="mt-field">
-                <span>ABOUT US <em className="pf-n">{aboutText.length} / {ABOUT_MAX}</em></span>
+                <span>About us <em className="pf-n">{aboutText.length} / {ABOUT_MAX}</em></span>
                 <textarea rows={6} maxLength={ABOUT_MAX} value={aboutText} onChange={(e) => setAboutText(e.target.value)}
                   placeholder="Your story, experience, what you specialise in. Blank lines start a new paragraph." />
               </label>
               <div className="pr-two pf-two">
                 <label className="mt-field">
-                  <span>CONTACT PHONE (OPTIONAL)</span>
+                  <span>Contact phone (optional)</span>
                   <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="e.g. 03 9000 0000" />
                 </label>
                 <label className="mt-field">
-                  <span>CONTACT EMAIL (OPTIONAL)</span>
+                  <span>Contact email (optional)</span>
                   <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="e.g. hello@yourbusiness.com.au" />
                 </label>
               </div>
               <label className="mt-field">
-                <span>OPENING HOURS (OPTIONAL)</span>
+                <span>Opening hours (optional)</span>
                 <input value={contactHours} onChange={(e) => setContactHours(e.target.value)} placeholder="e.g. Mon–Fri 7am–5pm, Sat by appointment" />
               </label>
             </section>
@@ -769,7 +769,7 @@ export default function ProviderProfile() {
 
           {section === 'premium' && !isPremium && (
             <section className="pf-section">
-              <h3 className="pf-h">Photos &amp; highlights <span className="pf-premium">PREMIUM</span></h3>
+              <h3 className="pf-h">Photos &amp; highlights <span className="pf-premium">Premium</span></h3>
               <p className="pf-lead">
                 Premium adds pictures and highlights to your public page.
                 {premiumPlan
@@ -796,7 +796,7 @@ export default function ProviderProfile() {
 
           {section === 'premium' && isPremium && (
             <section className="pf-section pf-prem">
-              <h3 className="pf-h">Photos &amp; highlights <span className="pf-premium">PREMIUM</span></h3>
+              <h3 className="pf-h">Photos &amp; highlights <span className="pf-premium">Premium</span></h3>
               <p className="pf-lead">Photos upload as soon as you choose them. Text here is saved with the rest of your profile.</p>
 
               {/* 1. Logo and hero */}
@@ -909,11 +909,11 @@ export default function ProviderProfile() {
               {/* 6. Links */}
               <div className="pr-two pf-two">
                 <label className="mt-field">
-                  <span>WEBSITE (OPTIONAL)</span>
+                  <span>Website (optional)</span>
                   <input maxLength={200} value={premium.website ?? ''} onChange={(e) => setP('website', e.target.value)} placeholder="https://" />
                 </label>
                 <label className="mt-field">
-                  <span>VIDEO LINK (OPTIONAL)</span>
+                  <span>Video link (optional)</span>
                   <input maxLength={300} value={premium.videoUrl ?? ''} onChange={(e) => setP('videoUrl', e.target.value)} placeholder="A YouTube or Vimeo link" />
                 </label>
               </div>

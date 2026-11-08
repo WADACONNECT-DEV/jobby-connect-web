@@ -57,20 +57,20 @@ export default function ResetPassword() {
         <section className="lp-auth-form-side">
           {!token ? (
             <div className="lp-auth-form">
-              <FormHead eyebrow="RESET YOUR PASSWORD" title="This link isn't complete"
+              <FormHead eyebrow="Reset your password" title="This link isn't complete"
                 sub="Open the link from your email again, or ask for a new one." />
               <Link to="/forgot-password" className="lp-auth-submit is-link">Request a new link</Link>
             </div>
           ) : done ? (
             <div className="lp-auth-form">
               <div className="lp-auth-done-ico is-ok" aria-hidden="true"><IconLock /></div>
-              <FormHead eyebrow="RESET YOUR PASSWORD" title="Password updated"
+              <FormHead eyebrow="Reset your password" title="Password updated"
                 sub="You can now log in with your new password. You've been logged out on your other devices." />
               <Link to="/login" className="lp-auth-submit is-link">Log in</Link>
             </div>
           ) : (
             <form className="lp-auth-form" onSubmit={onSubmit} noValidate>
-              <FormHead eyebrow="RESET YOUR PASSWORD" title="Set a new password"
+              <FormHead eyebrow="Reset your password" title="Set a new password"
                 sub="Choose a new password for your Jobby-Connect account." />
               {error && (
                 <FormError>

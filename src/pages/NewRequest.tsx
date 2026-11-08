@@ -229,11 +229,11 @@ export default function NewRequest() {
           <section className="rq-card">
             <h2 className="rq-card-title"><span className="rq-n">1</span>What do you need?</h2>
             <label className="mt-field">
-              <span>JOB TITLE</span>
+              <span>Job title</span>
               <input id="job-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Vacate clean, 2-bed unit" />
             </label>
             <label className="mt-field">
-              <span>SERVICE INDUSTRY</span>
+              <span>Service industry</span>
               <select id="job-industry" value={industryId} onChange={(e) => setIndustryId(e.target.value)}>
                 <option value="">Choose…</option>
                 {grouped.map((g) => g.name
@@ -246,7 +246,7 @@ export default function NewRequest() {
               </select>
             </label>
             <label className="mt-field">
-              <span>DESCRIBE THE JOB</span>
+              <span>Describe the job</span>
               <textarea id="job-description" rows={5} maxLength={DESCRIPTION_MAX} value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What needs doing, size, access, anything providers should know…" />
@@ -261,11 +261,11 @@ export default function NewRequest() {
             <h2 className="rq-card-title"><span className="rq-n">2</span>Where is the job?</h2>
             <div className="rq-two">
               <div className="mt-field rq-suburb">
-                <span><label htmlFor="job-suburb">SUBURB</label></span>
+                <span><label htmlFor="job-suburb">Suburb</label></span>
                 <SuburbPicker id="job-suburb" value={suburb} onChange={setSuburb} />
               </div>
               <label className="mt-field">
-                <span>JOB ADDRESS <em>(OPTIONAL)</em></span>
+                <span>Job address <em>(optional)</em></span>
                 <input id="job-address" value={jobAddress} onChange={(e) => setJobAddress(e.target.value)} placeholder="Street address for the work" />
               </label>
             </div>
@@ -289,7 +289,7 @@ export default function NewRequest() {
           <section className="rq-card">
             <h2 className="rq-card-title"><span className="rq-n">4</span>When? <em>(optional)</em></h2>
             <div className="mt-field">
-              <span>TIME FRAME</span>
+              <span>Time frame</span>
               <div className="rq-chips" role="group" aria-label="Time frame">
                 {TIME_FRAMES.map((t) => (
                   <button type="button" key={t} className={`rq-chip${timeFrame === t ? ' is-on' : ''}`}
@@ -309,7 +309,7 @@ export default function NewRequest() {
               )}
             </div>
             <label className="mt-field rq-half">
-              <span>REQUEST EXPIRES <em>(OPTIONAL)</em></span>
+              <span>Request expires <em>(optional)</em></span>
               <input id="job-expires" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
             </label>
           </section>
@@ -353,7 +353,7 @@ function NextSteps() {
 function DocIcon() {
   return (
     <svg aria-hidden="true" className="mt-head-ico" width="46" height="46" viewBox="0 0 24 24" fill="none"
-      stroke="#0F2A4A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      stroke="#0B2038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4" y="3" width="13" height="18" rx="2" /><path d="M8 8h5M8 12h5M8 16h3" />
       <path d="M19 11l2 2-2 2" stroke="#D9A400" strokeWidth="2.2" />
     </svg>

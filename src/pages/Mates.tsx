@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { MateCard } from '../components/mates/MateCard'
+import { StickyBar } from '../components/StickyBar'
 import { byDate, byNumber, byText, useListView, usePersistedValue, type FilterOption } from '../listView'
 import { useMaxProvidersPerRequest } from '../platform'
 import { type Mate } from '../types'
@@ -46,6 +47,7 @@ export default function Mates() {
   // Grid is the default: the first screen should show several providers at a
   // glance (UAT Round 2 §4.2). The choice is remembered for the session.
   const [layout, setLayout] = usePersistedValue<Layout>('customer.mates.layout', 'grid')
+  const topBlock = useRef<HTMLFormElement | null>(null)
 
   // Which mates are ticked for a single multi-provider request. Deliberately
   // NOT persisted - a stale selection surviving a page revisit would be a
@@ -180,9 +182,9 @@ export default function Mates() {
       {hasMates && (
         <>
           {/* Search row */}
-          <form className="mt-search" role="search" onSubmit={(e) => { e.preventDefault(); goToResults() }}>
+          <form className="mt-search" role="search" ref={topBlock} onSubmit={(e) => { e.preventDefault(); goToResults() }}>
             <label className="mt-field is-wide">
-              <span>SEARCH YOUR MATES</span>
+              <span>Search your mates</span>
               <span className="mt-input">
                 <SearchIcon />
                 <input type="search" value={list.view.search} placeholder="Provider name or keyword"
@@ -190,21 +192,21 @@ export default function Mates() {
               </span>
             </label>
             <label className="mt-field">
-              <span>INDUSTRY</span>
+              <span>Industry</span>
               <select value={filterValue('industry')} onChange={(e) => list.setFilter('industry', e.target.value)}>
                 <option value="">All industries</option>
                 {optionsFor('industry').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
             <label className="mt-field">
-              <span>SERVICE</span>
+              <span>Service</span>
               <select value={filterValue('service')} onChange={(e) => list.setFilter('service', e.target.value)}>
                 <option value="">All services</option>
                 {optionsFor('service').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
             <label className="mt-field">
-              <span>SUBURB</span>
+              <span>Suburb</span>
               <select value={filterValue('suburb')} onChange={(e) => list.setFilter('suburb', e.target.value)}>
                 <option value="">All suburbs</option>
                 {optionsFor('suburb').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -212,6 +214,21 @@ export default function Mates() {
             </label>
             <button type="submit" className="mt-search-btn"><SearchIcon light /> Search</button>
           </form>
+
+          <StickyBar anchor={topBlock}>
+            <span className="mt-input">
+              <SearchIcon />
+              <input type="search" value={list.view.search} placeholder="Provider name or keyword" aria-label="Search your mates"
+                onChange={(e) => list.setSearch(e.target.value)} />
+            </span>
+            <span className="sb-field">
+              <select value={filterValue('industry')} aria-label="Industry" onChange={(e) => list.setFilter('industry', e.target.value)}>
+                <option value="">All industries</option>
+                {optionsFor('industry').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </span>
+            <span className="sb-count">{list.shown === list.total ? `${list.total} saved mate${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} saved mates`}{selected.length > 0 ? ` · ${selected.length} selected` : ''}</span>
+          </StickyBar>
 
           <button type="button" className="mt-filters-toggle" aria-expanded={filtersOpen}
             onClick={() => setFiltersOpen((o) => !o)}>
@@ -341,7 +358,7 @@ export default function Mates() {
 function PeopleHeartIcon() {
   return (
     <svg aria-hidden="true" className="mt-head-ico" width="52" height="52" viewBox="0 0 48 48" fill="none"
-      stroke="#0F2A4A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      stroke="#0B2038" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M24 40L9.5 26a8.5 8.5 0 0 1 12-12L24 16.5l2.5-2.5a8.5 8.5 0 0 1 12 12" />
       <circle cx="33" cy="29" r="4.5" />
       <path d="M25 44c0-4.4 3.6-7.5 8-7.5s8 3.1 8 7.5" />

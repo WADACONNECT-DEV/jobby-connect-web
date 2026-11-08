@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { usePersistedValue } from '../listView'
 import { initialsOf } from '../components/mates/MateCard'
+import { StickyBar } from '../components/StickyBar'
 import {
   formatDate,
   formatMoney,
@@ -115,6 +116,7 @@ export default function JobbyMate() {
   // ---- connection list: status filter + search, remembered after Back ----
   const [status, setStatus] = usePersistedValue<string>('referrals.status', '')
   const [filter, setFilter] = usePersistedValue<string>('referrals.search', '')
+  const topBlock = useRef<HTMLDivElement | null>(null)
   const statusesPresent = useMemo(
     () => Array.from(new Set(mates.map((m) => m.pointsStatus))),
     [mates],
@@ -159,20 +161,20 @@ export default function JobbyMate() {
       <div className="jr-cards">
         {/* Flow A: invite a provider (any member can) */}
         <section className="jr-card">
-          <h3 className="jr-card-title">Invite a provider <span className="jr-badge">EARN POINTS</span></h3>
+          <h3 className="jr-card-title">Invite a provider <span className="jr-badge">Earn points</span></h3>
           <p className="jr-card-sub">Know a great tradie or local business? Send them an invite. When they join and accept, you earn Mate Points.</p>
           <form className="jr-form" onSubmit={(e) => { e.preventDefault(); if (provMobile.trim()) inviteProvider() }}>
             <label className="mt-field is-full">
-              <span>PROVIDER MOBILE NUMBER</span>
+              <span>Provider mobile number</span>
               <input type="tel" inputMode="tel" placeholder="04xx xxx xxx" value={provMobile}
                 onChange={(e) => setProvMobile(e.target.value)} />
             </label>
             <label className="mt-field">
-              <span>THEIR NAME (OPTIONAL)</span>
+              <span>Their name (optional)</span>
               <input placeholder="e.g. Sam's Plumbing" value={provName} onChange={(e) => setProvName(e.target.value)} />
             </label>
             <label className="mt-field">
-              <span>INDUSTRY (OPTIONAL)</span>
+              <span>Industry (optional)</span>
               <input placeholder="e.g. Plumbing" value={provIndustry} onChange={(e) => setProvIndustry(e.target.value)} />
             </label>
             <button type="submit" className="jr-send" disabled={!provMobile.trim()}>Send invite →</button>
@@ -185,7 +187,7 @@ export default function JobbyMate() {
           <p className="jr-card-sub">Someone invited you? Enter the code from your message to connect with them.</p>
           <form className="jr-claim" onSubmit={(e) => { e.preventDefault(); if (claimCode.trim()) claim() }}>
             <label className="mt-field">
-              <span>REFERRAL CODE</span>
+              <span>Referral code</span>
               <input placeholder="Referral code" value={claimCode} onChange={(e) => setClaimCode(e.target.value)} />
             </label>
             <button type="submit" className="jr-claim-btn" disabled={!claimCode.trim()}>Claim</button>
@@ -210,7 +212,7 @@ export default function JobbyMate() {
             </label>
             {offerPoints && (
               <label className="mt-field jr-narrow">
-                <span>POINTS PER CUSTOMER</span>
+                <span>Points per customer</span>
                 <input type="number" min={0} value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} />
               </label>
             )}
@@ -238,7 +240,7 @@ export default function JobbyMate() {
       )}
 
       {/* connections list */}
-      <div className="mt-toolbar jr-conn-head">
+      <div className="mt-toolbar jr-conn-head" ref={topBlock}>
         <h3 className="jr-conn-title">Your connections <span className="jr-count">· {mates.length}</span></h3>
         <div className="mt-toolbar-end">
           <label className="mt-sort">
@@ -255,6 +257,23 @@ export default function JobbyMate() {
           </span>
         </div>
       </div>
+
+      {mates.length > 0 && (
+        <StickyBar anchor={topBlock}>
+          <span className="sb-field">
+            <select value={status} aria-label="Status" onChange={(e) => setStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              {statusesPresent.map((s) => <option key={s} value={s}>{referralStatusLabel(s)}</option>)}
+            </select>
+          </span>
+          <span className="mt-input">
+            <SearchIcon />
+            <input type="search" placeholder={isProvider ? 'Name, suburb or industry' : 'Name or industry'}
+              value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search connections" />
+          </span>
+          <span className="sb-count">{mates.length} connection{mates.length === 1 ? '' : 's'}</span>
+        </StickyBar>
+      )}
 
       {loading ? (
         <div className="loading">Loading…</div>
@@ -324,7 +343,7 @@ function summarise(res: InviteResult): string {
 function PeoplePlusIcon() {
   return (
     <svg aria-hidden="true" className="mt-head-ico" width="48" height="48" viewBox="0 0 24 24" fill="none"
-      stroke="#0F2A4A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      stroke="#0B2038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="8" r="3.2" /><circle cx="15.5" cy="9" r="2.6" />
       <path d="M2.5 19c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5M13.5 14.2c.6-.2 1.3-.3 2-.3 2.6 0 4.5 1.9 4.5 4.6" />
       <path d="M19.5 2.5v4M17.5 4.5h4" stroke="#D9A400" strokeWidth="2.2" />

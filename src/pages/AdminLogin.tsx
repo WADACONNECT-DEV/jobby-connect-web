@@ -29,7 +29,7 @@ export default function AdminLogin() {
         <div className="admin-brand">
           <span className="brand-mark">J</span>
           <div>
-            <div className="admin-brand-name">JOBBY-CONNECT</div>
+            <div className="admin-brand-name">Jobby-Connect</div>
             <div className="admin-brand-sub">Admin Portal</div>
           </div>
         </div>

@@ -191,7 +191,7 @@ export default function Landing() {
       {/* ---------- everything you get ---------- */}
       <section id="get" tabIndex={-1} className="lp-get">
         <div className="lp-section-head">
-          <span className="lp-kicker">FOR CUSTOMERS</span>
+          <span className="lp-kicker">For customers</span>
           <h2 className="lp-h2">Everything you get with a free account</h2>
           <p className="lp-sub">From your first search to your next trusted Jobby Mate.</p>
         </div>

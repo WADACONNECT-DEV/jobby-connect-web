@@ -144,7 +144,7 @@ export default function ProviderView() {
               ? <img className="pv-logo" src={urls[logo.id]} alt="" />
               : <span className="pv-initials" aria-hidden="true">{initialsOf(provider.businessName)}</span>}
             <div className="pv-hero-main">
-              <h1 className="pv-name">{provider.businessName}{premium && <span className="pv-premium">PREMIUM</span>}</h1>
+              <h1 className="pv-name">{provider.businessName}{premium && <span className="pv-premium">Premium</span>}</h1>
               {(headIndustries || headSuburbs) && (
                 <p className="pv-line">{[headIndustries, headSuburbs].filter(Boolean).join(' · ')}</p>
               )}
@@ -213,7 +213,7 @@ export default function ProviderView() {
                   {provider.bio && <p className="pv-lead">{provider.bio}</p>}
                   {whatWeDo.length > 0 && (
                     <>
-                      <h3 className="pv-label">WHAT WE DO</h3>
+                      <h3 className="pv-label">What we do</h3>
                       <div className="pv-chips">
                         {whatWeDo.map((w, i) => <span className="pv-chip" key={`${w}-${i}`}>{w}</span>)}
                       </div>

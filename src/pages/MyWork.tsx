@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { StickyBar } from '../components/StickyBar'
 import { useAuth } from '../auth'
 import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import { initialsOf } from '../components/mates/MateCard'
@@ -254,6 +255,24 @@ export default function MyWork() {
     COMPLETED: 'Nothing marked complete and waiting on payment or review.',
   }
 
+  const topBlock = useRef<HTMLDivElement | null>(null)
+  const subTabs = (
+    <div className="mj-subtabs" role="tablist" aria-label="Your work">
+        {WORK_TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span className="mj-badge">{countOf(t.key)}</span>
+          </button>
+        ))}
+      </div>
+  )
+
   return (
     <div className="mt pr yw">
       <div className="mt-head">
@@ -277,27 +296,13 @@ export default function MyWork() {
         </div>
       )}
 
-      {jobs !== null && jobs.length > 0 && (
-        <div className="mj-subtabs" role="tablist" aria-label="Your work">
-          {WORK_TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-              <span className="mj-badge">{countOf(t.key)}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div ref={topBlock} className="mt-top">
+      {jobs !== null && jobs.length > 0 && subTabs}
 
       {inTab.length > 0 && (
         <div className="mt-search pr-filters yw-filters">
           <label className="mt-field is-wide">
-            <span>SEARCH JOBS</span>
+            <span>Search jobs</span>
             <span className="mt-input">
               <SearchIcon />
               <input type="search" value={list.view.search} placeholder="Title, suburb, customer or address"
@@ -305,14 +310,14 @@ export default function MyWork() {
             </span>
           </label>
           <label className="mt-field">
-            <span>INDUSTRY</span>
+            <span>Industry</span>
             <select value={list.view.filters.category ?? ''} onChange={(e) => list.setFilter('category', e.target.value)}>
               <option value="">All industries</option>
               {industries.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>SORT BY</span>
+            <span>Sort by</span>
             <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
               {list.sorts.map((so) => <option key={so.key} value={so.key}>{so.label}</option>)}
             </select>
@@ -326,6 +331,19 @@ export default function MyWork() {
 
       {inTab.length > 0 && (
         <h3 className="mt-count">{list.shown === list.total ? `${list.total} job${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} jobs`}</h3>
+      )}
+      </div>
+
+      {inTab.length > 0 && (
+        <StickyBar anchor={topBlock}>
+          {subTabs}
+          <span className="mt-input">
+            <SearchIcon />
+            <input type="search" value={list.view.search} placeholder="Title, suburb, customer or address" aria-label="Search jobs"
+              onChange={(e) => list.setSearch(e.target.value)} />
+          </span>
+          <span className="sb-count">{list.shown === list.total ? `${list.total} job${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} jobs`}</span>
+        </StickyBar>
       )}
 
       {jobs !== null && jobs.length > 0 && inTab.length === 0 && (
@@ -413,7 +431,7 @@ export default function MyWork() {
                     {progressError && <div className="jr-msg is-err">{progressError}</div>}
                     <div className="pr-two yw-two">
                       <label className="mt-field">
-                        <span>PERCENTAGE COMPLETE</span>
+                        <span>Percentage complete</span>
                         <input
                           type="number" min="0" max="100" step="1"
                           value={percent}
@@ -422,7 +440,7 @@ export default function MyWork() {
                         />
                       </label>
                       <label className="mt-field">
-                        <span>NOTE (OPTIONAL)</span>
+                        <span>Note (optional)</span>
                         <input
                           value={note}
                           onChange={(e) => setNote(e.target.value)}

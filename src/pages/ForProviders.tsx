@@ -194,7 +194,7 @@ export default function ForProviders() {
       <section id="join" className="lp-join">
         <div className="lp-join-in">
           <div className="lp-join-head">
-            <span className="lp-kicker">HOW TO JOIN</span>
+            <span className="lp-kicker">How to join</span>
             <h2 className="lp-h2-sm">Three steps to your first request</h2>
           </div>
           <ol className="lp-join-steps">
@@ -214,7 +214,7 @@ export default function ForProviders() {
       {/* ---------- everything you get ---------- */}
       <section id="get" tabIndex={-1} className="lp-get">
         <div className="lp-section-head">
-          <span className="lp-kicker">FOR PROVIDERS</span>
+          <span className="lp-kicker">For providers</span>
           <h2 className="lp-h2">Grow your business, on fair terms</h2>
           <p className="lp-sub">No lead fees. Private requests. Paid when the job is done.</p>
         </div>

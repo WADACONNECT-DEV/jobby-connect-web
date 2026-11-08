@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { StatCards } from '../components/StepLine'
+import { StickyBar } from '../components/StickyBar'
 import {
   CATEGORY_LABELS,
   formatDate,
@@ -20,6 +22,7 @@ export default function Admin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [jobFilter, setJobFilter] = useState<string>('ALL')
+  const topBlock = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -44,60 +47,84 @@ export default function Admin() {
 
   const statuses = Object.keys(overview.jobsByStatus)
   const visibleJobs = jobs.filter((j) => jobFilter === 'ALL' || j.status === jobFilter)
+  const weeks = completedPerWeek(jobs)
+  const weekMax = Math.max(1, ...weeks.map((w) => w.count))
 
   return (
     <>
-      <div className="page-head">
-        <h2>Admin dashboard</h2>
-      </div>
-
-      {/* Overview stat cards */}
-      <div className="stat-grid">
-        <Stat label="Users" value={overview.totalUsers} />
-        <Stat label="Providers" value={overview.totalProviders} />
-        <Stat label="Jobs" value={overview.totalJobs} />
-        <Stat label="Reviews" value={overview.totalReviews} />
-        <Stat label="Avg rating" value={overview.platformAverageRating || '—'} />
-      </div>
-
-      {/* Jobs by status */}
-      <h3 className="section-title">Jobs by status</h3>
-      <div className="pill-row">
-        {statuses.map((s) => (
-          <div className="pill" key={s}>
-            <span className={`status status-${s.toLowerCase()}`}>{statusLabel(s)}</span>
-            <span className="pill-num">{overview.jobsByStatus[s]}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Payments - placeholder until built */}
-      <h3 className="section-title">Payments <span className="soon">COMING SOON</span></h3>
-      <div className="stat-grid">
-        <Stat label="Pending payouts" value={overview.pendingPayouts} muted />
-        <Stat label="Held funds" value={formatMoney(overview.heldFundsCents / 100)} muted />
-        <Stat label="Payment issues" value={overview.paymentIssues} muted />
-      </div>
-
-      {/* Flags */}
-      <h3 className="section-title">Needs attention ({flags.length})</h3>
-      {flags.length === 0 ? (
-        <div className="empty"><p>Nothing flagged. All clear.</p></div>
-      ) : (
-        <div className="flag-list">
-          {flags.map((f, i) => (
-            <div className={`flag flag-${f.severity.toLowerCase()}`} key={i}>
-              <span className="flag-type">{f.type.replace('_', ' ')}</span>
-              <span className="flag-msg">{f.message}</span>
-              {f.since && <span className="flag-since">{formatDate(f.since)}</span>}
-            </div>
-          ))}
+      <div className="mt-head">
+        <div>
+          <h2 className="mt-title">Overview</h2>
+          <p className="mt-sub">{today()}</p>
         </div>
-      )}
+      </div>
+
+      <StatCards items={[
+        { label: 'Users', value: overview.totalUsers.toLocaleString('en-AU') },
+        { label: 'Providers', value: overview.totalProviders.toLocaleString('en-AU') },
+        { label: 'Jobs', value: overview.totalJobs.toLocaleString('en-AU') },
+        { label: 'Reviews', value: overview.totalReviews.toLocaleString('en-AU') },
+        { label: 'Average rating', value: overview.platformAverageRating ? overview.platformAverageRating.toFixed(1) : '—' },
+      ]} />
+
+      <div className="adm-two">
+        <section className="md-panel adm-chart">
+          <h3 className="sub">Jobs completed per week</h3>
+          {weeks.every((w) => w.count === 0) ? (
+            <p className="muted small">No completed jobs in the last 14 weeks.</p>
+          ) : (
+            <>
+              <div className="adm-bars" role="img" aria-label={`Jobs completed per week, last 14 weeks: ${weeks.map((w) => w.count).join(', ')}`}>
+                {weeks.map((w, i) => (
+                  <i key={w.start} className={i === weeks.length - 1 ? 'is-now' : ''} style={{ height: `${Math.round((w.count / weekMax) * 100)}%` }} title={`Week of ${formatDate(w.start)}: ${w.count}`} />
+                ))}
+              </div>
+              <div className="adm-bars-x muted small">
+                <span>{formatDate(weeks[0].start)}</span>
+                <span>{formatDate(weeks[weeks.length - 1].start)}</span>
+              </div>
+            </>
+          )}
+        </section>
+
+        <aside className="adm-side">
+          <section className="md-panel">
+            <h3 className="sub">Needs attention</h3>
+            {flags.length === 0 ? (
+              <p className="muted small">Nothing flagged. All clear.</p>
+            ) : (
+              <ul className="adm-lines">
+                {flags.map((f, i) => (
+                  <li key={i}>
+                    <span>{f.message}{f.since && <span className="muted small"> · {formatDate(f.since)}</span>}</span>
+                    <span className={`chip ${f.severity === 'WARN' ? 'chip-r' : 'chip-y'}`}>{f.type.replace(/_/g, ' ').toLowerCase()}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="md-panel">
+            <h3 className="sub">Payments</h3>
+            <ul className="adm-lines">
+              <li><span>Pending payouts</span><span>{overview.pendingPayouts}</span></li>
+              <li><span>Held funds</span><span>{formatMoney(overview.heldFundsCents / 100)}</span></li>
+              <li><span>Payment issues</span><span className={overview.paymentIssues > 0 ? 'chip chip-r' : ''}>{overview.paymentIssues}</span></li>
+            </ul>
+          </section>
+          <section className="md-panel">
+            <h3 className="sub">Jobs by status</h3>
+            <ul className="adm-lines">
+              {statuses.map((s) => (
+                <li key={s}><span className="adm-cap">{statusLabel(s)}</span><span>{overview.jobsByStatus[s].toLocaleString('en-AU')}</span></li>
+              ))}
+            </ul>
+          </section>
+        </aside>
+      </div>
 
       {/* All jobs */}
-      <h3 className="section-title">All jobs ({jobs.length})</h3>
-      <div className="filters">
+      <h3 className="sub adm-sec">All jobs ({jobs.length})</h3>
+      <div className="filters" ref={topBlock}>
         <button className={`filter${jobFilter === 'ALL' ? ' filter-on' : ''}`} onClick={() => setJobFilter('ALL')}>
           All
         </button>
@@ -107,6 +134,17 @@ export default function Admin() {
           </button>
         ))}
       </div>
+      {visibleJobs.length > 10 && (
+        <StickyBar anchor={topBlock}>
+          <div className="filters" style={{ margin: 0 }}>
+            <button className={`filter${jobFilter === 'ALL' ? ' filter-on' : ''}`} onClick={() => setJobFilter('ALL')}>All</button>
+            {statuses.map((s) => (
+              <button key={s} className={`filter${jobFilter === s ? ' filter-on' : ''}`} onClick={() => setJobFilter(s)}>{statusLabel(s)}</button>
+            ))}
+          </div>
+          <span className="sb-count">{visibleJobs.length} job{visibleJobs.length === 1 ? '' : 's'}</span>
+        </StickyBar>
+      )}
       <div className="table-wrap">
         <table className="admin-table">
           <thead>
@@ -139,7 +177,7 @@ export default function Admin() {
       </div>
 
       {/* All providers */}
-      <h3 className="section-title">Providers ({providers.length})</h3>
+      <h3 className="sub adm-sec">Providers ({providers.length})</h3>
       <div className="table-wrap">
         <table className="admin-table">
           <thead>
@@ -173,11 +211,29 @@ export default function Admin() {
   )
 }
 
-function Stat({ label, value, muted }: { label: string; value: number | string; muted?: boolean }) {
-  return (
-    <div className={`stat${muted ? ' stat-muted' : ''}`}>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  )
+/** Completed jobs per week for the last 14 weeks (Monday starts), from the jobs list already loaded. */
+function completedPerWeek(jobs: AdminJobRow[]): { start: string; count: number }[] {
+  const now = new Date()
+  const monday = new Date(now)
+  monday.setHours(0, 0, 0, 0)
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  const weeks: { start: string; from: number; to: number; count: number }[] = []
+  for (let i = 13; i >= 0; i--) {
+    const from = new Date(monday); from.setDate(monday.getDate() - i * 7)
+    const to = new Date(from); to.setDate(from.getDate() + 7)
+    weeks.push({ start: from.toISOString(), from: from.getTime(), to: to.getTime(), count: 0 })
+  }
+  for (const j of jobs) {
+    if (j.status !== 'COMPLETED') continue
+    const t = new Date(j.updatedAt).getTime()
+    const w = weeks.find((x) => t >= x.from && t < x.to)
+    if (w) w.count++
+  }
+  return weeks.map(({ start, count }) => ({ start, count }))
+}
+
+function today(): string {
+  const d = new Date()
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  return `${days[d.getDay()]} ${formatDate(d.toISOString())}`
 }

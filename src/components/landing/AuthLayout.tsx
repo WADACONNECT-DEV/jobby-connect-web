@@ -81,7 +81,7 @@ export function AuthShell({ children, narrow = false }: { children: ReactNode; n
         <div className="lp-auth-bar-in">
           <Link to="/" className="lp-brand">
             <span className="lp-brand-j" aria-hidden="true">J</span>
-            <span className="lp-brand-name">JOBBY-CONNECT</span>
+            <span className="lp-brand-name">Jobby-Connect</span>
           </Link>
           <Link to="/" className="lp-auth-back"><IconBack /> Back to home</Link>
         </div>

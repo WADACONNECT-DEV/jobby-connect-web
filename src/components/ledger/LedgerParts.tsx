@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { setPersistedValue, usePersistedValue } from '../../listView'
 import { CATEGORY_LABELS, formatMoney, type LedgerRow, type LedgerStatement, type ServiceCategory } from '../../types'
+import { StatCards } from '../StepLine'
+import { StickyBar } from '../StickyBar'
 
 /**
  * The Account Ledger, shared by the customer and provider pages (owner's ledger
@@ -104,6 +106,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
   const [suburb, setSuburb] = usePersistedValue<string>(key('suburb'), '')
   const [search, setSearch] = usePersistedValue<string>(key('search'), '')
   const [page, setPage] = useState(1)
+  const topBlock = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     api<LedgerStatement>(`/me/ledger?role=${role}`, 'GET')
@@ -209,6 +212,13 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
             </p>
           </div>
         </div>
+        {data && all.length > 0 && (
+          <div className="mt-toolbar-end mp-actions">
+            <button type="button" className="mt-btn-ghost" onClick={downloadXlsx}>Excel</button>
+            <button type="button" className="mt-btn-ghost" onClick={downloadCsv}>CSV</button>
+            <button type="button" className="mt-btn-ghost" onClick={() => window.print()}>Print / PDF</button>
+          </div>
+        )}
       </div>
 
       {error && <div className="msg err">{error}</div>}
@@ -226,9 +236,10 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
 
       {data && all.length > 0 && (
         <>
+          <div ref={topBlock} className="mt-top">
           <div className={`mt-search lg-filters${provider ? ' is-provider' : ''}`}>
             <label className="mt-field">
-              <span>PERIOD</span>
+              <span>Period</span>
               <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
                 {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
@@ -236,17 +247,17 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
             {period === 'CUSTOM' && (
               <>
                 <label className="mt-field">
-                  <span>FROM</span>
+                  <span>From</span>
                   <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
                 </label>
                 <label className="mt-field">
-                  <span>TO</span>
+                  <span>To</span>
                   <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
                 </label>
               </>
             )}
             <label className="mt-field">
-              <span>{provider ? 'CUSTOMER' : 'PROVIDER'}</span>
+              <span>{provider ? 'Customer' : 'Provider'}</span>
               <select value={who} onChange={(e) => setWho(e.target.value)}>
                 <option value="">All</option>
                 {options.who.map((w) => <option key={w} value={w}>{w}</option>)}
@@ -254,7 +265,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
             </label>
             {provider ? (
               <label className="mt-field">
-                <span>SUBURB</span>
+                <span>Suburb</span>
                 <select value={suburb} onChange={(e) => setSuburb(e.target.value)}>
                   <option value="">All</option>
                   {options.suburb.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -262,7 +273,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
               </label>
             ) : (
               <label className="mt-field">
-                <span>INDUSTRY</span>
+                <span>Industry</span>
                 <select value={industry} onChange={(e) => setIndustry(e.target.value)}>
                   <option value="">All</option>
                   {options.industry.map((s) => <option key={s} value={s}>{industryLabel(s)}</option>)}
@@ -270,7 +281,7 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
               </label>
             )}
             <label className="mt-field is-wide">
-              <span>SEARCH</span>
+              <span>Search</span>
               <span className="mt-input">
                 <SearchIcon />
                 <input type="search" value={search} placeholder="Number, e.g. INV-000017279, or description"
@@ -279,34 +290,45 @@ export function LedgerPage({ role }: { role: 'customer' | 'provider' }) {
             </label>
           </div>
 
-          <div className="mp-summary lg-summary" aria-label={`Summary for ${periodLabel}`}>
+          <div className="lg-summary" aria-label={`Summary for ${periodLabel}`}>
             {provider ? (
-              <>
-                <div className="mp-sum"><span>Opening balance</span><strong>{formatMoney(opening)}</strong></div>
-                <div className="mp-sum"><span>Invoiced</span><strong>{formatMoney(sent)}</strong></div>
-                <div className="mp-sum is-redeemed"><span>Charges</span><strong>−{formatMoney(charges)}</strong></div>
-                <div className="mp-sum is-earned"><span>Received</span><strong>{formatMoney(received)}</strong></div>
-                <div className="mp-sum"><span>GST net</span><strong>{formatMoney(gstNet)}</strong></div>
-                <div className="mp-sum is-closing"><span>Still to receive</span><strong>{formatMoney(closing)}</strong></div>
-              </>
+              <StatCards items={[
+                { label: 'Opening balance', value: formatMoney(opening) },
+                { label: 'Invoiced', value: formatMoney(sent) },
+                { label: 'Charges', value: `−${formatMoney(charges)}`, tone: 'neg' },
+                { label: 'Received', value: formatMoney(received), tone: 'pos' },
+                { label: 'GST net', value: formatMoney(gstNet) },
+                { label: 'Still to receive', value: formatMoney(closing), tone: 'hi' },
+              ]} />
             ) : (
-              <>
-                <div className="mp-sum"><span>Opening balance</span><strong>{formatMoney(opening)}</strong></div>
-                <div className="mp-sum"><span>Invoiced</span><strong>{formatMoney(invoiced)}</strong></div>
-                <div className="mp-sum is-earned"><span>Paid</span><strong>{formatMoney(paid)}</strong></div>
-                <div className="mp-sum is-closing"><span>Balance owing</span><strong>{formatMoney(closing)}</strong></div>
-              </>
+              <StatCards items={[
+                { label: 'Opening balance', value: formatMoney(opening) },
+                { label: 'Invoiced', value: formatMoney(invoiced) },
+                { label: 'Paid', value: formatMoney(paid), tone: 'pos' },
+                { label: 'Balance owing', value: formatMoney(closing), tone: 'hi' },
+              ]} />
             )}
           </div>
 
           <div className="mt-toolbar">
             <h3 className="mt-count">{periodLabel} · {shown.length} line{shown.length === 1 ? '' : 's'}</h3>
-            <div className="mt-toolbar-end mp-actions">
-              <button type="button" className="mt-btn-ghost" onClick={downloadXlsx}>Excel</button>
-              <button type="button" className="mt-btn-ghost" onClick={downloadCsv}>CSV</button>
-              <button type="button" className="mt-btn-ghost" onClick={() => window.print()}>Print / PDF</button>
-            </div>
           </div>
+          </div>
+
+          {shown.length > 0 && (
+            <StickyBar anchor={topBlock}>
+              <span className="sb-field">
+                <select value={period} aria-label="Period" onChange={(e) => setPeriod(e.target.value as Period)}>
+                  {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                </select>
+              </span>
+              <span className="sb-field">
+                <input type="search" value={search} placeholder="Number or description" aria-label="Search" onChange={(e) => setSearch(e.target.value)} />
+              </span>
+              <span className="sb-count">{periodLabel} · {shown.length} line{shown.length === 1 ? '' : 's'}{pages > 1 ? ` · page ${current} of ${pages}` : ''}</span>
+              <button type="button" className="mt-btn-ghost" onClick={downloadXlsx}>Excel</button>
+            </StickyBar>
+          )}
 
           {periodRows.length === 0 ? (
             <div className="mt-empty">

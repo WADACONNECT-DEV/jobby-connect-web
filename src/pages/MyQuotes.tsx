@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { StickyBar } from '../components/StickyBar'
 import { initialsOf } from '../components/mates/MateCard'
+import { StepLine } from '../components/StepLine'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   OUTCOME_LABELS, industryOf,
@@ -226,6 +228,24 @@ export default function MyQuotes() {
 
   const optionsFor = (key: string) => list.filters.find((f) => f.key === key)?.options ?? []
 
+  const topBlock = useRef<HTMLDivElement | null>(null)
+  const subTabs = (
+    <div className="mj-subtabs" role="tablist" aria-label="Your quotes">
+        {QUOTE_TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span className={`mj-badge${t.key === 'ACTION' && actionRows.length > 0 ? ' is-waiting' : ''}`}>{countOf(t.key)}</span>
+          </button>
+        ))}
+      </div>
+  )
+
   return (
     <div className="mt pr yq">
       <div className="mt-head">
@@ -241,22 +261,8 @@ export default function MyQuotes() {
       {error && <div className="msg err">{error}</div>}
       {quotes === null && !error && <div className="loading">Loading…</div>}
 
-      {quotes !== null && (
-        <div className="mj-subtabs" role="tablist" aria-label="Your quotes">
-          {QUOTE_TABS.map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={tab === t.key}
-              className={`mj-subtab${tab === t.key ? ' is-on' : ''}`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-              <span className={`mj-badge${t.key === 'ACTION' && actionRows.length > 0 ? ' is-waiting' : ''}`}>{countOf(t.key)}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div ref={topBlock} className="mt-top">
+      {quotes !== null && subTabs}
 
       {review && (
         <form className="pr-panel yq-review" onSubmit={submitReview}>
@@ -264,24 +270,24 @@ export default function MyQuotes() {
           <p className="pr-panel-lead">Submitting your review releases your payout for this {review.stageId ? 'stage' : 'job'}.</p>
           <div className="pr-two yq-two">
             <label className="mt-field">
-              <span>JOB DIFFICULTY (1 EASY – 5 HARD)</span>
+              <span>Job difficulty (1 easy – 5 hard)</span>
               <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
                 {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
             <label className="mt-field">
-              <span>CUSTOMER COOPERATION (1 POOR – 5 GREAT)</span>
+              <span>Customer cooperation (1 poor – 5 great)</span>
               <select value={cooperation} onChange={(e) => setCooperation(Number(e.target.value))}>
                 {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
           </div>
           <label className="mt-field">
-            <span>HAZARDS ENCOUNTERED (OPTIONAL)</span>
+            <span>Hazards encountered (optional)</span>
             <input value={hazards} onChange={(e) => setHazards(e.target.value)} />
           </label>
           <label className="mt-field">
-            <span>NOTES (OPTIONAL)</span>
+            <span>Notes (optional)</span>
             <input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
           <div className="pr-panel-actions">
@@ -294,7 +300,7 @@ export default function MyQuotes() {
       {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && (
         <div className="mt-search pr-filters yq-filters">
           <label className="mt-field is-wide">
-            <span>SEARCH QUOTES</span>
+            <span>Search quotes</span>
             <span className="mt-input">
               <SearchIcon />
               <input type="search" value={list.view.search} placeholder="Search your quotes"
@@ -302,28 +308,28 @@ export default function MyQuotes() {
             </span>
           </label>
           <label className="mt-field">
-            <span>QUOTE STATUS</span>
+            <span>Quote status</span>
             <select value={list.view.filters.status ?? ''} onChange={(e) => list.setFilter('status', e.target.value)}>
               <option value="">All quote statuses</option>
               {optionsFor('status').map((o) => <option key={o.value} value={o.value}>{o.label === 'ACCEPTED' ? 'Accepted' : o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>PAYMENT TYPE</span>
+            <span>Payment type</span>
             <select value={list.view.filters.payment ?? ''} onChange={(e) => list.setFilter('payment', e.target.value)}>
               <option value="">All payment types</option>
               {optionsFor('payment').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>WORK STATE</span>
+            <span>Work state</span>
             <select value={list.view.filters.action ?? ''} onChange={(e) => list.setFilter('action', e.target.value)}>
               <option value="">All work states</option>
               {optionsFor('action').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>SORT BY</span>
+            <span>Sort by</span>
             <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
               {list.sorts.map((so) => <option key={so.key} value={so.key}>{so.label}</option>)}
             </select>
@@ -337,6 +343,19 @@ export default function MyQuotes() {
 
       {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && (
         <h3 className="mt-count">{list.shown === list.total ? `${list.total} quote${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} quotes`}</h3>
+      )}
+      </div>
+
+      {tab === 'ACCEPTED' && acceptedQuotes.length > 0 && (
+        <StickyBar anchor={topBlock}>
+          {subTabs}
+          <span className="mt-input">
+            <SearchIcon />
+            <input type="search" value={list.view.search} placeholder="Search your quotes" aria-label="Search quotes"
+              onChange={(e) => list.setSearch(e.target.value)} />
+          </span>
+          <span className="sb-count">{list.shown === list.total ? `${list.total} quote${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} quotes`}</span>
+        </StickyBar>
       )}
 
       {tab === 'ACCEPTED' && acceptedQuotes.length === 0 && quotes !== null && (
@@ -409,6 +428,7 @@ export default function MyQuotes() {
                     <span className="yq-row-action">{unitAction(q.id, null, q.settlementStatus, q.jobTitle, q.id)}</span>
                   )}
                 </div>
+                {q.status === 'ACCEPTED' && q.paymentType !== 'STAGED' && <StageTimeline st={q.settlementStatus} />}
 
                 {staged && (
                   <ol className="yq-stages" aria-label="Payment stages">
@@ -546,23 +566,14 @@ function ladderStep(st: ProviderQuoteStage['settlementStatus']): number {
   switch (st) {
     case 'PENDING_PAYMENT': return 2
     case 'PENDING_REVIEW': return 3
-    case 'PAID': return 4
+    case 'PAID': return 5
     default: return 0
   }
 }
 
+/** The unit's state on the shared step line (design v2). */
 function StageTimeline({ st }: { st: SettlementStatus | null }) {
-  const at = ladderStep(st)
-  return (
-    <div className="yq-ladder" aria-label={`Stage state: ${LADDER[at]}`}>
-      {LADDER.map((label, i) => (
-        <span key={label} className={`yq-step${i < at ? ' is-done' : ''}${i === at ? ' is-now' : ''}`}>
-          <span className="yq-dot" aria-hidden="true" />
-          <span className="yq-step-label">{label}</span>
-        </span>
-      ))}
-    </div>
-  )
+  return <div className="yq-ladder"><StepLine done={ladderStep(st)} labels={LADDER} /></div>
 }
 
 /* ---------- icons (decorative) ---------- */

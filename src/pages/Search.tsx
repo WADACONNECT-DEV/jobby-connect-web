@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { ProviderResultCard } from '../components/mates/ProviderResultCard'
 import { SuburbPicker } from '../components/SuburbPicker'
+import { StickyBar } from '../components/StickyBar'
 import { useMaxProvidersPerRequest } from '../platform'
 import {
   SEARCH_SORT_LABELS,
@@ -36,6 +37,7 @@ export default function Search() {
   const [error, setError] = useState('')
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Selected[]>([])
+  const topBlock = useRef<HTMLDivElement | null>(null)
   const [savedMates, setSavedMates] = useState<Set<string>>(new Set())
 
   // The cap is admin-managed (UAT Round 2 open item 7.2) - never a literal here.
@@ -124,9 +126,10 @@ export default function Search() {
         </div>
       </div>
 
+      <div ref={topBlock} className="mt-top">
       <form className="mt-search fq-search" onSubmit={onSearch}>
         <label className="mt-field" htmlFor="search-industry">
-          <span>SERVICE INDUSTRY</span>
+          <span>Service industry</span>
           <select id="search-industry" value={industryId} onChange={(e) => setIndustryId(e.target.value)}>
             <option value="">Choose an industry…</option>
             {industries.map((i) => (
@@ -135,11 +138,11 @@ export default function Search() {
           </select>
         </label>
         <div className="mt-field fq-suburb">
-          <span><label htmlFor="search-suburb">SUBURB</label></span>
+          <span><label htmlFor="search-suburb">Suburb</label></span>
           <SuburbPicker id="search-suburb" value={suburbText} onChange={setSuburbText} onSelect={setSuburb} />
         </div>
         <label className="mt-field" htmlFor="search-sort">
-          <span>SORT BY</span>
+          <span>Sort by</span>
           <select id="search-sort" value={sort} onChange={(e) => changeSort(e.target.value as ProviderSearchSort)}>
             {SORTS.map((s) => <option key={s} value={s}>{SEARCH_SORT_LABELS[s]}</option>)}
           </select>
@@ -175,6 +178,19 @@ export default function Search() {
           </span>
         </div>
       )}
+      </div>
+
+      {results && results.length > 0 && !searching && (
+        <StickyBar anchor={topBlock}>
+          <span className="sb-count" style={{ marginLeft: 0 }}>{results.length} provider{results.length === 1 ? '' : 's'} · {industries.find((i) => i.id === industryId)?.name ?? ''}{suburb ? ` in ${suburb.name}` : ''}</span>
+          {selected.length > 0 && (
+            <>
+              <span className="sb-count">{selected.length} of {maxProviders} selected</span>
+              <button type="button" className="mt-continue" onClick={proceed}>Continue with {selected.length}</button>
+            </>
+          )}
+        </StickyBar>
+      )}
 
       {searching && <div className="mt-empty"><p>Searching…</p></div>}
 
@@ -196,7 +212,7 @@ export default function Search() {
       {results && results.length > 0 && !searching && (
         <>
           <h3 className="mt-count">{results.length} provider{results.length === 1 ? '' : 's'} found</h3>
-          <div className="mt-list">
+          <div className="mt-grid fq-grid">
             {results.map((p) => (
               <ProviderResultCard
                 key={p.userId}
@@ -222,7 +238,7 @@ export default function Search() {
 function MagnifierIcon() {
   return (
     <svg aria-hidden="true" className="mt-head-ico" width="46" height="46" viewBox="0 0 24 24" fill="none"
-      stroke="#0F2A4A" strokeWidth="1.9" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" stroke="#D9A400" strokeWidth="2.4" /></svg>
+      stroke="#0B2038" strokeWidth="1.9" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5l5 5" stroke="#D9A400" strokeWidth="2.4" /></svg>
   )
 }
 function SearchIcon() {

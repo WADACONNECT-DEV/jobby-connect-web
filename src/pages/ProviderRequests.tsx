@@ -1,8 +1,10 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { initialsOf } from '../components/mates/MateCard'
+import { StatCards } from '../components/StepLine'
+import { StickyBar } from '../components/StickyBar'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   industryOf,
@@ -365,6 +367,25 @@ export default function ProviderRequests() {
     key === 'RECEIVED' && (rows ?? []).some((r) => r.outcome === 'RECEIVED' && r.quoteId === null)
 
   const optionsFor = (key: string) => list.filters.find((f) => f.key === key)?.options ?? []
+  const topBlock = useRef<HTMLDivElement | null>(null)
+  const countLabel = list.shown === list.total ? `${list.total} request${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} requests`
+
+  const subTabs = (
+    <div className="mj-subtabs" role="tablist" aria-label="Requests to me">
+      {TABS.map((key) => (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={tab === key}
+          className={`mj-subtab${tab === key ? ' is-on' : ''}`}
+          onClick={() => setTab(key)}
+        >
+          {OUTCOME_LABELS[key]}
+          <span className={`mj-badge${needsAction(key) ? ' is-waiting' : ''}`}>{countOf(key)}</span>
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="mt pr">
@@ -396,27 +417,25 @@ export default function ProviderRequests() {
       {error && <div className="msg err">{error}</div>}
       {rows === null && !error && <div className="loading">Loading…</div>}
 
-      {rows !== null && (
-        <div className="mj-subtabs" role="tablist" aria-label="Requests to me">
-          {TABS.map((key) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={tab === key}
-              className={`mj-subtab${tab === key ? ' is-on' : ''}`}
-              onClick={() => setTab(key)}
-            >
-              {OUTCOME_LABELS[key]}
-              <span className={`mj-badge${needsAction(key) ? ' is-waiting' : ''}`}>{countOf(key)}</span>
-            </button>
-          ))}
-        </div>
+      {rows !== null && rows.length > 0 && (
+        <StatCards items={[
+          { label: 'New requests', value: String(rows.filter((r) => r.outcome === 'RECEIVED' && r.quoteId === null).length), tone: 'hi' },
+          { label: 'Quotes out', value: String(rows.filter((r) => r.outcome === 'REPLIED').length) },
+          { label: 'Won', value: String(rows.filter((r) => r.outcome === 'WON').length) },
+          // Work marked complete and not yet paid out: awaiting the customer's
+          // payment or your review. Staged quotes settle per stage, so they are
+          // counted on Your Quotes instead.
+          { label: 'Awaiting payout', value: formatMoney(rows.filter((r) => r.outcome === 'WON' && (r.settlementStatus === 'PENDING_PAYMENT' || r.settlementStatus === 'PENDING_REVIEW')).reduce((sum, r) => sum + (r.providerPayable ?? 0), 0)), tone: 'pos' },
+        ]} />
       )}
+
+      <div ref={topBlock} className="mt-top">
+      {rows !== null && subTabs}
 
       {inTab && inTab.length > 0 && (
         <div className="mt-search pr-filters">
           <label className="mt-field is-wide">
-            <span>SEARCH REQUESTS</span>
+            <span>Search requests</span>
             <span className="mt-input">
               <SearchIcon />
               <input type="search" value={list.view.search} placeholder="Title, suburb or customer"
@@ -424,21 +443,21 @@ export default function ProviderRequests() {
             </span>
           </label>
           <label className="mt-field">
-            <span>INDUSTRY</span>
+            <span>Industry</span>
             <select value={list.view.filters.category ?? ''} onChange={(e) => list.setFilter('category', e.target.value)}>
               <option value="">All industries</option>
               {optionsFor('category').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>STATUS</span>
+            <span>Status</span>
             <select value={list.view.filters.jobStatus ?? ''} onChange={(e) => list.setFilter('jobStatus', e.target.value)}>
               <option value="">All</option>
               {optionsFor('jobStatus').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </label>
           <label className="mt-field">
-            <span>SORT BY</span>
+            <span>Sort by</span>
             <select value={list.view.sortKey} onChange={(e) => list.setSort(e.target.value)}>
               {list.sorts.map((so) => <option key={so.key} value={so.key}>{so.label}</option>)}
             </select>
@@ -451,7 +470,20 @@ export default function ProviderRequests() {
       )}
 
       {inTab && inTab.length > 0 && (
-        <h3 className="mt-count">{list.shown === list.total ? `${list.total} request${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} requests`}</h3>
+        <h3 className="mt-count">{countLabel}</h3>
+      )}
+      </div>
+
+      {inTab && inTab.length > 0 && (
+        <StickyBar anchor={topBlock}>
+          {subTabs}
+          <span className="mt-input">
+            <SearchIcon />
+            <input type="search" value={list.view.search} placeholder="Title, suburb or customer" aria-label="Search requests"
+              onChange={(e) => list.setSearch(e.target.value)} />
+          </span>
+          <span className="sb-count">{countLabel}</span>
+        </StickyBar>
       )}
 
       {inTab && inTab.length === 0 && (
@@ -544,7 +576,7 @@ export default function ProviderRequests() {
                     {declineError && <div className="jr-msg is-err">{declineError}</div>}
 
                     <label className="mt-field" htmlFor={`decline-${row.jobId}`}>
-                      <span>YOUR MESSAGE TO THE CUSTOMER</span>
+                      <span>Your message to the customer</span>
                       <textarea
                         id={`decline-${row.jobId}`}
                         rows={3}
@@ -635,7 +667,7 @@ export default function ProviderRequests() {
                         <input type="number" min="0" step="0.01" value={bonus} onChange={(e) => { setBonus(e.target.value); edited() }} placeholder="0.00" />
                       </label>
                       <div className="mt-field">
-                        <span>PAYMENT</span>
+                        <span>Payment</span>
                         <div className="pr-seg" role="group" aria-label="Payment type">
                           <button type="button" className={paymentType === 'FULL' ? 'is-on' : ''} aria-pressed={paymentType === 'FULL'}
                             onClick={() => { if (paymentType !== 'FULL') { setPaymentType('FULL'); edited() } }}>Full payment</button>
@@ -676,7 +708,7 @@ export default function ProviderRequests() {
                     )}
 
                     <label className="mt-field">
-                      <span>MESSAGE TO THE CUSTOMER (OPTIONAL)</span>
+                      <span>Message to the customer (optional)</span>
                       <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="When you can start, what's included…" />
                     </label>
 

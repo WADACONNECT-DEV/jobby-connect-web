@@ -66,16 +66,16 @@ export default function Account() {
               <h2><UserIcon /> Your details</h2>
               <button className="mt-btn-ghost" onClick={() => navigate('/customer-profile')}>Edit details</button>
             </div>
-            <Row icon={<UserIcon small />} label="NAME">{name || <span className="ac-empty">Not added</span>}</Row>
-            <Row icon={<PhoneIcon />} label="MOBILE">{user?.mobile ? showMobile(user.mobile) : <span className="ac-empty">Not added</span>}</Row>
-            <Row icon={<PinIcon />} label="ADDRESS">{user?.registeredAddress || <span className="ac-empty">Not added</span>}</Row>
+            <Row icon={<UserIcon small />} label="Name">{name || <span className="ac-empty">Not added</span>}</Row>
+            <Row icon={<PhoneIcon />} label="Mobile">{user?.mobile ? showMobile(user.mobile) : <span className="ac-empty">Not added</span>}</Row>
+            <Row icon={<PinIcon />} label="Address">{user?.registeredAddress || <span className="ac-empty">Not added</span>}</Row>
           </section>
 
           <section className="ac-card">
             <div className="ac-card-head">
               <h2><LockIcon /> Sign-in &amp; security</h2>
             </div>
-            <Row icon={<MailIcon />} label="EMAIL">
+            <Row icon={<MailIcon />} label="Email">
               <span className="ac-val-line">
                 <span className="ac-break">{user?.email}</span>
                 <button className="mt-btn-ghost ac-small" onClick={() => setPanel(panel === 'email' ? 'none' : 'email')}>
@@ -83,7 +83,7 @@ export default function Account() {
                 </button>
               </span>
             </Row>
-            <Row icon={<LockIcon small />} label="PASSWORD">
+            <Row icon={<LockIcon small />} label="Password">
               <span className="ac-val-line">
                 <span aria-label="Password hidden">••••••••••</span>
                 <button className="mt-btn-ghost ac-small" onClick={() => setPanel(panel === 'password' ? 'none' : 'password')}>
@@ -91,7 +91,7 @@ export default function Account() {
                 </button>
               </span>
             </Row>
-            <Row icon={<IdIcon />} label="YOUR IDs">
+            <Row icon={<IdIcon />} label="Your IDs">
               <span className="ac-ids">
                 {user?.customerRef && <CopyId value={user.customerRef} />}
                 {user?.providerRef && <CopyId value={user.providerRef} />}
