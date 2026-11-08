@@ -1,8 +1,9 @@
 import { formatDate, formatMoney, type Mate } from '../../types'
+import { CardFoot, CardHead, CardMeta, CardRef, Figures, ListCard } from '../ListCard'
 
 /**
- * One saved provider on the Your Jobby Mates tab (redesign step 3, owner's
- * mates design). Presentational only: every action is handed in by Mates.tsx,
+ * One saved provider on the Your Jobby Mates tab, in the shared list-card
+ * layout (Your quotes order). Presentational only: every action is handed in by Mates.tsx,
  * which keeps the selection, remove and navigation logic it always had.
  */
 
@@ -35,78 +36,71 @@ export function MateCard({ mate, name, layout, selected, blocked, blockedTitle, 
   const services = mate.services ?? []
   const extraServices = services.length - SERVICES_SHOWN
   const promo = mate.promoPoints ?? 0
+  void layout
 
+  // The Your quotes card order (owner's direction, 8 Nov 2026): title and
+  // status, reference, figures, meta, actions.
   return (
-    <article className={`mc mc-${layout}${selected ? ' is-selected' : ''}`}>
-      <label className="mc-check" title={blocked ? blockedTitle : 'Include in one request'}>
-        <input type="checkbox" checked={selected} disabled={blocked} onChange={onToggle} />
-        <span className="mc-sr">Select {name}</span>
-      </label>
-
-      <span className="mc-avatar" aria-hidden="true">{initialsOf(name)}</span>
-
-      <div className="mc-body">
-        <div className="mc-title">
-          <h3>{name}</h3>
-          <span className="mc-saved"><HeartIcon /> Saved</span>
-          {promo > 0 && <span className="mc-bonus">+{formatMoney(promo)} bonus points</span>}
-        </div>
-
-        {mate.industries.length > 0 && (
-          <div className="mc-chips">
-            {mate.industries.map((industry) => <span className="mc-chip" key={industry}>{industry}</span>)}
-          </div>
+    <ListCard selected={selected} className="mc-card">
+      <CardHead
+        avatar={initialsOf(name)}
+        title={name}
+        status={<><HeartIcon /> Saved</>}
+        tone="wait"
+        right={(
+          <label title={blocked ? blockedTitle : 'Include in one request'}>
+            <input type="checkbox" checked={selected} disabled={blocked} onChange={onToggle} />
+            <span className="mc-sr">Select {name}</span>
+          </label>
         )}
+      />
 
-        {mate.suburbs.length > 0 && (
-          <div className="mc-line">
+      {mate.industries.length > 0 && (
+        <CardRef>{mate.industries.map((industry) => <span className="mc-chip" key={industry}>{industry}</span>)}</CardRef>
+      )}
+
+      <Figures items={[
+        {
+          label: 'Rating',
+          value: mate.reviewCount > 0 ? <>{mate.averageRating.toFixed(1)} <StarIcon /></> : '—',
+          note: mate.reviewCount > 0 ? `${mate.reviewCount} review${mate.reviewCount === 1 ? '' : 's'}` : 'No reviews yet',
+        },
+        { label: 'Jobs done', value: mate.jobsCompleted },
+        { label: 'Bonus points', value: promo > 0 ? `+${formatMoney(promo)}` : '—', tone: promo > 0 ? 'pos' : undefined, highlight: promo > 0 },
+      ]} />
+
+      {mate.suburbs.length > 0 && (
+        <CardMeta>
+          <span>
             <PinIcon />
-            <span>
-              {mate.suburbs.slice(0, SUBURBS_SHOWN).join(' · ')}
-              {extraSuburbs > 0 && ` +${extraSuburbs} suburb${extraSuburbs > 1 ? 's' : ''}`}
-            </span>
-          </div>
-        )}
-
-        {mate.bio && <p className="mc-bio">{mate.bio}</p>}
-
-        {services.length > 0 && (
-          <div className="mc-tags">
-            {services.slice(0, SERVICES_SHOWN).map((s) => <span className="mc-tag" key={s}>{s}</span>)}
-            {extraServices > 0 && <span className="mc-tag is-more">+{extraServices} more</span>}
-          </div>
-        )}
-
-        {mate.lastJobAt && (
-          <div className="mc-line is-muted">
-            <ClockIcon />
-            <span>Last used {formatDate(mate.lastJobAt)}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="mc-stats">
-        {mate.reviewCount > 0 ? (
-          <span className="mc-rating">
-            <StarIcon />
-            <strong>{mate.averageRating.toFixed(1)}</strong>
-            <span className="mc-reviews">({mate.reviewCount} review{mate.reviewCount === 1 ? '' : 's'})</span>
+            {mate.suburbs.slice(0, SUBURBS_SHOWN).join(' · ')}
+            {extraSuburbs > 0 && ` +${extraSuburbs} suburb${extraSuburbs > 1 ? 's' : ''}`}
           </span>
-        ) : (
-          <span className="mc-reviews">No reviews yet</span>
-        )}
-        <span className="mc-jobs">{mate.jobsCompleted} job{mate.jobsCompleted === 1 ? '' : 's'} completed</span>
-      </div>
+        </CardMeta>
+      )}
 
-      <div className="mc-actions">
+      {mate.bio && <p className="lc-desc">{mate.bio}</p>}
+
+      {services.length > 0 && (
+        <CardMeta>
+          {services.slice(0, SERVICES_SHOWN).map((s) => <span className="mc-tag" key={s}>{s}</span>)}
+          {extraServices > 0 && <span className="mc-tag is-more">+{extraServices} more</span>}
+        </CardMeta>
+      )}
+
+      {mate.lastJobAt && (
+        <CardMeta><span><ClockIcon />Last used {formatDate(mate.lastJobAt)}</span></CardMeta>
+      )}
+
+      <CardFoot>
         <button type="button" className={`mc-btn ${selected ? 'is-selected' : 'is-add'}`}
           onClick={onToggle} disabled={blocked} title={blocked ? blockedTitle : undefined} aria-pressed={selected}>
           {selected ? <><TickIcon /> Selected</> : 'Add to request'}
         </button>
         <button type="button" className="mc-btn is-ghost" onClick={onViewProfile}>View profile</button>
         <button type="button" className="mc-remove" onClick={onRemove}>Remove mate</button>
-      </div>
-    </article>
+      </CardFoot>
+    </ListCard>
   )
 }
 
@@ -134,7 +128,7 @@ function ClockIcon() {
 }
 function StarIcon() {
   return (
-    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#F7A400">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="#F7A400" style={{ verticalAlign: '-2px' }}>
       <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z" />
     </svg>
   )

@@ -8,6 +8,8 @@ import { initialsOf } from '../components/mates/MateCard'
 import { Stars } from '../components/Stars'
 import { ProgressBar } from '../components/ProgressBar'
 import { ImageUploader } from '../components/ImageUploader'
+import { CardGrid, CardHead, CardMeta, CardPerson, CardRef, Figures, ListCard } from '../components/ListCard'
+import { StepLine } from '../components/StepLine'
 import {
   industryOf,
   formatDate,
@@ -36,7 +38,7 @@ import {
  */
 const WORK_TABS = [
   { key: 'OPEN', label: 'Open' },
-  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'IN_PROGRESS', label: 'In progress' },
   { key: 'COMPLETED', label: 'Completed' },
 ] as const
 
@@ -75,6 +77,7 @@ export default function MyWork() {
   const [note, setNote] = useState('')
   const [progressError, setProgressError] = useState('')
   const [historyFor, setHistoryFor] = useState<string | null>(null)
+  const [photosFor, setPhotosFor] = useState<string | null>(null)
 
   // The provider's own quote for each job. Marking complete acts on the quote
   // (or one of its stages), so Your Work needs it to offer the same action as
@@ -219,7 +222,7 @@ export default function MyWork() {
   const inTab = classified.filter((c) => c.sub === tab)
 
   // List or Grid, remembered (redesign step 10). List is the default.
-  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.work.layout', 'list')
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.work.layout', 'grid')
 
   // Search, industry and sort within the open sub-tab (redesign step 10).
   // Narrows what is shown only; the sub-tab grouping above is unchanged.
@@ -358,7 +361,7 @@ export default function MyWork() {
       )}
 
       {list.shown > 0 && (
-        <div className={layout === 'grid' ? 'pr-grid' : 'pr-list'}>
+        <CardGrid layout={layout}>
           {list.visible.map(({ job, myQuote, awaitingCompletion, awaitingPayment, awaitingReview, markedComplete }) => {
             const busy = busyId === job.id
             const review = reviewByJob[job.id]
@@ -366,31 +369,41 @@ export default function MyWork() {
             const latest = history[0]
             const atFullProgress = (latest?.percent ?? 0) >= 100
             const myRef = (job.targetProviders ?? []).find((t) => t.userId === user?.id)?.requestRef
-            const panelOpen = progressOpenFor === job.id || historyFor === job.id
+            const panelOpen = progressOpenFor === job.id || historyFor === job.id || photosFor === job.id
+            const stages = myQuote?.stages ?? []
+            const stagesDone = stages.filter((st) => st.settlementStatus && st.settlementStatus !== 'PENDING_COMPLETION').length
+            const steps = job.status === 'COMPLETED' ? 5 : awaitingReview ? 4 : markedComplete ? 3 : history.length > 0 || job.status === 'IN_PROGRESS' ? 2 : 1
             // Yellow border when the next move is the provider's: review to
             // release payment, or progress at 100% and not yet marked complete.
             const yourMove = job.status === 'IN_PROGRESS' && (awaitingReview || (atFullProgress && awaitingCompletion))
             return (
-              <article className={`pr-card pr-${layout} yw-card${yourMove ? ' is-action' : ''}${panelOpen ? ' is-open' : ''}`} key={job.id}>
-                <div className="yq-top">
-                  <h3 className="pr-title">{job.title}</h3>
-                  <span className={`yq-status is-${job.status.toLowerCase()}`}>{statusLabel(job.status)}</span>
-                  {myRef && <span className="mj-ref"><code>{myRef}</code></span>}
-                </div>
+              <ListCard key={job.id} open={panelOpen} className="yw-card">
+                <CardHead
+                  title={job.title}
+                  status={statusLabel(job.status)}
+                  tone={job.status === 'COMPLETED' ? 'good' : yourMove ? 'wait' : job.status === 'IN_PROGRESS' ? 'dark' : 'neutral'}
+                  right={<span>{formatDate(job.createdAt)}</span>}
+                />
 
-                <div className="yq-cust">
-                  <span className="mc-avatar yq-avatar" aria-hidden="true">{initialsOf(job.customerName)}</span>
-                  <span>{job.customerName}</span>
-                </div>
+                {myRef && <CardRef><code>{myRef}</code></CardRef>}
 
-                <div className="pr-meta">
+                <CardPerson initials={initialsOf(job.customerName)} name={job.customerName} sub={job.jobAddress ?? job.suburb} />
+
+                <Figures items={[
+                  { label: 'Progress', value: `${latest?.percent ?? 0}%`, tone: atFullProgress ? 'pos' : undefined },
+                  { label: 'You get', value: myQuote ? formatMoney(myQuote.providerPayable) : '—', tone: 'pos', highlight: true },
+                  { label: 'Stages', value: stages.length > 0 ? `${stagesDone} of ${stages.length}` : 'Full', note: stages.length > 0 ? 'marked complete' : 'one payment' },
+                ]} />
+
+                <CardMeta>
                   <span className="mc-chip">{industryOf(job)}</span>
-                  <span className="mc-line"><PinIcon /> {job.suburb}</span>
-                  {job.timeFrame && <span className="pr-sub">{job.timeFrame}</span>}
-                  <span className="pr-sub">Requested {formatDate(job.createdAt)}</span>
-                </div>
-                {job.jobAddress && <p className="yw-addr"><span className="pr-amt-label">Job address</span> {job.jobAddress}</p>}
-                <p className="pr-desc">{job.description}</p>
+                  <span><PinIcon /> {job.suburb}</span>
+                  {job.timeFrame && <span>{job.timeFrame}</span>}
+                </CardMeta>
+
+                <p className="lc-desc" style={panelOpen ? { WebkitLineClamp: 'unset' } : undefined}>{job.description}</p>
+
+                {job.status !== 'CANCELLED' && <StepLine done={steps} />}
 
                 {latest && (
                   <ProgressBar
@@ -455,7 +468,7 @@ export default function MyWork() {
                   </form>
                 )}
 
-                {latest && (job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                {photosFor === job.id && latest && (job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
                   <ImageUploader
                     jobId={job.id}
                     kind="PROGRESS"
@@ -465,7 +478,7 @@ export default function MyWork() {
                   />
                 )}
 
-                {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                {photosFor === job.id && (job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
                   <ImageUploader
                     jobId={job.id}
                     kind="COMPLETION"
@@ -476,7 +489,7 @@ export default function MyWork() {
 
                 {/* The customer's own request photos, view only (handoff Part L).
                     Renders nothing when the customer sent none. */}
-                <ImageUploader jobId={job.id} kind="REQUEST" canUpload={false} label="Photos the customer sent" />
+                {photosFor === job.id && <ImageUploader jobId={job.id} kind="REQUEST" canUpload={false} label="Photos the customer sent" />}
 
                 {/* Mark complete, available here as well as under Your Quotes
                     (UAT Round 4 7). Offered once the posted progress reaches
@@ -537,7 +550,7 @@ export default function MyWork() {
                   </div>
                 )}
 
-                <div className="yw-foot">
+                <div className="yw-foot lc-foot">
                   <span className="yw-state">
                     {job.status === 'ACCEPTED' && 'Ready to start'}
                     {job.status === 'IN_PROGRESS' && awaitingReview && 'Paid by the customer — submit your review to get paid'}
@@ -558,15 +571,18 @@ export default function MyWork() {
                         {latest ? 'Update progress' : 'Post progress'}
                       </button>
                     )}
+                    <button className="mt-btn-ghost" onClick={() => setPhotosFor(photosFor === job.id ? null : job.id)} aria-expanded={photosFor === job.id}>
+                      {photosFor === job.id ? 'Hide photos' : 'Photos'}
+                    </button>
                     {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
                         form edits and nothing else. A job is ended by Decline
                         before acceptance, or by Dispute after it. */}
                   </div>
                 </div>
-              </article>
+              </ListCard>
             )
           })}
-        </div>
+        </CardGrid>
       )}
     </div>
   )

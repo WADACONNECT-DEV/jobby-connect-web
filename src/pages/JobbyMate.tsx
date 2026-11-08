@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { usePersistedValue } from '../listView'
 import { initialsOf } from '../components/mates/MateCard'
 import { StickyBar } from '../components/StickyBar'
+import { CardFoot, CardGrid, CardHead, CardMeta, CardRef, Figures, ListCard } from '../components/ListCard'
 import {
   formatDate,
   formatMoney,
@@ -285,7 +286,7 @@ export default function JobbyMate() {
           <button className="mt-btn-ghost" onClick={() => { setStatus(''); setFilter('') }}>Clear filters</button>
         </div>
       ) : (
-        <div className="jr-list">
+        <CardGrid>
           {filtered.map((m) => {
             const isInvite = !m.referralRecordId
             const name = isInvite
@@ -293,28 +294,29 @@ export default function JobbyMate() {
               : (m.otherPartyName ?? (m.otherPartyType === 'PROVIDER' ? 'Provider' : 'Customer'))
             const details = isInvite
               ? [m.inviteMobile, m.expiresAt && m.pointsStatus === 'INVITED' ? `link valid until ${formatDate(m.expiresAt)}` : null]
-              : [m.industry, m.suburb, m.direction === 'REFERRED_BY_ME' ? 'You referred them' : 'They referred you']
+              : [m.industry, m.suburb]
+            const st = m.pointsStatus
+            const tone = st === 'PAID' ? 'good' : st === 'PAYMENT_OVERDUE' ? 'bad' : st === 'NONE' || st === 'DECLINED' || st === 'INVITE_EXPIRED' ? 'neutral' : 'wait'
             return (
-              <div className={`jr-row${isInvite ? ' is-invite' : ''}`} key={m.referralRecordId ?? m.inviteId ?? m.createdAt}>
-                <span className={`mc-avatar jr-avatar${isInvite ? ' is-invite' : ''}`} aria-hidden="true">
-                  {isInvite ? '…' : initialsOf(name)}
-                </span>
-                <span className="jr-who">
-                  <strong>{name}</strong>
-                  <span className="jr-muted">{details.filter(Boolean).join(' · ')}</span>
-                </span>
-                <span className={`jr-chip is-${m.pointsStatus.toLowerCase()}`}>{referralStatusLabel(m.pointsStatus)}</span>
-                <span className="jr-amt">{pointsText(m)}</span>
-                <span className="jr-date">{formatDate(m.createdAt)}</span>
-                <span className="jr-act">
-                  {m.referralRecordId && m.pointsStatus === 'PAYMENT_OVERDUE' && m.direction === 'REFERRED_ME' && (
-                    <button className="mc-remove" onClick={() => complain(m.referralRecordId!)}>Report unpaid</button>
-                  )}
-                </span>
-              </div>
+              <ListCard key={m.referralRecordId ?? m.inviteId ?? m.createdAt} className={isInvite ? 'jr-card is-invite' : 'jr-card'}>
+                <CardHead avatar={isInvite ? '…' : initialsOf(name)} title={name} status={referralStatusLabel(st)} tone={tone} />
+                {!isInvite && (
+                  <CardRef>{m.direction === 'REFERRED_BY_ME' ? 'You referred them' : 'They referred you'}</CardRef>
+                )}
+                <Figures items={[
+                  { label: 'Mate Points', value: m.pointsAmount ? `${m.pointsAmount} pts` : '—' },
+                  { label: 'Value', value: m.pointsValue ? formatMoney(m.pointsValue) : '—', tone: st === 'PAID' && m.pointsValue ? 'pos' : undefined, highlight: st === 'PAID' && Boolean(m.pointsValue) },
+                ]} />
+                <CardMeta>{[`${isInvite ? 'Invited' : 'Connected'} ${formatDate(m.createdAt)}`, ...details.filter(Boolean)].join(' · ')}</CardMeta>
+                {m.referralRecordId && st === 'PAYMENT_OVERDUE' && m.direction === 'REFERRED_ME' && (
+                  <CardFoot>
+                    <button className="mc-btn is-ghost" onClick={() => complain(m.referralRecordId!)}>Report unpaid</button>
+                  </CardFoot>
+                )}
+              </ListCard>
             )
           })}
-        </div>
+        </CardGrid>
       )}
     </div>
   )

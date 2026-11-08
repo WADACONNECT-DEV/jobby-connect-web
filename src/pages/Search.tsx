@@ -212,7 +212,7 @@ export default function Search() {
       {results && results.length > 0 && !searching && (
         <>
           <h3 className="mt-count">{results.length} provider{results.length === 1 ? '' : 's'} found</h3>
-          <div className="mt-grid fq-grid">
+          <div className="lc-grid">
             {results.map((p) => (
               <ProviderResultCard
                 key={p.userId}

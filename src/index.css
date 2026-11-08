@@ -6585,3 +6585,85 @@ textarea.input { font-family: inherit; }
 }
 @media print { .sb { display: none !important; } }
 .mt-top { display: flex; flex-direction: column; gap: 16px; }
+
+/* ---------- list cards: the Your quotes layout on every list page ---------- */
+.lc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.lc-list { display: flex; flex-direction: column; gap: 12px; }
+.lc { background: #FFFFFF; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.app-pane.is-provider .lc { border-color: var(--cream-line); }
+.lc.is-selected { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow) inset; }
+.lc-grid .lc.is-open { grid-column: 1 / -1; }
+.lc-head { display: flex; align-items: flex-start; gap: 10px; }
+.lc-head-main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.lc-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--navy); overflow-wrap: anywhere; }
+.lc-head-right { flex: none; display: flex; align-items: center; gap: 8px; color: var(--slate); font-size: 13px; }
+.lc-head-right input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--navy); margin: 0; cursor: pointer; }
+.lc-chip { display: inline-block; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.lc-chip.is-neutral { background: var(--canvas); color: var(--slate); }
+.lc-chip.is-good { background: #E6F3EA; color: var(--green); }
+.lc-chip.is-wait { background: #FFF3C4; color: #7A5B00; }
+.lc-chip.is-bad { background: #FBE9EB; color: var(--red); }
+.lc-chip.is-dark { background: var(--navy); color: #FFFFFF; }
+.lc-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--navy); color: #FFFFFF; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.lc-avatar.is-small { width: 32px; height: 32px; font-size: 12.5px; }
+.lc-ref { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--slate); }
+.lc-ref code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; color: #24405F; }
+.lc-ref .mc-chip { font-size: 12.5px; }
+.lc-person { display: flex; align-items: center; gap: 10px; }
+.lc-person-text { display: flex; flex-direction: column; min-width: 0; }
+.lc-person-text b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.lc-person-text span { font-size: 13px; color: var(--slate); }
+.lc-figs { display: grid; gap: 10px; }
+.lc-fig { display: flex; flex-direction: column; gap: 2px; background: #FFFFFF; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.lc-fig.is-hi { background: var(--cream); border-color: var(--cream-line); }
+.lc-fig-label { font-size: 13px; color: var(--slate); }
+.lc-fig-value { font-size: 18px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.lc-fig-value.is-pos { color: var(--green); }
+.lc-fig-value.is-neg { color: var(--red); }
+.lc-fig-note { font-size: 12px; color: var(--slate); }
+.lc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13.5px; color: var(--slate); }
+.lc-meta .mc-tag { font-size: 12.5px; }
+.lc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; border-top: 1px solid #EEF2F6; padding-top: 12px; margin-top: auto; }
+.lc-foot .mc-remove, .lc-foot .mc-save, .lc-foot .mj-link { margin-left: auto; }
+.lc-desc { margin: 0; font-size: 14px; color: #24405F; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lc.is-open .lc-desc { -webkit-line-clamp: unset; }
+.lc-list .lc .lc-figs { max-width: 640px; }
+@media (max-width: 1100px) { .lc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .lc-grid { grid-template-columns: 1fr; }
+  .lc { padding: 14px; }
+  .lc-fig { padding: 8px 10px; }
+  .lc-fig-value { font-size: 16px; }
+}
+/* filter row: no left panel; extra filters sit in the row */
+.mt-search.is-row { grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)) auto; }
+.mt-search .mt-check { display: flex; align-items: center; gap: 8px; height: 42px; font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.mt-search .mt-check input { width: 18px; height: 18px; accent-color: var(--navy); }
+@media (max-width: 1100px) { .mt-search.is-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .mt-search.is-row { grid-template-columns: 1fr 1fr; } }
+.mj-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .mj-controls > :first-child { flex: 1 1 auto; min-width: 0; }
+.lc-foot .mc-btn { padding: 8px 12px; font-size: 13.5px; } .lc-foot .mc-remove { font-size: 13.5px; }
+.lc-meta svg { vertical-align: -2px; margin-right: 6px; }
+.yw-foot.lc-foot { justify-content: space-between; } .yw-foot .pr-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- figures never wrap: amounts stay whole and shrink to fit, labels stay on one line ---------- */
+.nw { white-space: nowrap; }
+.lc-figs { align-items: stretch; }
+.v2-stat, .mp-sum, .adm .stat { container-type: inline-size; min-width: 0; }
+.lc-figs, .yq-figs { container-type: inline-size; }
+.lc-fig, .yq-fig { min-width: 0; }
+.lc-fig-label, .yq-fig-label, .v2-stat > span, .mp-sum span, .stat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* sized from the row's width: three boxes share it */
+.lc-fig-value, .yq-fig-value { white-space: nowrap; overflow-wrap: normal; word-break: normal; font-size: clamp(13px, 5cqi, 18px); }
+.v2-stat > strong, .mp-sum strong, .stat-value { white-space: nowrap; overflow-wrap: normal; font-size: clamp(15px, 11cqi, 22px); }
+.lc-fig-note, .yq-fig-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yq-stage-amt { white-space: normal; }
+.yq-figs, .lc-figs, .v2-stats, .mp-summary { width: 100%; }
+.adm .md-panel { overflow-x: auto; } .adm .md-table td, .adm .admin-table td { white-space: nowrap; } .adm .md-table td:first-child, .adm .admin-table td:first-child { white-space: normal; min-width: 160px; }
+/* Figure rows: labels may wrap at word boundaries, but every box in the row
+   shares the same label / value / note lines (subgrid), so the values line up. */
+.lc-figs, .yq-figs { grid-template-rows: auto auto auto; row-gap: 0; }
+.lc-fig, .yq-fig { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 2px; align-content: start; }
+.lc-fig-label, .yq-fig-label { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
+@media (max-width: 720px) { .yq-figs { grid-template-rows: none; } .yq-fig { grid-row: auto; grid-template-rows: none; display: flex; } }
+.lc-fig-value.is-long, .yq-fig-value.is-long { font-size: clamp(12px, 4.1cqi, 16px); letter-spacing: -0.02em; }

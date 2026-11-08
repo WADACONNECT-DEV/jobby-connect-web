@@ -1,5 +1,6 @@
 import { formatMoney, type ProviderSummary } from '../../types'
 import { initialsOf } from './MateCard'
+import { CardFoot, CardHead, CardMeta, CardRef, Figures, ListCard } from '../ListCard'
 
 /**
  * One search result on Find & Request Quotes (redesign step 4), in the same
@@ -28,64 +29,55 @@ export function ProviderResultCard({ provider: p, selected, blocked, blockedTitl
   const extraSuburbs = suburbs.length - SUBURBS_SHOWN
   const extraServices = services.length - SERVICES_SHOWN
 
+  // The Your quotes card order (owner's direction, 8 Nov 2026). The three
+  // figures are the ones the ranking is built on (UAT Round 4 3.3-3.5).
   return (
-    <article className={`mc mc-grid${selected ? ' is-selected' : ''}`}>
-      <label className="mc-check" title={blocked ? blockedTitle : 'Include in one request'}>
-        <input type="checkbox" checked={selected} disabled={blocked} onChange={onToggle} />
-        <span className="mc-sr">Select {p.businessName}</span>
-      </label>
-
-      <span className="mc-avatar" aria-hidden="true">{initialsOf(p.businessName)}</span>
-
-      <div className="mc-body">
-        <div className="mc-title">
-          <h3>{p.businessName}</h3>
-          {p.promoPoints > 0 && <span className="mc-bonus">+{formatMoney(p.promoPoints)} Mate Points offered</span>}
-        </div>
-
-        {industries.length > 0 && (
-          <div className="mc-chips">
-            {industries.map((industry) => <span className="mc-chip" key={industry}>{industry}</span>)}
-          </div>
+    <ListCard selected={selected} className="mc-card">
+      <CardHead
+        avatar={initialsOf(p.businessName)}
+        title={p.businessName}
+        right={(
+          <label title={blocked ? blockedTitle : 'Include in one request'}>
+            <input type="checkbox" checked={selected} disabled={blocked} onChange={onToggle} />
+            <span className="mc-sr">Select {p.businessName}</span>
+          </label>
         )}
+      />
 
-        {suburbs.length > 0 ? (
-          <div className="mc-line">
+      {industries.length > 0 && (
+        <CardRef>{industries.map((industry) => <span className="mc-chip" key={industry}>{industry}</span>)}</CardRef>
+      )}
+
+      <Figures items={[
+        {
+          label: 'Rating',
+          value: p.reviewCount > 0 ? <>{p.averageRating.toFixed(1)} <StarIcon /></> : '—',
+          note: p.reviewCount > 0 ? `${p.ratingPercent}% · ${p.reviewCount} review${p.reviewCount === 1 ? '' : 's'}` : 'No reviews yet',
+        },
+        { label: 'Jobs done', value: p.jobsCompleted },
+        { label: 'Bonus points', value: p.promoPoints > 0 ? `+${formatMoney(p.promoPoints)}` : '—', tone: p.promoPoints > 0 ? 'pos' : undefined, highlight: p.promoPoints > 0 },
+      ]} />
+
+      {suburbs.length > 0 ? (
+        <CardMeta>
+          <span>
             <PinIcon />
-            <span>
-              {suburbs.slice(0, SUBURBS_SHOWN).join(' · ')}
-              {extraSuburbs > 0 && ` +${extraSuburbs} suburb${extraSuburbs > 1 ? 's' : ''}`}
-            </span>
-          </div>
-        ) : (
-          p.serviceArea && <div className="mc-line"><PinIcon /><span>{p.serviceArea}</span></div>
-        )}
-
-        {services.length > 0 && (
-          <div className="mc-tags">
-            {services.slice(0, SERVICES_SHOWN).map((s) => <span className="mc-tag" key={s}>{s}</span>)}
-            {extraServices > 0 && <span className="mc-tag is-more">+{extraServices} more</span>}
-          </div>
-        )}
-      </div>
-
-      {/* The three figures the ranking is built on, so the order on screen is
-          explainable rather than mysterious (UAT Round 4 3.3-3.5). */}
-      <div className="mc-stats">
-        {p.reviewCount > 0 ? (
-          <span className="mc-rating">
-            <StarIcon />
-            <strong>{p.averageRating.toFixed(1)}</strong>
-            <span className="mc-reviews">({p.reviewCount} review{p.reviewCount === 1 ? '' : 's'})</span>
+            {suburbs.slice(0, SUBURBS_SHOWN).join(' · ')}
+            {extraSuburbs > 0 && ` +${extraSuburbs} suburb${extraSuburbs > 1 ? 's' : ''}`}
           </span>
-        ) : (
-          <span className="mc-reviews">No reviews yet</span>
-        )}
-        {p.reviewCount > 0 && <span className="mc-jobs">{p.ratingPercent}% rating</span>}
-        <span className="mc-jobs">{p.jobsCompleted} job{p.jobsCompleted === 1 ? '' : 's'} completed</span>
-      </div>
+        </CardMeta>
+      ) : (
+        p.serviceArea && <CardMeta><span><PinIcon />{p.serviceArea}</span></CardMeta>
+      )}
 
-      <div className="mc-actions">
+      {services.length > 0 && (
+        <CardMeta>
+          {services.slice(0, SERVICES_SHOWN).map((s) => <span className="mc-tag" key={s}>{s}</span>)}
+          {extraServices > 0 && <span className="mc-tag is-more">+{extraServices} more</span>}
+        </CardMeta>
+      )}
+
+      <CardFoot>
         <button type="button" className={`mc-btn ${selected ? 'is-selected' : 'is-add'}`}
           onClick={onToggle} disabled={blocked} title={blocked ? blockedTitle : undefined} aria-pressed={selected}>
           {selected ? '✓ Selected' : 'Add to request'}
@@ -94,8 +86,8 @@ export function ProviderResultCard({ provider: p, selected, blocked, blockedTitl
         <button type="button" className="mc-remove mc-save" onClick={onSave} disabled={saved}>
           {saved ? '♥ Saved' : '♡ Save as Jobby Mate'}
         </button>
-      </div>
-    </article>
+      </CardFoot>
+    </ListCard>
   )
 }
 
@@ -108,7 +100,7 @@ function PinIcon() {
 }
 function StarIcon() {
   return (
-    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#F7A400">
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="#F7A400" style={{ verticalAlign: '-2px' }}>
       <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z" />
     </svg>
   )

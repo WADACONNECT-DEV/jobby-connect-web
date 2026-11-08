@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { initialsOf } from '../components/mates/MateCard'
 import { StatCards } from '../components/StepLine'
 import { StickyBar } from '../components/StickyBar'
+import { CardFoot, CardGrid, CardHead, CardMeta, CardPerson, CardRef, Figures, ListCard, dayMonth } from '../components/ListCard'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   industryOf,
@@ -65,7 +66,7 @@ export default function ProviderRequests() {
   const [rate, setRate] = useState<QuoteRate | null>(null)
 
   // List or Grid, remembered (redesign step 9). List is the default.
-  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.pipeline.layout', 'list')
+  const [layout, setLayout] = usePersistedValue<'list' | 'grid'>('provider.pipeline.layout', 'grid')
 
   const inTab = rows === null ? null : rows.filter((r) => r.outcome === tab)
 
@@ -503,59 +504,54 @@ export default function ProviderRequests() {
       )}
 
       {list.shown > 0 && (
-        <div className={layout === 'grid' ? 'pr-grid' : 'pr-list'}>
+        <CardGrid layout={layout}>
           {list.visible.map((row) => {
             const canQuote = row.outcome === 'RECEIVED' && row.quoteId === null
             const panelOpen = openFor === row.jobId || declineFor === row.jobId
             const closes = closesIn(row)
             const others = row.targetCount - 1
             return (
-              <article className={`pr-card pr-${layout}${canQuote ? ' is-action' : ''}${panelOpen ? ' is-open' : ''}`} key={row.jobId}>
-                <div className="pr-head">
-                  <span className="mc-avatar pr-avatar" aria-hidden="true">{initialsOf(row.customerName)}</span>
-                  <div className="pr-body">
-                    <h3 className="pr-title">{row.jobTitle}</h3>
-                    <div className="pr-meta">
-                      <span className="mc-chip">{industryOf(row)}</span>
-                      <span className="mc-line"><PinIcon /> {row.suburb}</span>
-                      {row.requestRef && <span className="mj-ref"><code>{row.requestRef}</code></span>}
-                      {closes && <span className={`pr-closes${closes.today ? ' is-today' : ''}`}>{closes.label}</span>}
-                    </div>
-                    <p className="pr-sub">
-                      {row.customerName} · requested {formatDate(row.requestedAt)}
-                      {others > 0 && <> · also sent to {others} other provider{others === 1 ? '' : 's'}</>}
-                      {row.timeFrame && <> · {row.timeFrame}</>}
-                      {canQuote && row.draftSavedAt && <> · <span className="pr-draft">draft saved</span></>}
-                    </p>
-                    {layout === 'list' && <p className="pr-desc">{row.description}</p>}
-                  </div>
+              <ListCard key={row.jobId} open={panelOpen} className="pr-card">
+                <CardHead
+                  title={row.jobTitle}
+                  status={canQuote ? (row.draftSavedAt ? 'Draft saved' : 'New') : row.outcome === 'WON' ? `Won · ${statusLabel(row.jobStatus)}` : row.outcome === 'REPLIED' ? 'Quote sent' : OUTCOME_LABELS[row.outcome]}
+                  tone={canQuote ? 'wait' : row.outcome === 'WON' ? 'good' : row.outcome === 'REPLIED' ? 'dark' : row.outcome === 'DECLINED' || row.outcome === 'LOST' ? 'bad' : 'neutral'}
+                  right={<span>{formatDate(row.requestedAt)}</span>}
+                />
 
-                  <div className="pr-side">
-                    {row.quoteId && (
-                      <div className="pr-amt">
-                        {row.quoteTotal !== null && <span><span className="pr-amt-label">Customer pays</span> {formatMoney(row.quoteTotal)}</span>}
-                        {row.providerPayable !== null && <span className="pr-amt-you"><span className="pr-amt-label">You get</span> {formatMoney(row.providerPayable)}</span>}
-                        {row.quotedAt && <span className="pr-amt-label">Quoted {formatDate(row.quotedAt)}</span>}
-                      </div>
-                    )}
-                    {canQuote ? (
-                      panelOpen ? null : (
-                        <div className="pr-actions">
-                          <button className={layout === 'grid' ? 'pr-link' : 'mt-btn-ghost'} onClick={() => openDecline(row.jobId)}>Decline</button>
-                          <button className="mt-continue" onClick={() => openQuote(row.jobId)}>
-                            {row.draftSavedAt ? 'Continue quote' : 'Send a quote'} →
-                          </button>
-                        </div>
-                      )
-                    ) : row.outcome === 'WON' ? (
-                      <span className="pr-tag is-won">✓ Won · {statusLabel(row.jobStatus)}</span>
-                    ) : row.outcome === 'REPLIED' ? (
-                      <span className="pr-tag is-sent">✓ Quote sent</span>
-                    ) : (
-                      <span className="pr-tag">{OUTCOME_LABELS[row.outcome]}</span>
-                    )}
-                  </div>
-                </div>
+                {row.requestRef && <CardRef><code>{row.requestRef}</code></CardRef>}
+
+                <CardPerson
+                  initials={initialsOf(row.customerName)}
+                  name={row.customerName}
+                  sub={others > 0 ? `Also sent to ${others} other provider${others === 1 ? '' : 's'}` : 'Sent to you only'}
+                />
+
+                <Figures items={row.quoteId ? [
+                  { label: 'Customer pays', value: row.quoteTotal !== null ? formatMoney(row.quoteTotal) : '—' },
+                  { label: 'You get', value: row.providerPayable !== null ? formatMoney(row.providerPayable) : '—', tone: 'pos', highlight: true },
+                  { label: 'Quoted', value: row.quotedAt ? dayMonth(row.quotedAt).value : '—', note: row.quotedAt ? dayMonth(row.quotedAt).note : undefined },
+                ] : [
+                  { label: 'Invited', value: row.targetCount },
+                  { label: 'Closes', value: closes ? (closes.today ? 'Today' : closes.label.replace(/^Closes in /, '')) : '—', highlight: Boolean(canQuote && closes), tone: closes?.today ? 'neg' : undefined },
+                  { label: 'When', value: row.timeFrame ?? '—' },
+                ]} />
+
+                <CardMeta>
+                  <span className="mc-chip">{industryOf(row)}</span>
+                  <span><PinIcon /> {row.suburb}</span>
+                </CardMeta>
+
+                <p className="lc-desc" style={panelOpen ? { WebkitLineClamp: 'unset' } : undefined}>{row.description}</p>
+
+                {canQuote && !panelOpen && (
+                  <CardFoot>
+                    <button className="mt-continue" onClick={() => openQuote(row.jobId)}>
+                      {row.draftSavedAt ? 'Continue quote' : 'Send a quote'} →
+                    </button>
+                    <button className="mt-btn-ghost" onClick={() => openDecline(row.jobId)}>Decline</button>
+                  </CardFoot>
+                )}
 
                 {row.outcome === 'DECLINED' && row.declineMessage && (
                   <div className="mj-declined">
@@ -773,10 +769,10 @@ export default function ProviderRequests() {
                     </p>
                   </form>
                 )}
-              </article>
+              </ListCard>
             )
           })}
-        </div>
+        </CardGrid>
       )}
     </div>
   )

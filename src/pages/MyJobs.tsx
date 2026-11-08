@@ -9,6 +9,7 @@ import { ImageUploader } from '../components/ImageUploader'
 import { initialsOf } from '../components/mates/MateCard'
 import { StatCards, StepLine } from '../components/StepLine'
 import { StickyBar } from '../components/StickyBar'
+import { CardGrid, CardHead, CardMeta, CardPerson, CardRef, Figures, ListCard, dayMonth, type Figure } from '../components/ListCard'
 import { byDate, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import { METHOD_LABELS, industryOf, SIMULATION_LABELS, formatDate, formatDateTime, formatMoney, statusLabel, settlementLabel, type CustomerQuote, type Job, type PaymentCapabilities, type PaymentMethod, type PaymentResult, type PaymentSimulation, type ProgressEntry, type Review, type SettlementStatus, type Wallet } from '../types'
 
@@ -96,6 +97,30 @@ function owingOn(q: CustomerQuote): number {
 }
 
 /**
+ * The three figure boxes on a job card. Before acceptance: how many providers
+ * were asked, how many declined, and when the request closes. After: the
+ * quote total, what is still to pay (cream when something is due), and the
+ * Mate Points the job earns.
+ */
+function figuresFor(job: Job, quotes: CustomerQuote[] | undefined): Figure[] {
+  const accepted = (quotes ?? []).find((q) => q.status === 'ACCEPTED')
+  if (accepted) {
+    const due = owingOn(accepted)
+    return [
+      { label: 'Quote total', value: formatMoney(accepted.total), note: accepted.paymentType === 'STAGED' ? 'Paid in stages' : undefined },
+      { label: due > 0 ? 'To pay' : 'Paid', value: due > 0 ? formatMoney(due) : '✓', tone: due > 0 ? undefined : 'pos', highlight: due > 0 },
+      { label: 'Mate Points', value: formatMoney(accepted.pointsEarned) },
+    ]
+  }
+  const targets = job.targetProviders ?? []
+  return [
+    { label: 'Providers asked', value: targets.length || job.targetCount },
+    { label: 'Declined', value: targets.filter((t) => t.status === 'DECLINED').length },
+    { label: job.status === 'QUOTED' ? 'Quotes' : 'Closes', value: job.status === 'QUOTED' ? 'Ready' : job.expiresAt ? dayMonth(job.expiresAt).value : '—', note: job.status !== 'QUOTED' && job.expiresAt ? dayMonth(job.expiresAt).note : undefined, highlight: job.status === 'QUOTED' },
+  ]
+}
+
+/**
  * How many of the five steps (Quote accepted → Started → Marked complete →
  * Paid → Reviewed) a job has passed, from what the page already holds.
  */
@@ -150,6 +175,7 @@ export default function MyJobs() {
   // Which sub-page is open survives leaving the tab and coming back
   // (Round 1 §5.3, restated in Round 7 check 3.3).
   const [tab, setTab] = usePersistedValue<JobsTab>('customer.jobs.tab', 'OPEN')
+  const [layout, setLayout] = usePersistedValue<'grid' | 'list'>('customer.jobs.layout', 'grid')
 
   const inTab = (jobs ?? []).filter((job) => subPageOf(job, quotesByJob[job.id]) === tab)
   const countOf = (key: JobsTab) =>
@@ -448,6 +474,10 @@ export default function MyJobs() {
       {jobs && jobs.length > 0 && inTab.length > 0 && (
         <div className="mj-controls">
           <ListControls list={list} searchPlaceholder="Search your requests" countLabel="requests" />
+          <div className="mt-view" role="group" aria-label="View">
+            <button type="button" className={layout === 'list' ? 'is-on' : ''} aria-pressed={layout === 'list'} onClick={() => setLayout('list')}>List</button>
+            <button type="button" className={layout === 'grid' ? 'is-on' : ''} aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>Grid</button>
+          </div>
         </div>
       )}
       </div>
@@ -478,7 +508,7 @@ export default function MyJobs() {
       )}
 
       {jobs && list.shown > 0 && (
-        <div className="mj-list">
+        <CardGrid layout={layout}>
           {list.visible.map((job) => {
             const quotes = quotesByJob[job.id]
             const isOpen = list.isExpanded(job.id)
@@ -493,29 +523,44 @@ export default function MyJobs() {
             const descOpen = fullDesc.has(job.id)
             const longDesc = job.description.length > 160
             return (
-              <article className="mj-card" key={job.id}>
-                <div className="mj-top">
-                  <h3 className="mj-title">{job.title}</h3>
-                  <span className={`mj-status is-${group.toLowerCase()}`}>{statusLabel(job.status)}</span>
-                  <span className="mj-date">{formatDate(job.createdAt)}</span>
-                </div>
+              <ListCard key={job.id} open={isOpen || reviewOpenFor === job.id || historyFor === job.id || descOpen} className="mj-card">
+                <CardHead
+                  title={job.title}
+                  status={statusLabel(job.status)}
+                  tone={group === 'COMPLETED' ? 'good' : group === 'NOT_PROCEEDED' ? 'neutral' : group === 'IN_PROGRESS' ? 'dark' : 'wait'}
+                  right={<span>{formatDate(job.createdAt)}</span>}
+                />
 
-                <div className="mj-meta">
+                {/* The Quote Request ID for each invited provider (UAT Round 4
+                    8.4) - exactly as issued, the reference to quote when asking
+                    about this job. */}
+                {refs.length > 0 && (
+                  <CardRef>
+                    {refs.map((t) => (
+                      <span key={t.userId} title={t.name}><code>{t.requestRef}</code>{refs.length > 1 && <> {t.name}</>}</span>
+                    ))}
+                  </CardRef>
+                )}
+
+                {job.providerName && job.status !== 'OPEN' ? (
+                  <CardPerson initials={initialsOf(job.providerName)} name={job.providerName} sub="Your provider" />
+                ) : (
+                  <CardPerson
+                    initials={String(targets.length || job.targetCount)}
+                    name={targets.length > 0 ? targets.map((t) => t.name).join(', ') : `${job.targetCount} provider${job.targetCount > 1 ? 's' : ''}`}
+                    sub={job.status === 'OPEN' ? 'Sent to · awaiting quotes' : job.status === 'QUOTED' ? 'Sent to · quotes in' : 'Sent to'}
+                  />
+                )}
+
+                <Figures items={figuresFor(job, quotes)} />
+
+                <CardMeta>
                   <span className="mc-chip">{industryOf(job)}</span>
                   <span className="mc-line"><PinIcon /> {job.suburb}</span>
-                  {job.timeFrame && <span className="mj-muted">{job.timeFrame}</span>}
-                  {/* The Quote Request ID for each invited provider (UAT Round 4
-                      8.4) - exactly as issued, the reference to quote when asking
-                      about this job. */}
-                  {refs.map((t) => (
-                    <span className="mj-ref" key={t.userId} title={t.name}>
-                      <code>{t.requestRef}</code>
-                      {refs.length > 1 && <span className="mj-ref-name">{t.name}</span>}
-                    </span>
-                  ))}
-                </div>
+                  {job.timeFrame && <span>{job.timeFrame}</span>}
+                </CardMeta>
 
-                <p className={`mj-desc${descOpen || !longDesc ? '' : ' is-clamped'}`}>{job.description}</p>
+                <p className={`lc-desc${descOpen ? ' is-full' : ''}`} style={descOpen ? { WebkitLineClamp: 'unset' } : undefined}>{job.description}</p>
                 {longDesc && (
                   <button type="button" className="mj-link" onClick={() => setFullDesc((prev) => {
                     const next = new Set(prev)
@@ -524,24 +569,6 @@ export default function MyJobs() {
                   })}>
                     {descOpen ? 'Show less' : 'Show more'}
                   </button>
-                )}
-
-                {job.status === 'OPEN' && (
-                  <div className="mj-sent">
-                    <span className="mj-label">Sent to</span>
-                    {targets.length > 0 ? (
-                      <span className="mj-people">
-                        {targets.map((t) => (
-                          <span className={`mj-person${t.status === 'DECLINED' ? ' is-declined' : ''}`} key={t.userId}>
-                            <span className="mj-initials" aria-hidden="true">{initialsOf(t.name)}</span>{t.name}
-                          </span>
-                        ))}
-                      </span>
-                    ) : (
-                      <span>{job.targetCount} provider{job.targetCount > 1 ? 's' : ''}</span>
-                    )}
-                    <span className="mj-muted">· awaiting quotes</span>
-                  </div>
                 )}
 
                 {/* A provider who declined, with their reason, so the customer
@@ -555,17 +582,6 @@ export default function MyJobs() {
                     {t.declineMessage && <p>{t.declineMessage}</p>}
                   </div>
                 ))}
-
-                {/* Photos the customer sent with the request; editable while it's still open. */}
-                <div className="mj-photos">
-                  <ImageUploader jobId={job.id} kind="REQUEST" canUpload={job.status === 'OPEN'} label="Photos you sent" />
-                  {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
-                    <ImageUploader jobId={job.id} kind="PROGRESS" label="Progress photos" />
-                  )}
-                  {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
-                    <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
-                  )}
-                </div>
 
                 {job.status !== 'OPEN' && job.status !== 'QUOTED' && (
                   <div className="mj-steps">
@@ -598,12 +614,6 @@ export default function MyJobs() {
                   </div>
                 )}
 
-                {job.providerName && job.status !== 'OPEN' && (
-                  <div className="mj-assigned">
-                    <span className="mj-initials" aria-hidden="true">{initialsOf(job.providerName)}</span>
-                    <span>Assigned to <strong>{job.providerName}</strong></span>
-                  </div>
-                )}
 
                 {job.status !== 'OPEN' && quotes && quotes.length > 0
                   && !quotes.some(owes)
@@ -635,11 +645,11 @@ export default function MyJobs() {
                   </div>
                 )}
 
-                <div className="mj-foot">
-                  <button className="mc-btn is-ghost" onClick={() => toggleQuotes(job.id)}>
+                <div className="mj-foot lc-foot">
+                  <button className={`mc-btn ${job.status === 'QUOTED' && !isOpen ? 'is-selected' : 'is-ghost'}`} onClick={() => toggleQuotes(job.id)}>
                     {isOpen
-                      ? (job.status === 'OPEN' ? 'Hide quotes' : 'Hide quote')
-                      : (job.status === 'OPEN' ? 'View quotes' : 'View quote')}
+                      ? (job.status === 'OPEN' || job.status === 'QUOTED' ? 'Hide quotes' : 'Hide details')
+                      : (job.status === 'OPEN' || job.status === 'QUOTED' ? 'View quotes' : 'View quote & photos')}
                   </button>
                   {/* No Cancel here. UAT Round 7 §9: Cancel discards unsaved
                       form edits and nothing else, on this screen and on the
@@ -671,6 +681,19 @@ export default function MyJobs() {
                       <button type="submit" className="mc-btn is-selected" disabled={busy}>{busy ? 'Submitting…' : (RATING_LABELS[rating] ?? 'Submit review')}</button>
                     </div>
                   </form>
+                )}
+
+                {isOpen && (
+                  /* Photos the customer sent with the request; editable while it's still open. */
+                  <div className="mj-photos">
+                    <ImageUploader jobId={job.id} kind="REQUEST" canUpload={job.status === 'OPEN'} label="Photos you sent" />
+                    {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                      <ImageUploader jobId={job.id} kind="PROGRESS" label="Progress photos" />
+                    )}
+                    {(job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') && (
+                      <ImageUploader jobId={job.id} kind="COMPLETION" label="Completion photos" />
+                    )}
+                  </div>
                 )}
 
                 {isOpen && (
@@ -781,10 +804,10 @@ export default function MyJobs() {
                     ))}
                   </div>
                 )}
-              </article>
+              </ListCard>
             )
           })}
-        </div>
+        </CardGrid>
       )}
     </div>
   )

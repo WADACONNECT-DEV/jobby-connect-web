@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { MateCard } from '../components/mates/MateCard'
+import { CardGrid } from '../components/ListCard'
 import { StickyBar } from '../components/StickyBar'
 import { byDate, byNumber, byText, useListView, usePersistedValue, type FilterOption } from '../listView'
 import { useMaxProvidersPerRequest } from '../platform'
@@ -41,7 +42,6 @@ export default function Mates() {
   const navigate = useNavigate()
   const [mates, setMates] = useState<Mate[] | null>(null)
   const [error, setError] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const resultsRef = useRef<HTMLHeadingElement | null>(null)
 
   // Grid is the default: the first screen should show several providers at a
@@ -151,7 +151,6 @@ export default function Mates() {
   const atCap = selected.length >= maxProviders
   const capTitle = `You can request up to ${maxProviders} providers at once`
   const hasMates = mates !== null && mates.length > 0
-  const activeFilterCount = ['rating', 'bonus'].filter((k) => filterValue(k)).length
 
   return (
     <div className="mt">
@@ -182,7 +181,7 @@ export default function Mates() {
       {hasMates && (
         <>
           {/* Search row */}
-          <form className="mt-search" role="search" ref={topBlock} onSubmit={(e) => { e.preventDefault(); goToResults() }}>
+          <form className="mt-search is-row" role="search" ref={topBlock} onSubmit={(e) => { e.preventDefault(); goToResults() }}>
             <label className="mt-field is-wide">
               <span>Search your mates</span>
               <span className="mt-input">
@@ -212,7 +211,18 @@ export default function Mates() {
                 {optionsFor('suburb').map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
-            <button type="submit" className="mt-search-btn"><SearchIcon light /> Search</button>
+            <label className="mt-field">
+              <span>Rating</span>
+              <select value={filterValue('rating')} onChange={(e) => list.setFilter('rating', e.target.value)}>
+                <option value="">Any rating</option>
+                {RATING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="mt-check">
+              <input type="checkbox" checked={filterValue('bonus') === 'yes'}
+                onChange={(e) => list.setFilter('bonus', e.target.checked ? 'yes' : '')} />
+              Bonus points only
+            </label>
           </form>
 
           <StickyBar anchor={topBlock}>
@@ -230,51 +240,6 @@ export default function Mates() {
             <span className="sb-count">{list.shown === list.total ? `${list.total} saved mate${list.total === 1 ? '' : 's'}` : `${list.shown} of ${list.total} saved mates`}{selected.length > 0 ? ` · ${selected.length} selected` : ''}</span>
           </StickyBar>
 
-          <button type="button" className="mt-filters-toggle" aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((o) => !o)}>
-            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </button>
-
-          <div className="mt-body">
-            {/* Left panel */}
-            <aside className={`mt-side${filtersOpen ? ' is-open' : ''}`} aria-label="Refine your mates">
-              <div className="mt-side-head">
-                <h3>Refine your mates</h3>
-                <button type="button" className="mt-reset" onClick={list.clear}>Reset</button>
-              </div>
-
-              <fieldset className="mt-group">
-                <legend>Rating</legend>
-                <label className="mt-radio">
-                  <input type="radio" name="mt-rating" checked={!filterValue('rating')}
-                    onChange={() => list.setFilter('rating', '')} />
-                  Any rating
-                </label>
-                {RATING_OPTIONS.map((o) => (
-                  <label className="mt-radio" key={o.value}>
-                    <input type="radio" name="mt-rating" checked={filterValue('rating') === o.value}
-                      onChange={() => list.setFilter('rating', o.value)} />
-                    {o.label}
-                  </label>
-                ))}
-              </fieldset>
-
-              <fieldset className="mt-group">
-                <legend>Only show</legend>
-                <label className="mt-radio">
-                  <input type="checkbox" checked={filterValue('bonus') === 'yes'}
-                    onChange={(e) => list.setFilter('bonus', e.target.checked ? 'yes' : '')} />
-                  Offering bonus points
-                </label>
-              </fieldset>
-
-              <div className="mt-note">
-                <HeartBlueIcon />
-                <span><strong>Your saved providers</strong><br />Keep your favourites close.</span>
-              </div>
-            </aside>
-
-            {/* Main column */}
             <section className="mt-main">
               {selected.length > 0 && (
                 <div className="mt-selbar" role="status">
@@ -317,7 +282,7 @@ export default function Mates() {
                   <button className="mt-btn-ghost" onClick={list.clear}>Clear filters</button>
                 </div>
               ) : (
-                <div className={layout === 'grid' ? 'mt-grid' : 'mt-list'}>
+                <CardGrid layout={layout}>
                   {list.visible.map((m) => {
                     const isSelected = selected.includes(m.providerUserId)
                     return (
@@ -335,7 +300,7 @@ export default function Mates() {
                       />
                     )
                   })}
-                </div>
+                </CardGrid>
               )}
 
               <div className="mt-more">
@@ -346,7 +311,6 @@ export default function Mates() {
                   </button></span>
               </div>
             </section>
-          </div>
         </>
       )}
     </div>
@@ -394,12 +358,5 @@ function GridIcon() {
     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="7" rx="1" />
       <rect x="4" y="13" width="7" height="7" rx="1" /><rect x="13" y="13" width="7" height="7" rx="1" /></svg>
-  )
-}
-function HeartBlueIcon() {
-  return (
-    <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="#2F7BE0">
-      <path d="M12 21l-8.4-8.1a5.3 5.3 0 0 1 7.5-7.5L12 6.3l.9-.9a5.3 5.3 0 0 1 7.5 7.5z" />
-    </svg>
   )
 }

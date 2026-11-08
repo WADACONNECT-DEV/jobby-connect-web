@@ -406,17 +406,17 @@ export default function MyQuotes() {
 
                 <div className="yq-figs">
                   <div className="yq-fig">
-                    <span className="yq-fig-label">Customer pays</span>
-                    <span className="yq-fig-value">{formatMoney(q.customerTotal)}</span>
+                    <span className="yq-fig-label" title="Customer pays">Customer pays</span>
+                    <span className={`yq-fig-value${formatMoney(q.customerTotal).length >= 10 ? ' is-long' : ''}`}>{formatMoney(q.customerTotal)}</span>
                   </div>
                   <div className="yq-fig">
-                    <span className="yq-fig-label">Platform charges</span>
-                    <span className="yq-fig-value">{formatMoney(charges)}</span>
+                    <span className="yq-fig-label" title="Platform charges">Platform charges</span>
+                    <span className={`yq-fig-value${formatMoney(charges).length >= 10 ? ' is-long' : ''}`}>{formatMoney(charges)}</span>
                     <span className="yq-fig-note">incl GST {formatMoney(chargesGst)}</span>
                   </div>
                   <div className="yq-fig is-you">
-                    <span className="yq-fig-label">You get paid</span>
-                    <span className="yq-fig-value">{formatMoney(q.providerPayable)}</span>
+                    <span className="yq-fig-label" title="You get paid">You get paid</span>
+                    <span className={`yq-fig-value${formatMoney(q.providerPayable).length >= 10 ? ' is-long' : ''}`}>{formatMoney(q.providerPayable)}</span>
                   </div>
                 </div>
 
@@ -436,7 +436,7 @@ export default function MyQuotes() {
                       <li className="yq-stage" key={st.id ?? st.name}>
                         <div className="yq-stage-head">
                           <span className="yq-stage-name">{i + 1}. {st.name}{st.completion ? ' (auto)' : ''} · {st.percent}%</span>
-                          <span className="yq-stage-amt">{formatMoney(st.customerTotal)} <span className="pr-amt-label">· you get {formatMoney(st.providerPayable)}</span></span>
+                          <span className="yq-stage-amt"><span className="nw">{formatMoney(st.customerTotal)}</span> <span className="pr-amt-label nw">· you get {formatMoney(st.providerPayable)}</span></span>
                         </div>
                         <StageTimeline st={st.settlementStatus} />
                         {q.status === 'ACCEPTED' && st.id && (st.settlementStatus === 'PENDING_COMPLETION' || st.settlementStatus === 'PENDING_REVIEW') && (
