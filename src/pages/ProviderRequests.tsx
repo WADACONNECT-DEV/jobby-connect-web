@@ -5,7 +5,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { initialsOf } from '../components/mates/MateCard'
 import { StatCards } from '../components/StepLine'
 import { StickyBar } from '../components/StickyBar'
-import { CardFoot, CardGrid, CardHead, CardMeta, CardPerson, CardRef, Figures, ListCard, dayMonth } from '../components/ListCard'
+import { CardFoot, CardGrid, CardHead, CardMeta, CardPerson, CardRef, Figures, ListCard, dayMonth, shortTimeFrame } from '../components/ListCard'
 import { byDate, byNumber, byText, optionsFrom, useListView, usePersistedValue } from '../listView'
 import {
   industryOf,
@@ -534,7 +534,7 @@ export default function ProviderRequests() {
                 ] : [
                   { label: 'Invited', value: row.targetCount },
                   { label: 'Closes', value: closes ? (closes.today ? 'Today' : closes.label.replace(/^Closes in /, '')) : '—', highlight: Boolean(canQuote && closes), tone: closes?.today ? 'neg' : undefined },
-                  { label: 'When', value: row.timeFrame ?? '—' },
+                  { label: 'When', value: shortTimeFrame(row.timeFrame).value, title: shortTimeFrame(row.timeFrame).title },
                 ]} />
 
                 <CardMeta>

@@ -6667,3 +6667,6 @@ textarea.input { font-family: inherit; }
 .lc-fig-label, .yq-fig-label { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
 @media (max-width: 720px) { .yq-figs { grid-template-rows: none; } .yq-fig { grid-row: auto; grid-template-rows: none; display: flex; } }
 .lc-fig-value.is-long, .yq-fig-value.is-long { font-size: clamp(12px, 4.1cqi, 16px); letter-spacing: -0.02em; }
+/* words in a figure box wrap at spaces; numbers stay on one line */
+.lc-fig-value.is-words { white-space: normal; overflow-wrap: break-word; line-height: 1.2; letter-spacing: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

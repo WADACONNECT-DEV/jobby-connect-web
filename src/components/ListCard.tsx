@@ -67,6 +67,8 @@ export interface Figure {
   tone?: 'pos' | 'neg'
   /** The box that matters most on the card (cream). */
   highlight?: boolean
+  /** Full text on hover when the value is a short form ('1 month' for 'Within a month'). */
+  title?: string
 }
 
 /** Two to three figure boxes; the highlighted one is the figure that matters most. */
@@ -76,7 +78,8 @@ export function Figures({ items }: { items: Figure[] }) {
       {items.map((f) => (
         <div key={f.label} className={`lc-fig${f.highlight ? ' is-hi' : ''}`}>
           <span className="lc-fig-label" title={f.label}>{f.label}</span>
-          <span className={`lc-fig-value${f.tone === 'pos' ? ' is-pos' : f.tone === 'neg' ? ' is-neg' : ''}${longValue(f.value) ? ' is-long' : ''}`}>{f.value}</span>
+          <span className={`lc-fig-value${f.tone === 'pos' ? ' is-pos' : f.tone === 'neg' ? ' is-neg' : ''}${isWords(f.value) ? ' is-words' : longValue(f.value) ? ' is-long' : ''}`}
+            title={f.title ?? (isWords(f.value) ? String(f.value) : undefined)}>{f.value}</span>
           {f.note && <span className="lc-fig-note">{f.note}</span>}
         </div>
       ))}
@@ -106,6 +109,32 @@ function sentence(text: string): string {
   if (text !== text.toUpperCase()) return text
   const lower = text.toLowerCase()
   return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
+/**
+ * A value made of words ("Within a month", a customer's own wording) may wrap
+ * at a space, up to two lines (the full text shows on hover); amounts, counts
+ * and dates ("$4,431.39", "3", "29 Sep") never wrap.
+ */
+export function isWords(value: ReactNode): boolean {
+  if (typeof value !== 'string') return false
+  return /[A-Za-z]{3,}/.test(value.replace(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/, '')) && /\s/.test(value.trim())
+}
+
+/** The customer's time frame in a figure box: the standard choices shortened, anything else as typed. */
+export function shortTimeFrame(text: string | null | undefined): { value: string; title?: string } {
+  if (!text) return { value: '—' }
+  const map: Record<string, string> = {
+    'as soon as possible': 'ASAP',
+    'within a week': '1 week',
+    'within 2 weeks': '2 weeks',
+    'within two weeks': '2 weeks',
+    'within a month': '1 month',
+    'flexible': 'Flexible',
+    'this week': 'This week',
+  }
+  const short = map[text.trim().toLowerCase()]
+  return short ? { value: short, title: short === text ? undefined : text } : { value: text }
 }
 
 /** Amounts of ten characters or more ("$13,170.27") get a smaller size so they still fit one line. */
