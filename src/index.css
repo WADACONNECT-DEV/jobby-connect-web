@@ -3045,10 +3045,10 @@ textarea.input { font-family: inherit; }
   --lp-nav-bg: #FFFFFF;
   --lp-nav-fg: #0F2A4A;
   --lp-link: #24405F;
-  --lp-pill-bg: #EAF4FC;
+  --lp-pill-bg: #E3F2FB;
   --lp-pill-on-bg: #0F2A4A;
   --lp-pill-on-fg: #FFFFFF;
-  --lp-hero-bg: #EAF4FC;
+  --lp-hero-bg: #E3F2FB;
   --lp-hero-fg: #0F2A4A;
   --lp-eyebrow: #24405F;
   --lp-lead: #3E5571;
@@ -3056,15 +3056,15 @@ textarea.input { font-family: inherit; }
   --lp-show-shadow: 0 14px 40px rgba(15, 42, 74, 0.10);
   --lp-ctrl-border: #D6E0EA;
   --lp-seg-todo: #D6E0EA;
-  --lp-tile: #F1F7FC;
+  --lp-tile: #E8F3FB;
   --lp-num-bg: #F7C21B;
   --lp-num-fg: #0F2A4A;
   --lp-photo-bg: #D7E8F6;
   --lp-tag-bg: #FFFFFF;
   --lp-tag-fg: #0F2A4A;
-  --lp-card-bg: #F1F7FC;
+  --lp-card-bg: #E5F2FB;
   --lp-feat-card-bg: #FFFFFF;
-  --lp-strip-bg: #EAF4FC;
+  --lp-strip-bg: #E4F2FB;
   --lp-ghost-border: #5D7899;
   --lp-ghost-fg: #FFFFFF;
 }
